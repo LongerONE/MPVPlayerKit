@@ -3,6 +3,29 @@ import UIKit
 @testable import MPVPlayerKit
 
 final class MPVPlayerModelTests: XCTestCase {
+    func testSourceFilesStayWithinMaintenanceLineLimit() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let sourcesURL = packageRoot.appendingPathComponent("Sources/MPVPlayerKit")
+        let sourceFiles = try FileManager.default.contentsOfDirectory(
+            at: sourcesURL,
+            includingPropertiesForKeys: nil
+        ).filter { $0.pathExtension == "swift" }
+
+        XCTAssertFalse(sourceFiles.isEmpty)
+        for sourceFile in sourceFiles {
+            let source = try String(contentsOf: sourceFile, encoding: .utf8)
+            let lineCount = source.split(separator: "\n", omittingEmptySubsequences: false).count
+            XCTAssertLessThanOrEqual(
+                lineCount,
+                600,
+                "\(sourceFile.lastPathComponent) has \(lineCount) lines"
+            )
+        }
+    }
+
     func testConfigurationCreatesBridgeValues() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let configuration = MPVPlayerConfiguration(
