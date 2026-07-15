@@ -59,7 +59,7 @@ let playerViewController = MPVQuickPlayerViewController(url: videoURL)
 present(playerViewController, animated: true)
 ```
 
-The quick interface includes play/pause, seeking, time display, audio selection and subtitle selection. It also supports full-screen pan gestures: horizontal seeking, brightness on the left half and system volume on the right half. Each gesture can be disabled when the host app owns that interaction:
+The quick interface includes play/pause, seeking, time display, audio selection, subtitle selection and a centered loading indicator while the video is buffering. It also supports full-screen pan gestures: horizontal seeking, brightness on the left half and system volume on the right half. Each gesture can be disabled when the host app owns that interaction:
 
 ```swift
 playerViewController.gestureOptions = [.seeking, .volume]

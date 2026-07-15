@@ -28,6 +28,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     private let timeLabel = UILabel()
     private let audioButton = UIButton(type: .system)
     private let subtitleButton = UIButton(type: .system)
+    private let loadingIndicator = UIActivityIndicatorView(style: .large)
     private let systemVolumeView = MPVolumeView(frame: .zero)
     private let gestureHUD = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterialDark))
     private let gestureHUDIcon = UIImageView()
@@ -86,6 +87,12 @@ public final class MPVQuickPlayerViewController: UIViewController {
         player.playbackView.backgroundColor = .black
         player.contentMode = .scaleAspectFit
         view.addSubview(player.playbackView)
+
+        loadingIndicator.color = .white
+        loadingIndicator.hidesWhenStopped = true
+        loadingIndicator.accessibilityLabel = "Loading video"
+        loadingIndicator.accessibilityIdentifier = "MPVQuickPlayer.loadingIndicator"
+        view.addSubview(loadingIndicator)
 
         controlsView.backgroundColor = UIColor.black.withAlphaComponent(0.72)
         view.addSubview(controlsView)
@@ -151,6 +158,9 @@ public final class MPVQuickPlayerViewController: UIViewController {
     private func configureLayout() {
         player.playbackView.snp.makeConstraints { make in
             make.edges.equalToSuperview()
+        }
+        loadingIndicator.snp.makeConstraints { make in
+            make.center.equalToSuperview()
         }
         controlsView.snp.makeConstraints { make in
             make.leading.trailing.bottom.equalToSuperview()
@@ -410,6 +420,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
         return min(max(startValue - translationY / effectiveHeight, 0), 1)
     }
 
+    static func shouldShowLoading(for state: MPVPlaybackState) -> Bool {
+        state == .buffering
+    }
+
     private static func timeDescription(currentTime: TimeInterval, duration: TimeInterval) -> String {
         "\(clockDescription(currentTime)) / \(clockDescription(duration))"
     }
@@ -442,6 +456,11 @@ extension MPVQuickPlayerViewController: MPVPlayerDelegate {
     public func player(_ player: MPVPlayer, didChangeState state: MPVPlaybackState) {
         let isPlaying = state == .buffering || state == .readyToPlay || state == .bufferFinished
         playButton.setImage(UIImage(systemName: isPlaying ? "pause.fill" : "play.fill"), for: .normal)
+        if Self.shouldShowLoading(for: state) {
+            loadingIndicator.startAnimating()
+        } else {
+            loadingIndicator.stopAnimating()
+        }
     }
 
     public func player(

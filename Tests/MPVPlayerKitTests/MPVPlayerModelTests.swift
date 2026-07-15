@@ -99,4 +99,13 @@ final class MPVPlayerModelTests: XCTestCase {
             accuracy: 0.001
         )
     }
+
+    func testQuickPlayerOnlyShowsLoadingIndicatorWhileBuffering() {
+        XCTAssertTrue(MPVQuickPlayerViewController.shouldShowLoading(for: .buffering))
+        XCTAssertFalse(MPVQuickPlayerViewController.shouldShowLoading(for: .readyToPlay))
+        XCTAssertFalse(MPVQuickPlayerViewController.shouldShowLoading(for: .bufferFinished))
+        XCTAssertFalse(MPVQuickPlayerViewController.shouldShowLoading(for: .paused))
+        XCTAssertFalse(MPVQuickPlayerViewController.shouldShowLoading(for: .playedToTheEnd))
+        XCTAssertFalse(MPVQuickPlayerViewController.shouldShowLoading(for: .error))
+    }
 }
