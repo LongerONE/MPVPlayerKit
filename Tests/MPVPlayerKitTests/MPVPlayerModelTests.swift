@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 @testable import MPVPlayerKit
 
 final class MPVPlayerModelTests: XCTestCase {
@@ -153,5 +154,77 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertFalse(MPVQuickPlayerViewController.shouldShowLoading(for: .paused))
         XCTAssertFalse(MPVQuickPlayerViewController.shouldShowLoading(for: .playedToTheEnd))
         XCTAssertFalse(MPVQuickPlayerViewController.shouldShowLoading(for: .error))
+    }
+
+    func testQuickPlayerExposesConfigurationAndRuntimeSettings() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
+        let controller = MPVQuickPlayerViewController(
+            configuration: MPVPlayerConfiguration(
+                url: url,
+                videoQuality: .highQuality,
+                debandEnabled: true,
+                interpolationOptions: .smooth
+            ),
+            autoplay: false
+        )
+
+        XCTAssertEqual(controller.videoQuality, .highQuality)
+        XCTAssertTrue(controller.debandEnabled)
+        XCTAssertEqual(controller.interpolationOptions, .smooth)
+
+        controller.setPlaybackRate(1.5)
+        controller.setVideoQuality(.powerSaving)
+        controller.setDebandEnabled(false)
+        controller.setInterpolationOptions(.highQuality)
+        controller.setSubtitleDelay(90)
+        controller.setSubtitleStyle(.highContrast)
+
+        XCTAssertEqual(controller.playbackRate, 1.5)
+        XCTAssertEqual(controller.videoQuality, .powerSaving)
+        XCTAssertFalse(controller.debandEnabled)
+        XCTAssertEqual(controller.interpolationOptions, .highQuality)
+        XCTAssertEqual(controller.subtitleDelay, 60)
+        XCTAssertEqual(controller.subtitleStyle, .highContrast)
+    }
+
+    func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
+        let style = MPVSubtitleStyle(
+            fontSize: 200,
+            bold: true,
+            outlineSize: -1,
+            shadowOffset: 20,
+            bottomOffset: -20
+        )
+
+        XCTAssertEqual(style.fontSize, 120)
+        XCTAssertTrue(style.bold)
+        XCTAssertEqual(style.outlineSize, 0)
+        XCTAssertEqual(style.shadowOffset, 10)
+        XCTAssertEqual(style.bottomOffset, 0)
+        XCTAssertEqual((style.bridgeDictionary["fontSize"] as? NSNumber)?.doubleValue, 120)
+        XCTAssertEqual((style.bridgeDictionary["bold"] as? NSNumber)?.boolValue, true)
+    }
+
+    func testQuickPlayerUsesAvailableSFSymbolControls() {
+        [
+            "xmark",
+            "play.fill",
+            "pause.fill",
+            "film",
+            "waveform",
+            "captions.bubble",
+            "gearshape",
+            "sun.max.fill",
+            "speaker.wave.2.fill",
+        ].forEach { symbol in
+            XCTAssertNotNil(UIImage(systemName: symbol), symbol)
+        }
+    }
+
+    func testQuickPlayerSettingTitlesAreStable() {
+        XCTAssertEqual(MPVQuickPlayerViewController.rateTitle(1.25), "1.25×")
+        XCTAssertEqual(MPVQuickPlayerViewController.videoQualityTitle(.balanced), "Balanced")
+        XCTAssertEqual(MPVQuickPlayerViewController.interpolationTitle(.highQuality), "High Quality")
+        XCTAssertEqual(MPVQuickPlayerViewController.delayTitle(-0.5), "-0.5s")
     }
 }

@@ -105,6 +105,60 @@ public struct MPVInterpolationOptions: Equatable, Sendable {
     }
 }
 
+public struct MPVSubtitleStyle: Equatable, Sendable {
+    public var fontSize: Double
+    public var bold: Bool
+    public var textColor: String
+    public var outlineSize: Double
+    public var outlineColor: String
+    public var shadowOffset: Double
+    public var backgroundColor: String
+    public var bottomOffset: Double
+
+    public init(
+        fontSize: Double = 38,
+        bold: Bool = false,
+        textColor: String = "#FFFFFFFF",
+        outlineSize: Double = 0,
+        outlineColor: String = "#FF000000",
+        shadowOffset: Double = 0,
+        backgroundColor: String = "#00000000",
+        bottomOffset: Double = 34
+    ) {
+        self.fontSize = fontSize.isFinite ? min(max(fontSize, 8), 120) : 38
+        self.bold = bold
+        self.textColor = textColor
+        self.outlineSize = outlineSize.isFinite ? min(max(outlineSize, 0), 10) : 0
+        self.outlineColor = outlineColor
+        self.shadowOffset = shadowOffset.isFinite ? min(max(shadowOffset, 0), 10) : 0
+        self.backgroundColor = backgroundColor
+        self.bottomOffset = bottomOffset.isFinite ? min(max(bottomOffset, 0), 300) : 34
+    }
+
+    public static let defaultStyle = MPVSubtitleStyle()
+    public static let large = MPVSubtitleStyle(fontSize: 52, outlineSize: 1.5)
+    public static let highContrast = MPVSubtitleStyle(
+        fontSize: 42,
+        bold: true,
+        outlineSize: 2,
+        shadowOffset: 1,
+        backgroundColor: "#80000000"
+    )
+
+    var bridgeDictionary: NSDictionary {
+        [
+            "fontSize": NSNumber(value: fontSize),
+            "bold": NSNumber(value: bold),
+            "textColor": textColor,
+            "outlineSize": NSNumber(value: outlineSize),
+            "outlineColor": outlineColor,
+            "shadowOffset": NSNumber(value: shadowOffset),
+            "backgroundColor": backgroundColor,
+            "bottomOffset": NSNumber(value: bottomOffset),
+        ] as NSDictionary
+    }
+}
+
 private extension MPVInterpolationQuality {
     var defaultTemporalScaler: MPVTemporalScaler {
         switch self {
@@ -290,6 +344,10 @@ public final class MPVPlayer: NSObject {
         playbackView.updatePlayRate(NSNumber(value: rate))
     }
 
+    public func updateVideoQuality(_ quality: MPVVideoQuality) {
+        playbackView.updateVideoQuality(NSNumber(value: quality.rawValue))
+    }
+
     public func updateVideoRenderOptions(
         debandEnabled: Bool,
         interpolationOptions: MPVInterpolationOptions
@@ -328,25 +386,42 @@ public final class MPVPlayer: NSObject {
         playbackView.updateSubtitleDelay(NSNumber(value: delay))
     }
 
+    @discardableResult
     public func loadExternalSubtitle(
         from url: URL,
         usesOriginalStyle: Bool = false,
         completion: @escaping (Bool) -> Void
-    ) {
-        let requestID = UUID().uuidString
+    ) -> UUID {
+        let requestID = UUID()
         let timeout = DispatchWorkItem { [weak self] in
-            self?.finishSubtitleLoad(requestID: requestID, success: false)
+            self?.finishSubtitleLoad(requestID: requestID.uuidString, success: false)
         }
-        pendingSubtitleLoads[requestID] = PendingSubtitleLoad(
+        pendingSubtitleLoads[requestID.uuidString] = PendingSubtitleLoad(
             completion: completion,
             timeout: timeout
         )
         playbackView.loadSubtitle([
-            "requestID": requestID,
+            "requestID": requestID.uuidString,
             "url": url.absoluteString,
             "usesOriginalStyle": NSNumber(value: usesOriginalStyle),
         ] as NSDictionary)
         DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeout)
+        return requestID
+    }
+
+    public func cancelExternalSubtitleLoad(_ requestID: UUID) {
+        playbackView.cancelSubtitleLoad([
+            "requestID": requestID.uuidString,
+        ] as NSDictionary)
+        finishSubtitleLoad(requestID: requestID.uuidString, success: false)
+    }
+
+    public func updateSubtitleStyle(_ style: MPVSubtitleStyle) {
+        playbackView.updateSubtitleStyle(style.bridgeDictionary)
+    }
+
+    public func currentSubtitleText() -> String? {
+        playbackView.currentSubtitleText() as String?
     }
 
     private func observePlaybackEvents() {
