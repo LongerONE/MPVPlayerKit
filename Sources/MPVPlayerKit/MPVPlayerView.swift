@@ -204,7 +204,7 @@ public final class MPVPlayerView: UIView {
     private var currentSubtitleUsesOriginalStyle = false
     private var videoQualityPreset = MPVVideoQualityPreset.balanced
     private var debandEnabled = false
-    private var smoothPlaybackEnabled = false
+    private var interpolationOptions = MPVInterpolationOptions.off
     private var subtitleDelayValue = 0.0
     private var subtitleStyleValues: [String: String] = [
         MPVProperty.subtitleFontSize: "38.000",
@@ -328,7 +328,7 @@ public final class MPVPlayerView: UIView {
         let qualityRawValue = (configuration["videoQuality"] as? NSNumber)?.intValue
         videoQualityPreset = qualityRawValue.flatMap(MPVVideoQualityPreset.init(rawValue:)) ?? .balanced
         debandEnabled = boolValue(configuration["debandEnabled"])
-        smoothPlaybackEnabled = boolValue(configuration["smoothPlaybackEnabled"])
+        interpolationOptions = MPVInterpolationOptions(bridgeDictionary: configuration)
         setDecoderMode(.initializing)
         stopped = false
         setupFailed = false
@@ -430,11 +430,11 @@ public final class MPVPlayerView: UIView {
 
     @objc public func updateVideoRenderOptions(_ options: NSDictionary) {
         let debandEnabled = boolValue(options["debandEnabled"])
-        let smoothPlaybackEnabled = boolValue(options["smoothPlaybackEnabled"])
+        let interpolationOptions = MPVInterpolationOptions(bridgeDictionary: options)
         queue.async { [weak self] in
             guard let self else { return }
             self.debandEnabled = debandEnabled
-            self.smoothPlaybackEnabled = smoothPlaybackEnabled
+            self.interpolationOptions = interpolationOptions
             guard self.mpv != nil else { return }
             self.applyVideoRenderProperties()
         }
@@ -718,12 +718,22 @@ public final class MPVPlayerView: UIView {
     }
 
     private var videoRenderOptions: [(String, String)] {
-        [
+        var options = [
             ("deband", debandEnabled ? "yes" : "no"),
-            ("interpolation", smoothPlaybackEnabled ? "yes" : "no"),
-            ("video-sync", smoothPlaybackEnabled ? "display-resample" : "audio"),
-            ("tscale", "oversample"),
+            ("interpolation", interpolationOptions.quality == .off ? "no" : "yes"),
+            ("video-sync", interpolationOptions.quality == .off ? "audio" : "display-resample"),
+            ("tscale", interpolationOptions.temporalScaler.rawValue),
+            ("interpolation-threshold", String(interpolationOptions.threshold)),
+            ("tscale-clamp", String(interpolationOptions.clamp)),
+            ("tscale-antiring", String(interpolationOptions.antiring)),
         ]
+        if let blur = interpolationOptions.blur {
+            options.append(("tscale-blur", String(blur)))
+        }
+        if let radius = interpolationOptions.radius {
+            options.append(("tscale-radius", String(radius)))
+        }
+        return options
     }
 
     private func applyVideoRenderProperties() {
@@ -731,7 +741,7 @@ public final class MPVPlayerView: UIView {
             _ = command("set", args: [option.0, option.1], checkForErrors: false)
         }
         mpvDebugLog(
-            "video render options updated deband=\(debandEnabled) smoothPlayback=\(smoothPlaybackEnabled)"
+            "video render options updated deband=\(debandEnabled) interpolationQuality=\(interpolationOptions.quality) tscale=\(interpolationOptions.temporalScaler.rawValue)"
         )
         logEffectiveVideoSettings(reason: "render-runtime")
     }
@@ -747,13 +757,18 @@ public final class MPVPlayerView: UIView {
             "interpolation",
             "video-sync",
             "tscale",
+            "interpolation-threshold",
+            "tscale-blur",
+            "tscale-clamp",
+            "tscale-radius",
+            "tscale-antiring",
         ]
         let properties = propertyNames.map { name in
             "\(name)=\(getString(name) ?? "<unavailable>")"
         }
         .joined(separator: " ")
         mpvDebugLog(
-            "video settings effective reason=\(reason) requestedQuality=\(videoQualityPreset) requestedDeband=\(debandEnabled) requestedSmoothPlayback=\(smoothPlaybackEnabled) properties=[\(properties)]"
+            "video settings effective reason=\(reason) requestedQuality=\(videoQualityPreset) requestedDeband=\(debandEnabled) requestedInterpolationQuality=\(interpolationOptions.quality) properties=[\(properties)]"
         )
     }
 

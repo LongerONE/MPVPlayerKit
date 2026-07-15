@@ -50,6 +50,23 @@ if let subtitle = subtitleTracks.first {
 
 Set `MPVPlayer.delegate` to receive state, time, buffering and decoder-mode updates.
 
+## Frame interpolation
+
+Choose one of the built-in interpolation profiles when creating the player:
+
+```swift
+let configuration = MPVPlayerConfiguration(
+    url: videoURL,
+    interpolationOptions: .smooth
+)
+```
+
+The profiles use mpv's temporal scaling filters: `.standard` uses `oversample`, `.smooth` uses `linear`, and `.highQuality` uses `mitchell` with antiring. Advanced callers can construct `MPVInterpolationOptions` to select a different `MPVTemporalScaler` and tune `threshold`, `blur`, `clamp`, `radius`, or `antiring`. This is mpv frame mixing/resampling rather than motion-compensated AI frame generation.
+
+Apply a new profile during playback with `player.updateVideoRenderOptions(debandEnabled:interpolationOptions:)`.
+
+The legacy `smoothPlaybackEnabled` configuration remains supported and maps to the standard profile.
+
 ## Quick player interface
 
 For apps that do not need custom controls:

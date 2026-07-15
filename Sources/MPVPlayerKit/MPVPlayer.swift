@@ -22,6 +22,103 @@ public enum MPVVideoQuality: Int, Sendable {
     case highQuality
 }
 
+public enum MPVTemporalScaler: String, CaseIterable, Sendable {
+    case oversample
+    case linear
+    case catmullRom = "catmull_rom"
+    case mitchell
+    case gaussian
+    case bicubic
+}
+
+public enum MPVInterpolationQuality: Int, CaseIterable, Sendable {
+    case off
+    case standard
+    case smooth
+    case highQuality
+}
+
+public struct MPVInterpolationOptions: Equatable, Sendable {
+    public var quality: MPVInterpolationQuality
+    public var temporalScaler: MPVTemporalScaler
+    public var threshold: Double
+    public var blur: Double?
+    public var clamp: Double
+    public var radius: Double?
+    public var antiring: Double
+
+    public init(
+        quality: MPVInterpolationQuality = .off,
+        temporalScaler: MPVTemporalScaler? = nil,
+        threshold: Double = 0.01,
+        blur: Double? = nil,
+        clamp: Double = 1.0,
+        radius: Double? = nil,
+        antiring: Double? = nil
+    ) {
+        self.quality = quality
+        self.temporalScaler = temporalScaler ?? quality.defaultTemporalScaler
+        self.threshold = threshold.isFinite ? min(max(threshold, -1.0), 1.0) : 0.01
+        self.blur = blur.flatMap { $0.isFinite ? min(max($0, 0.5), 2.0) : nil }
+        self.clamp = clamp.isFinite ? min(max(clamp, 0.0), 1.0) : 1.0
+        self.radius = radius.flatMap { $0.isFinite ? min(max($0, 0.5), 16.0) : nil }
+        self.antiring = antiring.map { $0.isFinite ? min(max($0, 0.0), 1.0) : quality.defaultAntiring }
+            ?? quality.defaultAntiring
+    }
+
+    public static let off = MPVInterpolationOptions(quality: .off)
+    public static let standard = MPVInterpolationOptions(quality: .standard)
+    public static let smooth = MPVInterpolationOptions(quality: .smooth)
+    public static let highQuality = MPVInterpolationOptions(quality: .highQuality)
+
+    var bridgeValues: [String: Any] {
+        var values: [String: Any] = [
+            "interpolationQuality": NSNumber(value: quality.rawValue),
+            "temporalScaler": temporalScaler.rawValue,
+            "interpolationThreshold": NSNumber(value: threshold),
+            "tscaleClamp": NSNumber(value: clamp),
+            "tscaleAntiring": NSNumber(value: antiring),
+        ]
+        if let blur {
+            values["tscaleBlur"] = NSNumber(value: blur)
+        }
+        if let radius {
+            values["tscaleRadius"] = NSNumber(value: radius)
+        }
+        return values
+    }
+
+    init(bridgeDictionary values: NSDictionary) {
+        let legacyEnabled = (values["smoothPlaybackEnabled"] as? NSNumber)?.boolValue ?? false
+        let quality = (values["interpolationQuality"] as? NSNumber)
+            .flatMap { MPVInterpolationQuality(rawValue: $0.intValue) }
+            ?? (legacyEnabled ? .standard : .off)
+        self.init(
+            quality: quality,
+            temporalScaler: (values["temporalScaler"] as? String).flatMap(MPVTemporalScaler.init(rawValue:)),
+            threshold: (values["interpolationThreshold"] as? NSNumber)?.doubleValue ?? 0.01,
+            blur: (values["tscaleBlur"] as? NSNumber)?.doubleValue,
+            clamp: (values["tscaleClamp"] as? NSNumber)?.doubleValue ?? 1.0,
+            radius: (values["tscaleRadius"] as? NSNumber)?.doubleValue,
+            antiring: (values["tscaleAntiring"] as? NSNumber)?.doubleValue
+        )
+    }
+}
+
+private extension MPVInterpolationQuality {
+    var defaultTemporalScaler: MPVTemporalScaler {
+        switch self {
+        case .off, .standard: .oversample
+        case .smooth: .linear
+        case .highQuality: .mitchell
+        }
+    }
+
+    var defaultAntiring: Double {
+        self == .highQuality ? 0.6 : 0.0
+    }
+}
+
 public enum MPVMediaTrackType: String, CaseIterable, Sendable {
     case video
     case audio
@@ -36,7 +133,11 @@ public struct MPVPlayerConfiguration: Sendable {
     public var isDolbyVisionPlayback: Bool
     public var videoQuality: MPVVideoQuality
     public var debandEnabled: Bool
-    public var smoothPlaybackEnabled: Bool
+    public var interpolationOptions: MPVInterpolationOptions
+    public var smoothPlaybackEnabled: Bool {
+        get { interpolationOptions.quality != .off }
+        set { interpolationOptions = newValue ? .standard : .off }
+    }
 
     public init(
         url: URL,
@@ -46,7 +147,8 @@ public struct MPVPlayerConfiguration: Sendable {
         isDolbyVisionPlayback: Bool = false,
         videoQuality: MPVVideoQuality = .balanced,
         debandEnabled: Bool = false,
-        smoothPlaybackEnabled: Bool = false
+        smoothPlaybackEnabled: Bool = false,
+        interpolationOptions: MPVInterpolationOptions? = nil
     ) {
         self.url = url
         self.headers = headers
@@ -55,7 +157,7 @@ public struct MPVPlayerConfiguration: Sendable {
         self.isDolbyVisionPlayback = isDolbyVisionPlayback
         self.videoQuality = videoQuality
         self.debandEnabled = debandEnabled
-        self.smoothPlaybackEnabled = smoothPlaybackEnabled
+        self.interpolationOptions = interpolationOptions ?? (smoothPlaybackEnabled ? .standard : .off)
     }
 
     var bridgeDictionary: NSDictionary {
@@ -68,6 +170,7 @@ public struct MPVPlayerConfiguration: Sendable {
             "debandEnabled": NSNumber(value: debandEnabled),
             "smoothPlaybackEnabled": NSNumber(value: smoothPlaybackEnabled),
         ]
+        values.merge(interpolationOptions.bridgeValues) { _, new in new }
         if let userAgent, userAgent.isEmpty == false {
             values["userAgent"] = userAgent
         }
@@ -185,6 +288,18 @@ public final class MPVPlayer: NSObject {
 
     public func setPlaybackRate(_ rate: Double) {
         playbackView.updatePlayRate(NSNumber(value: rate))
+    }
+
+    public func updateVideoRenderOptions(
+        debandEnabled: Bool,
+        interpolationOptions: MPVInterpolationOptions
+    ) {
+        var values: [String: Any] = [
+            "debandEnabled": NSNumber(value: debandEnabled),
+            "smoothPlaybackEnabled": NSNumber(value: interpolationOptions.quality != .off),
+        ]
+        values.merge(interpolationOptions.bridgeValues) { _, new in new }
+        playbackView.updateVideoRenderOptions(values as NSDictionary)
     }
 
     public func tracks(ofType type: MPVMediaTrackType) -> [MPVMediaTrack] {
