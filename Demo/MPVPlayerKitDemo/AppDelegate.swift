@@ -9,7 +9,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        let sampleURL = URL(string: "https://test-streams.mux.dev/x36xhzz/x36xhzz.m3u8")!
+        let sampleURL = URL(string: "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8")!
         let playerViewController = MPVQuickPlayerViewController(url: sampleURL)
 
         let window = UIWindow(frame: UIScreen.main.bounds)
