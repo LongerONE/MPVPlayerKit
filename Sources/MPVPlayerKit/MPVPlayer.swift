@@ -259,6 +259,7 @@ public struct MPVMediaTrack: Identifiable, Equatable, Sendable {
     }
 }
 
+@MainActor
 public protocol MPVPlayerDelegate: AnyObject {
     func player(_ player: MPVPlayer, didChangeState state: MPVPlaybackState)
     func player(_ player: MPVPlayer, didUpdateCurrentTime currentTime: TimeInterval, duration: TimeInterval)
@@ -273,6 +274,7 @@ public extension MPVPlayerDelegate {
     func player(_ player: MPVPlayer, didUpdateDecoderMode mode: MPVDecoderMode) {}
 }
 
+@MainActor
 public final class MPVPlayer: NSObject {
     private struct PendingSubtitleLoad {
         let completion: (Bool) -> Void
@@ -312,7 +314,7 @@ public final class MPVPlayer: NSObject {
         ))
     }
 
-    deinit {
+    isolated deinit {
         let center = NotificationCenter.default
         observers.forEach(center.removeObserver)
         pendingSubtitleLoads.values.forEach { $0.timeout.cancel() }
@@ -431,59 +433,69 @@ public final class MPVPlayer: NSObject {
             object: playbackView,
             queue: .main
         ) { [weak self] notification in
-            guard let self,
-                  let rawValue = notification.userInfo?[MPVPlayerKitNotificationKey.state] as? Int,
+            guard let rawValue = notification.userInfo?[MPVPlayerKitNotificationKey.state] as? Int,
                   let state = MPVPlaybackState(rawValue: rawValue) else { return }
-            self.delegate?.player(self, didChangeState: state)
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.delegate?.player(self, didChangeState: state)
+            }
         })
         observers.append(center.addObserver(
             forName: MPVPlayerKitNotification.didUpdateTime,
             object: playbackView,
             queue: .main
         ) { [weak self] notification in
-            guard let self else { return }
             let currentTime = Self.doubleValue(
                 notification.userInfo?[MPVPlayerKitNotificationKey.currentTime]
             )
             let duration = Self.doubleValue(
                 notification.userInfo?[MPVPlayerKitNotificationKey.duration]
             )
-            self.delegate?.player(self, didUpdateCurrentTime: currentTime, duration: duration)
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.delegate?.player(self, didUpdateCurrentTime: currentTime, duration: duration)
+            }
         })
         observers.append(center.addObserver(
             forName: MPVPlayerKitNotification.didUpdateBufferingProgress,
             object: playbackView,
             queue: .main
         ) { [weak self] notification in
-            guard let self else { return }
             let progress = (notification.userInfo?[MPVPlayerKitNotificationKey.bufferingProgress] as? NSNumber)?.intValue
                 ?? notification.userInfo?[MPVPlayerKitNotificationKey.bufferingProgress] as? Int
                 ?? 0
-            self.delegate?.player(self, didUpdateBufferingProgress: progress)
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.delegate?.player(self, didUpdateBufferingProgress: progress)
+            }
         })
         observers.append(center.addObserver(
             forName: MPVPlayerKitNotification.didUpdateDecoderMode,
             object: playbackView,
             queue: .main
         ) { [weak self] notification in
-            guard let self,
-                  let rawValue = notification.userInfo?[MPVPlayerKitNotificationKey.decoderMode] as? Int,
+            guard let rawValue = notification.userInfo?[MPVPlayerKitNotificationKey.decoderMode] as? Int,
                   let mode = MPVDecoderMode(rawValue: rawValue) else { return }
-            self.delegate?.player(self, didUpdateDecoderMode: mode)
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.delegate?.player(self, didUpdateDecoderMode: mode)
+            }
         })
         observers.append(center.addObserver(
             forName: MPVPlayerKitNotification.didLoadSubtitle,
             object: playbackView,
             queue: .main
         ) { [weak self] notification in
-            guard let self,
-                  let requestID = notification.userInfo?[MPVPlayerKitNotificationKey.requestID] as? String else {
+            guard let requestID = notification.userInfo?[MPVPlayerKitNotificationKey.requestID] as? String else {
                 return
             }
             let success = (notification.userInfo?[MPVPlayerKitNotificationKey.success] as? NSNumber)?.boolValue
                 ?? notification.userInfo?[MPVPlayerKitNotificationKey.success] as? Bool
                 ?? false
-            self.finishSubtitleLoad(requestID: requestID, success: success)
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.finishSubtitleLoad(requestID: requestID, success: success)
+            }
         })
     }
 
@@ -493,8 +505,10 @@ public final class MPVPlayer: NSObject {
         pending.completion(success)
     }
 
-    private static func doubleValue(_ value: Any?) -> Double {
-        if let value = value as? Double { return value }
-        return (value as? NSNumber)?.doubleValue ?? 0
+    nonisolated private static func doubleValue(_ value: Any?) -> Double {
+        if let number = value as? NSNumber { return number.doubleValue }
+        if let double = value as? Double { return double }
+        if let int = value as? Int { return Double(int) }
+        return 0
     }
 }
