@@ -294,4 +294,38 @@ final class MPVPlayerModelTests: XCTestCase {
             }
         }
     }
+
+    @MainActor
+    func testSimulatorSoftwareProfileDisablesLavcDirectRendering() {
+        #if targetEnvironment(simulator)
+        let playerView = MPVPlayerView(frame: .zero)
+        let softwareProfile = playerView.makeSetupProfiles().first {
+            $0.name == "metal-software"
+        }
+
+        XCTAssertEqual(
+            softwareProfile?.options.first { $0.0 == "vd-lavc-dr" }?.1,
+            "no"
+        )
+        #endif
+    }
+
+    @MainActor
+    func testSimulatorUsesCompatibilityGPURenderer() {
+        #if targetEnvironment(simulator)
+        let playerView = MPVPlayerView(frame: .zero)
+        let softwareProfile = playerView.makeSetupProfiles().first {
+            $0.name == "metal-software"
+        }
+        let options = Dictionary(
+            uniqueKeysWithValues: softwareProfile?.options ?? []
+        )
+
+        XCTAssertEqual(options["vo"], "gpu")
+        XCTAssertEqual(options["gpu-api"], "vulkan")
+        XCTAssertEqual(options["gpu-context"], "moltenvk")
+        XCTAssertEqual(options["gpu-dumb-mode"], "yes")
+        XCTAssertFalse(playerView.usesExtendedDynamicRangeOutput)
+        #endif
+    }
 }

@@ -284,6 +284,14 @@ public final class MPVPlayerView: UIView {
         metalLayer.framebufferOnly = true
         metalLayer.needsDisplayOnBoundsChange = true
         #if os(iOS)
+        #if targetEnvironment(simulator)
+        // The simulator Metal driver has much tighter shared-memory limits than
+        // real devices. SDR output also matches the compatibility GPU renderer
+        // used by the simulator setup profile.
+        usesExtendedDynamicRangeOutput = false
+        metalLayer.pixelFormat = .bgra8Unorm_srgb
+        metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
+        #else
         if #available(iOS 16.0, *) {
             usesExtendedDynamicRangeOutput = true
             metalLayer.pixelFormat = .rgba16Float
@@ -294,6 +302,7 @@ public final class MPVPlayerView: UIView {
             metalLayer.pixelFormat = .bgra8Unorm_srgb
             metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
         }
+        #endif
         #else
         usesExtendedDynamicRangeOutput = false
         metalLayer.pixelFormat = .bgra8Unorm_srgb

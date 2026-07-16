@@ -46,11 +46,18 @@ extension MPVPlayerView {
         let hardwareDecode = "videotoolbox"
         #endif
 
+        var softwareDecodeOptions: [(String, String)] = [
+            ("hwdec", "no"),
+        ]
+        #if targetEnvironment(simulator)
+        // MTLSimDriver limits a single host-coherent allocation to 256 MB.
+        // Direct rendering can exceed it for 4K 10-bit software decoding.
+        softwareDecodeOptions.append(("vd-lavc-dr", "no"))
+        #endif
+
         let softwareProfile = MPVSetupProfile(
             name: "metal-software",
-            options: metalVideoOutputOptions + [
-                ("hwdec", "no"),
-            ]
+            options: metalVideoOutputOptions + softwareDecodeOptions
         )
 
         guard forceSoftwareDecode == false, hardwareDecode != "no" else {
@@ -77,7 +84,19 @@ extension MPVPlayerView {
         } else {
             colorOptions = Self.sdrMetalVideoOutputOptions
         }
+        #if targetEnvironment(simulator)
+        // gpu-next uploads software-decoded frames through libplacebo PBOs.
+        // MTLSimDriver rejects that shared-memory allocation for 10-bit HEVC.
+        // Keep Vulkan embedding, but use mpv's compatibility GPU renderer.
+        let simulatorColorOptions = colorOptions.map { option in
+            option.0 == "vo" ? ("vo", "gpu") : option
+        }
+        return simulatorColorOptions + [
+            ("gpu-dumb-mode", "yes"),
+        ] + videoQualityPreset.options + videoRenderOptions
+        #else
         return colorOptions + videoQualityPreset.options + videoRenderOptions
+        #endif
     }
 
     func applyVideoQualityProperties(_ preset: MPVVideoQualityPreset) {
