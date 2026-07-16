@@ -34,7 +34,8 @@ extension MPVPlayerView {
         #endif
     }
 
-    func logSubtitleTextChange() {
+    nonisolated func logSubtitleTextChange() {
+        dispatchPrecondition(condition: .onQueue(queue))
         #if DEBUG
         let text = getString(MPVProperty.subtitleText) ?? ""
         guard hasLoggedSubtitleTextEvent == false || text != lastLoggedSubtitleText else { return }
@@ -55,7 +56,8 @@ extension MPVPlayerView {
         #endif
     }
 
-    func logMessage(_ event: UnsafeMutablePointer<mpv_event>) {
+    nonisolated func logMessage(_ event: UnsafeMutablePointer<mpv_event>) {
+        dispatchPrecondition(condition: .onQueue(queue))
         guard let data = event.pointee.data else { return }
         let message = data.assumingMemoryBound(to: mpv_event_log_message.self)
         let prefix = String(cString: message.pointee.prefix)
@@ -72,7 +74,7 @@ extension MPVPlayerView {
         #endif
     }
 
-    func shouldPrintMPVLogMessage(prefix: String, level: String, text: String) -> Bool {
+    nonisolated func shouldPrintMPVLogMessage(prefix: String, level: String, text: String) -> Bool {
         switch level {
         case "fatal", "error", "warn":
             return true
@@ -99,14 +101,14 @@ extension MPVPlayerView {
         return diagnosticKeywords.contains { normalizedText.contains($0) }
     }
 
-    func getDouble(_ name: String) -> Double {
+    nonisolated func getDouble(_ name: String) -> Double {
         guard let mpv else { return 0.0 }
         var data = Double()
         mpv_get_property(mpv, name, MPV_FORMAT_DOUBLE, &data)
         return data
     }
 
-    func getInt64(_ name: String) -> Int64? {
+    nonisolated func getInt64(_ name: String) -> Int64? {
         guard let mpv else { return nil }
         var data = Int64()
         let status = mpv_get_property(mpv, name, MPV_FORMAT_INT64, &data)
@@ -114,7 +116,7 @@ extension MPVPlayerView {
         return data
     }
 
-    func getFlag(_ name: String) -> Bool? {
+    nonisolated func getFlag(_ name: String) -> Bool? {
         guard let mpv else { return nil }
         var data = Int32()
         let status = mpv_get_property(mpv, name, MPV_FORMAT_FLAG, &data)
@@ -122,7 +124,7 @@ extension MPVPlayerView {
         return data != 0
     }
 
-    func getString(_ name: String) -> String? {
+    nonisolated func getString(_ name: String) -> String? {
         guard let mpv, let pointer = mpv_get_property_string(mpv, name) else {
             return nil
         }
@@ -133,7 +135,7 @@ extension MPVPlayerView {
         return value.isEmpty ? nil : value
     }
 
-    func refreshDecoderModeAfterPlaybackRestart() {
+    nonisolated func refreshDecoderModeAfterPlaybackRestart() {
         guard let activeHWDec = getString(MPVProperty.hwdecCurrent)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
               activeHWDec.isEmpty == false else {
@@ -149,7 +151,7 @@ extension MPVPlayerView {
         setDecoderMode(decoderMode)
     }
 
-    func logVideoColorParameters() {
+    nonisolated func logVideoColorParameters() {
         let inputProperties = [
             "video-params/pixelformat",
             "video-params/colormatrix",
@@ -179,7 +181,7 @@ extension MPVPlayerView {
         )
     }
 
-    func videoColorParameterDescription(_ properties: [String]) -> String {
+    nonisolated func videoColorParameterDescription(_ properties: [String]) -> String {
         properties.map { property in
             let name = property.split(separator: "/").last.map(String.init) ?? property
             return "\(name)=\(getString(property) ?? "unavailable")"

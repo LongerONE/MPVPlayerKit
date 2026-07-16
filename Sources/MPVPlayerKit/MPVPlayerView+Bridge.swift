@@ -97,7 +97,7 @@ extension MPVPlayerView {
         return "\(components?.string ?? url.absoluteString) queryItems=\(queryItemCount)"
     }
 
-    var activeProfileDescription: String {
+    nonisolated var activeProfileDescription: String {
         guard setupProfiles.indices.contains(activeSetupProfileIndex) else {
             return "none"
         }
@@ -114,7 +114,7 @@ extension MPVPlayerView {
         return false
     }
 
-    func mpvDebugLog(_ message: String) {
+    nonisolated func mpvDebugLog(_ message: String) {
         #if DEBUG
         print("MPVPlayerView[\(ObjectIdentifier(self))] \(message)")
         #endif
@@ -130,14 +130,12 @@ extension MPVPlayerView {
         }
     }
 
-    func setDecoderMode(_ decoderMode: MPVPlayerDecoderMode) {
-        notifyOnMain {
-            NotificationCenter.default.post(
-                name: MPVPlayerKitNotification.didUpdateDecoderMode,
-                object: self,
-                userInfo: [MPVPlayerKitNotificationKey.decoderMode: decoderMode.rawValue]
-            )
-        }
+    nonisolated func setDecoderMode(_ decoderMode: MPVPlayerDecoderMode) {
+        NotificationCenter.default.post(
+            name: MPVPlayerKitNotification.didUpdateDecoderMode,
+            object: self,
+            userInfo: [MPVPlayerKitNotificationKey.decoderMode: decoderMode.rawValue]
+        )
     }
 
     func notifyTime(currentTime: TimeInterval, duration: TimeInterval) {

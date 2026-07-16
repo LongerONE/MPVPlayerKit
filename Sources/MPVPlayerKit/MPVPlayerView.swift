@@ -188,15 +188,15 @@ public final class MPVPlayerView: UIView {
     var url: URL?
     var headers: [String: String] = [:]
     var userAgent: String?
-    let queue = DispatchQueue(label: "com.mpvplayerkit.player", qos: .userInitiated)
+    nonisolated let queue = DispatchQueue(label: "com.mpvplayerkit.player", qos: .userInitiated)
     let queueSpecificKey = DispatchSpecificKey<Void>()
     let contentModeSnapshotLock = NSLock()
     var contentModeSnapshot: MPVContentModeSnapshot = .fit
-    var mpv: OpaquePointer?
+    nonisolated(unsafe) var mpv: OpaquePointer?
     var timeTimer: DispatchSourceTimer?
     var hasReportedReadyToPlay = false
-    var hasPlaybackRestarted = false
-    var hasLoggedVideoColorParameters = false
+    nonisolated(unsafe) var hasPlaybackRestarted = false
+    nonisolated(unsafe) var hasLoggedVideoColorParameters = false
     var stopped = false
     var setupFailed = false
     var forceSoftwareDecode = false
@@ -249,9 +249,9 @@ public final class MPVPlayerView: UIView {
     var committedSubtitleSelection: SubtitleSelectionSnapshot?
     var nextSubtitleLoadUserdata: UInt64 = 1
     var subtitleSelectionEpoch: UInt64 = 0
-    var lastLoggedSubtitleText = ""
-    var hasLoggedSubtitleTextEvent = false
-    var repeatedMPVLogMessageCounts: [String: Int] = [:]
+    nonisolated(unsafe) var lastLoggedSubtitleText = ""
+    nonisolated(unsafe) var hasLoggedSubtitleTextEvent = false
+    nonisolated(unsafe) var repeatedMPVLogMessageCounts: [String: Int] = [:]
     var lastAppliedLayerBounds = CGRect.null
     var lastAppliedDrawableSize = CGSize.zero
     var videoOutputRefreshWorkItem: DispatchWorkItem?
@@ -261,8 +261,8 @@ public final class MPVPlayerView: UIView {
     let geometryTransitionDimAlpha: CGFloat = 0.36
     let geometryTransitionFadeOutDuration: TimeInterval = 0.32
     var geometryTransitionAnimationID = 0
-    var setupProfiles: [MPVSetupProfile] = []
-    var activeSetupProfileIndex = 0
+    nonisolated(unsafe) var setupProfiles: [MPVSetupProfile] = []
+    nonisolated(unsafe) var activeSetupProfileIndex = 0
 
     @objc public override init(frame: CGRect) {
         super.init(frame: frame)

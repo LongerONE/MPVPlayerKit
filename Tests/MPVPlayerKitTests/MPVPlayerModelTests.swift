@@ -2,6 +2,10 @@ import XCTest
 import UIKit
 @testable import MPVPlayerKit
 
+private struct TestUnsafeTransfer<Value>: @unchecked Sendable {
+    let value: Value
+}
+
 final class MPVPlayerModelTests: XCTestCase {
     func testSourceFilesStayWithinMaintenanceLineLimit() throws {
         let packageRoot = URL(fileURLWithPath: #filePath)
@@ -249,5 +253,24 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(MPVQuickPlayerViewController.videoQualityTitle(.balanced), "Balanced")
         XCTAssertEqual(MPVQuickPlayerViewController.interpolationTitle(.highQuality), "High Quality")
         XCTAssertEqual(MPVQuickPlayerViewController.delayTitle(-0.5), "-0.5s")
+    }
+
+    @MainActor
+    func testDiagnosticsCanRunOnMPVQueue() async {
+        let playerView = MPVPlayerView(frame: .zero)
+        let transfer = TestUnsafeTransfer(value: playerView)
+
+        let shouldPrint = await withCheckedContinuation { continuation in
+            playerView.queue.async {
+                transfer.value.logSubtitleTextChange()
+                let shouldPrint = transfer.value.shouldPrintMPVLogMessage(
+                    prefix: "subtitle",
+                    level: "info",
+                    text: "glyph rendered"
+                )
+                continuation.resume(returning: shouldPrint)
+            }
+        }
+        XCTAssertTrue(shouldPrint)
     }
 }
