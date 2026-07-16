@@ -33,7 +33,7 @@ extension MPVPlayerView {
         }
     }
 
-    func readEvents() {
+    nonisolated func readEvents() {
         queue.async { [weak self] in
             guard let self else { return }
             while let mpv = self.mpv {
@@ -70,7 +70,7 @@ extension MPVPlayerView {
         }
     }
 
-    func handleCommandReply(_ event: UnsafeMutablePointer<mpv_event>) {
+    nonisolated func handleCommandReply(_ event: UnsafeMutablePointer<mpv_event>) {
         dispatchPrecondition(condition: .onQueue(queue))
         let userdata = event.pointee.reply_userdata
         if let canceled = canceledExternalSubtitleCommands.removeValue(forKey: userdata) {
@@ -109,7 +109,7 @@ extension MPVPlayerView {
         pending.requestIDs.forEach { notifySubtitleLoad(requestID: $0, success: success) }
     }
 
-    func cancelPendingExternalSubtitleLoad(handle: OpaquePointer, reason: String) {
+    nonisolated func cancelPendingExternalSubtitleLoad(handle: OpaquePointer, reason: String) {
         dispatchPrecondition(condition: .onQueue(queue))
         guard let pending = pendingExternalSubtitleLoad else { return }
         pendingExternalSubtitleLoad = nil
@@ -123,7 +123,7 @@ extension MPVPlayerView {
     }
 
     @discardableResult
-    func beginNewSubtitleSelection(reason: String) -> UInt64 {
+    nonisolated func beginNewSubtitleSelection(reason: String) -> UInt64 {
         dispatchPrecondition(condition: .onQueue(queue))
         subtitleSelectionEpoch &+= 1
         if let mpv {
@@ -136,7 +136,7 @@ extension MPVPlayerView {
         return subtitleSelectionEpoch
     }
 
-    func captureSubtitleSelection() -> SubtitleSelectionSnapshot {
+    nonisolated func captureSubtitleSelection() -> SubtitleSelectionSnapshot {
         SubtitleSelectionSnapshot(
             usesOriginalStyle: currentSubtitleUsesOriginalStyle,
             subtitleID: getInt64(MPVProperty.subtitleID),
@@ -144,14 +144,14 @@ extension MPVPlayerView {
         )
     }
 
-    func logicalSubtitleSelection() -> SubtitleSelectionSnapshot {
+    nonisolated func logicalSubtitleSelection() -> SubtitleSelectionSnapshot {
         if let committedSubtitleSelection { return committedSubtitleSelection }
         let initial = captureSubtitleSelection()
         committedSubtitleSelection = initial
         return initial
     }
 
-    func performSubtitleSelectionTransaction(
+    nonisolated func performSubtitleSelectionTransaction(
         previous: SubtitleSelectionSnapshot,
         targetUsesOriginalStyle: Bool,
         targetSubtitleID: Int64?,
@@ -186,7 +186,7 @@ extension MPVPlayerView {
     }
 
     @discardableResult
-    func restoreSubtitleSelection(_ snapshot: SubtitleSelectionSnapshot) -> Bool {
+    nonisolated func restoreSubtitleSelection(_ snapshot: SubtitleSelectionSnapshot) -> Bool {
         let hideSucceeded = command("set", args: [MPVProperty.subtitleVisibility, "no"], checkForErrors: false) >= 0
         let styleSucceeded = applySubtitleStyleMode(usesOriginalStyle: snapshot.usesOriginalStyle)
         let sidSucceeded = command(
@@ -205,7 +205,7 @@ extension MPVPlayerView {
         return true
     }
 
-    func enterSafeSubtitleState(reason: String) {
+    nonisolated func enterSafeSubtitleState(reason: String) {
         let hidden = command("set", args: [MPVProperty.subtitleVisibility, "no"], checkForErrors: false) >= 0
         let disabled = command("set", args: [MPVProperty.subtitleID, "no"], checkForErrors: false) >= 0
         if hidden, disabled {
@@ -226,7 +226,7 @@ extension MPVPlayerView {
         // global player error state, which presents the playback failure UI.
     }
 
-    func cancelExternalSubtitleRequestOnMPVQueue(requestID: String) {
+    nonisolated func cancelExternalSubtitleRequestOnMPVQueue(requestID: String) {
         dispatchPrecondition(condition: .onQueue(queue))
         if var pending = pendingExternalSubtitleLoad, pending.requestIDs.contains(requestID) {
             pending.requestIDs.removeAll(where: { $0 == requestID })
@@ -262,7 +262,7 @@ extension MPVPlayerView {
         notifySubtitleLoad(requestID: requestID, success: false)
     }
 
-    func restoreAfterStaleExternalReplyIfNeeded(_ canceled: PendingExternalSubtitleLoad) {
+    nonisolated func restoreAfterStaleExternalReplyIfNeeded(_ canceled: PendingExternalSubtitleLoad) {
         guard let staleSubtitleID = externalSubtitleTrackID(
             source: canceled.source,
             urlString: canceled.url,
@@ -280,7 +280,7 @@ extension MPVPlayerView {
         }
     }
 
-    func notifySubtitleLoad(requestID: String, success: Bool) {
+    nonisolated func notifySubtitleLoad(requestID: String, success: Bool) {
         notifyOnMain {
             NotificationCenter.default.post(
                 name: MPVPlayerKitNotification.didLoadSubtitle,
@@ -293,11 +293,18 @@ extension MPVPlayerView {
         }
     }
 
-    func handleEndFile(_ event: UnsafeMutablePointer<mpv_event>) {
+    nonisolated func handleEndFile(_ event: UnsafeMutablePointer<mpv_event>) {
         let endFile = event.pointee.data?.assumingMemoryBound(to: mpv_event_end_file.self).pointee
         let errorCode = endFile?.error ?? 0
+        let reason = endFile?.reason
+        notifyOnMain {
+            self.handleEndFileOnMain(reason: reason, errorCode: errorCode)
+        }
+    }
+
+    func handleEndFileOnMain(reason: mpv_end_file_reason?, errorCode: CInt) {
         let errorMessage = errorCode == 0 ? "none" : String(cString: mpv_error_string(errorCode))
-        guard let reason = endFile?.reason else {
+        guard let reason else {
             mpvDebugLog("event end-file missing reason error=\(errorCode) message=\(errorMessage) profile=\(activeProfileDescription)")
             if retryNextProfileAfterPlaybackFailure(errorCode: errorCode) {
                 return
@@ -374,7 +381,7 @@ extension MPVPlayerView {
         return setupMPV(url: url, profile: setupProfiles[activeSetupProfileIndex])
     }
 
-    func handlePropertyChange(_ event: UnsafeMutablePointer<mpv_event>) {
+    nonisolated func handlePropertyChange(_ event: UnsafeMutablePointer<mpv_event>) {
         guard let data = event.pointee.data else {
             return
         }
@@ -384,12 +391,12 @@ extension MPVPlayerView {
         case MPVProperty.pausedForCache:
             let bufferingValue = property.data?.assumingMemoryBound(to: Int32.self).pointee ?? 0
             let buffering = bufferingValue != 0
-            if buffering {
-                stopTimeTimer()
-            } else if isPlaying {
-                startTimeTimer()
-            }
             notifyOnMain {
+                if buffering {
+                    self.stopTimeTimer()
+                } else if self.isPlaying {
+                    self.startTimeTimer()
+                }
                 self.notifyBufferingProgress(buffering ? 0 : 100)
                 self.notifyState(buffering ? .buffering : .bufferFinished)
             }

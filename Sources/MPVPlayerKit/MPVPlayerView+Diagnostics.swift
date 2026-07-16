@@ -189,7 +189,7 @@ extension MPVPlayerView {
         .joined(separator: " ")
     }
 
-    func setDouble(_ name: String, _ value: Double) {
+    nonisolated func setDouble(_ name: String, _ value: Double) {
         guard let mpv else { return }
         var data = value
         mpv_set_property(mpv, name, MPV_FORMAT_DOUBLE, &data)
@@ -201,7 +201,7 @@ extension MPVPlayerView {
         mpv_set_property(mpv, name, MPV_FORMAT_FLAG, &data)
     }
 
-    var subtitleStylePropertyNames: [String] {
+    nonisolated var subtitleStylePropertyNames: [String] {
         [
             MPVProperty.subtitleFontSize,
             MPVProperty.subtitleBold,
@@ -227,7 +227,7 @@ extension MPVPlayerView {
     }
 
     @discardableResult
-    func applySubtitleStyleMode(usesOriginalStyle: Bool) -> Bool {
+    nonisolated func applySubtitleStyleMode(usesOriginalStyle: Bool) -> Bool {
         let override = usesOriginalStyle ? "no" : "strip"
         let status = command("set", args: [MPVProperty.subtitleASSOverride, override], checkForErrors: false)
         mpvDebugLog("subtitle style mode original=\(usesOriginalStyle) assOverride=\(override) status=\(status)")
@@ -250,7 +250,7 @@ extension MPVPlayerView {
     }
 
     @discardableResult
-    func applyUserSubtitleStyleProperties() -> Bool {
+    nonisolated func applyUserSubtitleStyleProperties() -> Bool {
         var success = true
         for property in subtitleStylePropertyNames {
             guard let value = subtitleStyleValues[property] else { continue }
@@ -268,7 +268,7 @@ extension MPVPlayerView {
         })
     }
 
-    func externalSubtitleTrackID(
+    nonisolated func externalSubtitleTrackID(
         source: String,
         urlString: String,
         preferringIDsNotIn previousIDs: Set<Int64>
@@ -288,7 +288,7 @@ extension MPVPlayerView {
         return matches.first(where: { previousIDs.contains($0) == false }) ?? matches.first
     }
 
-    func canonicalExternalSubtitleSource(_ source: String) -> String {
+    nonisolated func canonicalExternalSubtitleSource(_ source: String) -> String {
         guard let url = URL(string: source) else {
             return URL(fileURLWithPath: source).standardizedFileURL.path
         }

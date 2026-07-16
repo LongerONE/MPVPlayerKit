@@ -11,7 +11,7 @@ import libmpv
 
 extension MPVPlayerView {
     @discardableResult
-    func command(
+    nonisolated func command(
         _ command: String,
         args: [String?] = [],
         handle: OpaquePointer? = nil,
@@ -34,7 +34,7 @@ extension MPVPlayerView {
         return returnValue
     }
 
-    func makeCArgs(_ command: String, _ args: [String?]) -> [String?] {
+    nonisolated func makeCArgs(_ command: String, _ args: [String?]) -> [String?] {
         var stringArgs = args
         stringArgs.insert(command, at: 0)
         stringArgs.append(nil)
@@ -66,7 +66,7 @@ extension MPVPlayerView {
     }
 
     @discardableResult
-    func checkError(_ status: CInt, operation: String? = nil, notifyOnFailure: Bool = true) -> Bool {
+    nonisolated func checkError(_ status: CInt, operation: String? = nil, notifyOnFailure: Bool = true) -> Bool {
         if status < 0 {
             #if DEBUG
             let name = operation ?? "unknown"
@@ -74,7 +74,9 @@ extension MPVPlayerView {
             mpvDebugLog("api error operation=\(name) status=\(status) message=\(message)")
             #endif
             if notifyOnFailure {
-                notifyState(.error)
+                notifyOnMain {
+                    self.notifyState(.error)
+                }
             }
             return false
         }
@@ -159,11 +161,15 @@ extension MPVPlayerView {
         )
     }
 
-    func notifyOnMain(_ body: @escaping () -> Void) {
+    nonisolated func notifyOnMain(_ body: @escaping @MainActor @Sendable () -> Void) {
         if Thread.isMainThread {
-            body()
+            MainActor.assumeIsolated {
+                body()
+            }
         } else {
-            DispatchQueue.main.async(execute: body)
+            Task { @MainActor in
+                body()
+            }
         }
     }
 }

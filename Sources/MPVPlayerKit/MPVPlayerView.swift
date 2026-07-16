@@ -201,12 +201,12 @@ public final class MPVPlayerView: UIView {
     var setupFailed = false
     var forceSoftwareDecode = false
     var isDolbyVisionPlayback = false
-    var currentSubtitleUsesOriginalStyle = false
+    nonisolated(unsafe) var currentSubtitleUsesOriginalStyle = false
     var videoQualityPreset = MPVVideoQualityPreset.balanced
     var debandEnabled = false
     var interpolationOptions = MPVInterpolationOptions.off
-    var subtitleDelayValue = 0.0
-    var subtitleStyleValues: [String: String] = [
+    nonisolated(unsafe) var subtitleDelayValue = 0.0
+    nonisolated(unsafe) var subtitleStyleValues: [String: String] = [
         MPVProperty.subtitleFontSize: "38.000",
         MPVProperty.subtitleBold: "no",
         MPVProperty.subtitleColor: "#FFFFFFFF",
@@ -242,13 +242,13 @@ public final class MPVPlayerView: UIView {
     }
 
     // Access only from `queue`; command reply handling runs on this queue as well.
-    var loadedExternalSubtitleIDs: [String: Int64] = [:]
-    var pendingExternalSubtitleLoad: PendingExternalSubtitleLoad?
-    var canceledExternalSubtitleCommands: [UInt64: PendingExternalSubtitleLoad] = [:]
-    var activeExternalSubtitleActivation: ExternalSubtitleActivation?
-    var committedSubtitleSelection: SubtitleSelectionSnapshot?
-    var nextSubtitleLoadUserdata: UInt64 = 1
-    var subtitleSelectionEpoch: UInt64 = 0
+    nonisolated(unsafe) var loadedExternalSubtitleIDs: [String: Int64] = [:]
+    nonisolated(unsafe) var pendingExternalSubtitleLoad: PendingExternalSubtitleLoad?
+    nonisolated(unsafe) var canceledExternalSubtitleCommands: [UInt64: PendingExternalSubtitleLoad] = [:]
+    nonisolated(unsafe) var activeExternalSubtitleActivation: ExternalSubtitleActivation?
+    nonisolated(unsafe) var committedSubtitleSelection: SubtitleSelectionSnapshot?
+    nonisolated(unsafe) var nextSubtitleLoadUserdata: UInt64 = 1
+    nonisolated(unsafe) var subtitleSelectionEpoch: UInt64 = 0
     nonisolated(unsafe) var lastLoggedSubtitleText = ""
     nonisolated(unsafe) var hasLoggedSubtitleTextEvent = false
     nonisolated(unsafe) var repeatedMPVLogMessageCounts: [String: Int] = [:]

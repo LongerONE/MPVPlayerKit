@@ -273,4 +273,20 @@ final class MPVPlayerModelTests: XCTestCase {
         }
         XCTAssertTrue(shouldPrint)
     }
+
+    @MainActor
+    func testMPVWakeupCanEnterEventReaderOffMainThread() async {
+        let playerView = MPVPlayerView(frame: .zero)
+        let transfer = TestUnsafeTransfer(value: playerView)
+
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                transfer.value.readEvents()
+                transfer.value.notifyOnMain {
+                    XCTAssertTrue(Thread.isMainThread)
+                    continuation.resume()
+                }
+            }
+        }
+    }
 }
