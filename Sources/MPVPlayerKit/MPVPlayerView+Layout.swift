@@ -263,9 +263,7 @@ extension MPVPlayerView {
             repeating: .milliseconds(500),
             leeway: .milliseconds(100)
         )
-        timer.setEventHandler { [weak self] in
-            self?.publishTime()
-        }
+        timer.setEventHandler(handler: makeMPVTimeTimerHandler(self))
         timeTimer = timer
         timer.resume()
     }

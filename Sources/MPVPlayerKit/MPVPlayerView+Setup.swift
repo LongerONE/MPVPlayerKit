@@ -9,6 +9,12 @@ import libmpv
 #error("MPVPlayerKit requires MPVKit's Libmpv module.")
 #endif
 
+func mpvPlayerWakeupCallback(_ context: UnsafeMutableRawPointer?) {
+    guard let context else { return }
+    let playerView = Unmanaged<MPVPlayerView>.fromOpaque(context).takeUnretainedValue()
+    playerView.readEvents()
+}
+
 extension MPVPlayerView {
     func setupMPV() {
         guard let url else {
@@ -235,11 +241,11 @@ extension MPVPlayerView {
             operation: "observe sub-text",
             notifyOnFailure: false
         )
-        mpv_set_wakeup_callback(mpv, { context in
-            guard let context else { return }
-            let playerView = Unmanaged<MPVPlayerView>.fromOpaque(context).takeUnretainedValue()
-            playerView.readEvents()
-        }, Unmanaged.passUnretained(self).toOpaque())
+        mpv_set_wakeup_callback(
+            mpv,
+            mpvPlayerWakeupCallback,
+            Unmanaged.passUnretained(self).toOpaque()
+        )
         mpvDebugLog("setupMPV wakeup callback installed profile=\(profile.name)")
 
         notifyState(.buffering)

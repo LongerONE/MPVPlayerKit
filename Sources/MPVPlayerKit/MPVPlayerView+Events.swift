@@ -9,8 +9,23 @@ import libmpv
 #error("MPVPlayerKit requires MPVKit's Libmpv module.")
 #endif
 
+final class MPVPlayerViewWeakTransfer: @unchecked Sendable {
+    weak var value: MPVPlayerView?
+
+    init(_ value: MPVPlayerView) {
+        self.value = value
+    }
+}
+
+func makeMPVTimeTimerHandler(_ playerView: MPVPlayerView) -> @Sendable () -> Void {
+    let transfer = MPVPlayerViewWeakTransfer(playerView)
+    return {
+        transfer.value?.publishTime()
+    }
+}
+
 extension MPVPlayerView {
-    func publishTime() {
+    nonisolated func publishTime() {
         guard mpv != nil else { return }
         let current = getDouble(MPVProperty.timePosition)
         let total = getDouble(MPVProperty.duration)
