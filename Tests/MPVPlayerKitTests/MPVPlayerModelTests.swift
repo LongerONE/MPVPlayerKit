@@ -275,6 +275,20 @@ final class MPVPlayerModelTests: XCTestCase {
     }
 
     @MainActor
+    func testRuntimeVideoOptionHelpersCanRunOnMPVQueue() async {
+        let playerView = MPVPlayerView(frame: .zero)
+        let transfer = TestUnsafeTransfer(value: playerView)
+
+        await withCheckedContinuation { continuation in
+            playerView.queue.async {
+                transfer.value.applyVideoQualityProperties(.balanced)
+                transfer.value.applyVideoRenderProperties()
+                continuation.resume()
+            }
+        }
+    }
+
+    @MainActor
     func testMPVWakeupCanEnterEventReaderOffMainThread() async {
         let playerView = MPVPlayerView(frame: .zero)
         let transfer = TestUnsafeTransfer(value: playerView)

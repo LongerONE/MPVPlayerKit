@@ -99,7 +99,7 @@ extension MPVPlayerView {
         #endif
     }
 
-    func applyVideoQualityProperties(_ preset: MPVVideoQualityPreset) {
+    nonisolated func applyVideoQualityProperties(_ preset: MPVVideoQualityPreset) {
         preset.options.forEach { option in
             _ = command("set", args: [option.0, option.1], checkForErrors: false)
         }
@@ -107,7 +107,7 @@ extension MPVPlayerView {
         logEffectiveVideoSettings(reason: "quality-runtime")
     }
 
-    var videoRenderOptions: [(String, String)] {
+    nonisolated var videoRenderOptions: [(String, String)] {
         var options = [
             ("deband", debandEnabled ? "yes" : "no"),
             ("interpolation", interpolationOptions.quality == .off ? "no" : "yes"),
@@ -126,7 +126,7 @@ extension MPVPlayerView {
         return options
     }
 
-    func applyVideoRenderProperties() {
+    nonisolated func applyVideoRenderProperties() {
         videoRenderOptions.forEach { option in
             _ = command("set", args: [option.0, option.1], checkForErrors: false)
         }
@@ -136,7 +136,7 @@ extension MPVPlayerView {
         logEffectiveVideoSettings(reason: "render-runtime")
     }
 
-    func logEffectiveVideoSettings(reason: String) {
+    nonisolated func logEffectiveVideoSettings(reason: String) {
         let propertyNames = [
             "scale",
             "cscale",

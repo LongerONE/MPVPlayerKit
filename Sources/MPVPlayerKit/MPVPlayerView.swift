@@ -202,9 +202,12 @@ public final class MPVPlayerView: UIView {
     var forceSoftwareDecode = false
     var isDolbyVisionPlayback = false
     nonisolated(unsafe) var currentSubtitleUsesOriginalStyle = false
-    var videoQualityPreset = MPVVideoQualityPreset.balanced
-    var debandEnabled = false
-    var interpolationOptions = MPVInterpolationOptions.off
+    // Runtime playback updates are serialized on `queue`, not the UIView's
+    // main-actor executor. Keep these snapshots available to those queue-bound
+    // helpers; configuration writes happen before the MPV handle is started.
+    nonisolated(unsafe) var videoQualityPreset = MPVVideoQualityPreset.balanced
+    nonisolated(unsafe) var debandEnabled = false
+    nonisolated(unsafe) var interpolationOptions = MPVInterpolationOptions.off
     nonisolated(unsafe) var subtitleDelayValue = 0.0
     nonisolated(unsafe) var subtitleStyleValues: [String: String] = [
         MPVProperty.subtitleFontSize: "38.000",
