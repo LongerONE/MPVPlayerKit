@@ -1,4 +1,5 @@
 {
+  "originHash" : "fbc7e0cc115166fc4f5ffd4f5da598ece5bcfa7dff7bddb0a67e776ed6e81025",
   "pins" : [
     {
       "identity" : "mpvkit",
@@ -8,16 +9,7 @@
         "revision" : "613c0ccc3acf70e136aaff880a9b5fe8fdfaf5b8",
         "version" : "0.41.0"
       }
-    },
-    {
-      "identity" : "snapkit",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/SnapKit/SnapKit.git",
-      "state" : {
-        "revision" : "2842e6e84e82eb9a8dac0100ca90d9444b0307f4",
-        "version" : "5.7.1"
-      }
     }
   ],
-  "version" : 2
+  "version" : 3
 }

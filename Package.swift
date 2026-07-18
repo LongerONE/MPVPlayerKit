@@ -16,14 +16,12 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/mpvkit/MPVKit.git", from: "0.41.0"),
-        .package(url: "https://github.com/SnapKit/SnapKit.git", from: "5.7.1"),
     ],
     targets: [
         .target(
             name: "MPVPlayerKit",
             dependencies: [
                 .product(name: "MPVKit", package: "MPVKit"),
-                .product(name: "SnapKit-Dynamic", package: "SnapKit"),
             ],
             path: ".",
             exclude: [

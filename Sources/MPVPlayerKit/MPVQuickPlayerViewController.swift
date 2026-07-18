@@ -1,4 +1,3 @@
-import SnapKit
 import MediaPlayer
 import UIKit
 import UniformTypeIdentifiers
@@ -208,78 +207,104 @@ public final class MPVQuickPlayerViewController: UIViewController {
         button.tintColor = .white
         button.accessibilityLabel = label
         trackButtonStack.addArrangedSubview(button)
-        button.snp.makeConstraints { make in
-            make.size.equalTo(32)
-        }
+        button.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            button.widthAnchor.constraint(equalToConstant: 32),
+            button.heightAnchor.constraint(equalToConstant: 32),
+        ])
         button.addTarget(self, action: action, for: .touchUpInside)
     }
 
     func configureLayout() {
-        player.playbackView.snp.makeConstraints { make in
-            make.edges.equalToSuperview()
-        }
-        topBar.snp.makeConstraints { make in
-            make.leading.trailing.top.equalToSuperview()
-        }
-        closeButton.snp.makeConstraints { make in
-            make.leading.equalTo(topBar.safeAreaLayoutGuide.snp.leading).offset(12)
-            make.bottom.equalToSuperview().offset(-8)
-            make.size.equalTo(36)
-            make.top.equalTo(topBar.safeAreaLayoutGuide.snp.top).offset(8)
-        }
-        statusLabel.snp.makeConstraints { make in
-            make.leading.greaterThanOrEqualTo(closeButton.snp.trailing).offset(12)
-            make.trailing.equalTo(topBar.safeAreaLayoutGuide.snp.trailing).offset(-12)
-            make.centerY.equalTo(closeButton)
-        }
-        loadingIndicator.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-        }
-        controlsView.snp.makeConstraints { make in
-            make.leading.trailing.bottom.equalToSuperview()
-        }
-        playButton.snp.makeConstraints { make in
-            make.leading.equalTo(controlsView.safeAreaLayoutGuide.snp.leading).offset(12)
-            make.top.equalToSuperview().offset(10)
-            make.size.equalTo(36)
-        }
-        progressSlider.snp.makeConstraints { make in
-            make.leading.equalTo(playButton.snp.trailing).offset(8)
-            make.centerY.equalTo(playButton)
-            make.trailing.equalTo(controlsView.safeAreaLayoutGuide.snp.trailing).offset(-12)
-        }
-        timeLabel.snp.makeConstraints { make in
-            make.leading.equalTo(progressSlider)
-            make.top.equalTo(progressSlider.snp.bottom).offset(6)
-            make.bottom.equalTo(controlsView.safeAreaLayoutGuide.snp.bottom).offset(-10)
-            make.trailing.lessThanOrEqualTo(trackButtonStack.snp.leading).offset(-12)
-        }
-        trackButtonStack.snp.makeConstraints { make in
-            make.trailing.equalTo(progressSlider)
-            make.centerY.equalTo(timeLabel)
-        }
-        systemVolumeView.snp.makeConstraints { make in
-            make.size.equalTo(1)
-            make.leading.bottom.equalToSuperview()
-        }
-        gestureHUD.snp.makeConstraints { make in
-            make.center.equalToSuperview()
-            make.width.equalTo(220)
-        }
-        gestureHUDIcon.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(14)
-            make.centerX.equalToSuperview()
-            make.size.equalTo(24)
-        }
-        gestureHUDLabel.snp.makeConstraints { make in
-            make.top.equalTo(gestureHUDIcon.snp.bottom).offset(8)
-            make.leading.trailing.equalToSuperview().inset(12)
-        }
-        gestureHUDProgress.snp.makeConstraints { make in
-            make.top.equalTo(gestureHUDLabel.snp.bottom).offset(10)
-            make.leading.trailing.equalToSuperview().inset(16)
-            make.bottom.equalToSuperview().offset(-14)
-        }
+        let constrainedViews = [
+            player.playbackView,
+            topBar,
+            closeButton,
+            statusLabel,
+            loadingIndicator,
+            controlsView,
+            playButton,
+            progressSlider,
+            timeLabel,
+            trackButtonStack,
+            systemVolumeView,
+            gestureHUD,
+            gestureHUDIcon,
+            gestureHUDLabel,
+            gestureHUDProgress,
+        ]
+        constrainedViews.forEach { $0.translatesAutoresizingMaskIntoConstraints = false }
+
+        let topSafeArea = topBar.safeAreaLayoutGuide
+        let controlsSafeArea = controlsView.safeAreaLayoutGuide
+        let hudContentView = gestureHUD.contentView
+        NSLayoutConstraint.activate([
+            player.playbackView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            player.playbackView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            player.playbackView.topAnchor.constraint(equalTo: view.topAnchor),
+            player.playbackView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            topBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            topBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            topBar.topAnchor.constraint(equalTo: view.topAnchor),
+
+            closeButton.leadingAnchor.constraint(equalTo: topSafeArea.leadingAnchor, constant: 12),
+            closeButton.topAnchor.constraint(equalTo: topSafeArea.topAnchor, constant: 8),
+            closeButton.bottomAnchor.constraint(equalTo: topBar.bottomAnchor, constant: -8),
+            closeButton.widthAnchor.constraint(equalToConstant: 36),
+            closeButton.heightAnchor.constraint(equalToConstant: 36),
+
+            statusLabel.leadingAnchor.constraint(greaterThanOrEqualTo: closeButton.trailingAnchor, constant: 12),
+            statusLabel.trailingAnchor.constraint(equalTo: topSafeArea.trailingAnchor, constant: -12),
+            statusLabel.centerYAnchor.constraint(equalTo: closeButton.centerYAnchor),
+
+            loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+
+            controlsView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            controlsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            controlsView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+
+            playButton.leadingAnchor.constraint(equalTo: controlsSafeArea.leadingAnchor, constant: 12),
+            playButton.topAnchor.constraint(equalTo: controlsView.topAnchor, constant: 10),
+            playButton.widthAnchor.constraint(equalToConstant: 36),
+            playButton.heightAnchor.constraint(equalToConstant: 36),
+
+            progressSlider.leadingAnchor.constraint(equalTo: playButton.trailingAnchor, constant: 8),
+            progressSlider.trailingAnchor.constraint(equalTo: controlsSafeArea.trailingAnchor, constant: -12),
+            progressSlider.centerYAnchor.constraint(equalTo: playButton.centerYAnchor),
+
+            timeLabel.leadingAnchor.constraint(equalTo: progressSlider.leadingAnchor),
+            timeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 6),
+            timeLabel.bottomAnchor.constraint(equalTo: controlsSafeArea.bottomAnchor, constant: -10),
+            timeLabel.trailingAnchor.constraint(lessThanOrEqualTo: trackButtonStack.leadingAnchor, constant: -12),
+
+            trackButtonStack.trailingAnchor.constraint(equalTo: progressSlider.trailingAnchor),
+            trackButtonStack.centerYAnchor.constraint(equalTo: timeLabel.centerYAnchor),
+
+            systemVolumeView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            systemVolumeView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            systemVolumeView.widthAnchor.constraint(equalToConstant: 1),
+            systemVolumeView.heightAnchor.constraint(equalToConstant: 1),
+
+            gestureHUD.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            gestureHUD.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            gestureHUD.widthAnchor.constraint(equalToConstant: 220),
+
+            gestureHUDIcon.topAnchor.constraint(equalTo: hudContentView.topAnchor, constant: 14),
+            gestureHUDIcon.centerXAnchor.constraint(equalTo: hudContentView.centerXAnchor),
+            gestureHUDIcon.widthAnchor.constraint(equalToConstant: 24),
+            gestureHUDIcon.heightAnchor.constraint(equalToConstant: 24),
+
+            gestureHUDLabel.topAnchor.constraint(equalTo: gestureHUDIcon.bottomAnchor, constant: 8),
+            gestureHUDLabel.leadingAnchor.constraint(equalTo: hudContentView.leadingAnchor, constant: 12),
+            gestureHUDLabel.trailingAnchor.constraint(equalTo: hudContentView.trailingAnchor, constant: -12),
+
+            gestureHUDProgress.topAnchor.constraint(equalTo: gestureHUDLabel.bottomAnchor, constant: 10),
+            gestureHUDProgress.leadingAnchor.constraint(equalTo: hudContentView.leadingAnchor, constant: 16),
+            gestureHUDProgress.trailingAnchor.constraint(equalTo: hudContentView.trailingAnchor, constant: -16),
+            gestureHUDProgress.bottomAnchor.constraint(equalTo: hudContentView.bottomAnchor, constant: -14),
+        ])
     }
 
     func configureGestures() {
