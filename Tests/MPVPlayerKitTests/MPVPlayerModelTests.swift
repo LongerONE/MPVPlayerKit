@@ -250,9 +250,66 @@ final class MPVPlayerModelTests: XCTestCase {
 
     func testQuickPlayerSettingTitlesAreStable() {
         XCTAssertEqual(MPVQuickPlayerViewController.rateTitle(1.25), "1.25×")
-        XCTAssertEqual(MPVQuickPlayerViewController.videoQualityTitle(.balanced), "Balanced")
-        XCTAssertEqual(MPVQuickPlayerViewController.interpolationTitle(.highQuality), "High Quality")
-        XCTAssertEqual(MPVQuickPlayerViewController.delayTitle(-0.5), "-0.5s")
+        XCTAssertEqual(
+            MPVQuickPlayerViewController.videoQualityTitle(.balanced, localization: "en"),
+            "Balanced"
+        )
+        XCTAssertEqual(
+            MPVQuickPlayerViewController.videoQualityTitle(.balanced, localization: "zh-Hans"),
+            "均衡"
+        )
+        XCTAssertEqual(
+            MPVQuickPlayerViewController.interpolationTitle(.highQuality, localization: "en"),
+            "High Quality"
+        )
+        XCTAssertEqual(
+            MPVQuickPlayerViewController.delayTitle(-0.5, localization: "en"),
+            "-0.5s"
+        )
+        XCTAssertEqual(
+            MPVQuickPlayerViewController.delayTitle(-0.5, localization: "zh-Hans"),
+            "-0.5秒"
+        )
+    }
+
+    func testLocalizationUsesSimplifiedChineseOnlyForSimplifiedChineseLocales() {
+        ["zh-Hans", "zh-Hans-CN", "zh_CN", "zh-SG"].forEach { language in
+            XCTAssertEqual(
+                MPVLocalization.localizationIdentifier(preferredLanguages: [language]),
+                "zh-Hans",
+                language
+            )
+        }
+        ["zh-Hant", "zh-TW", "zh-HK", "zh", "en", "ja", "fr"].forEach { language in
+            XCTAssertEqual(
+                MPVLocalization.localizationIdentifier(preferredLanguages: [language]),
+                "en",
+                language
+            )
+        }
+        XCTAssertEqual(
+            MPVLocalization.localizationIdentifier(preferredLanguages: []),
+            "en"
+        )
+    }
+
+    func testLocalizationLoadsPackageResourcesAndFallsBackToEnglish() {
+        XCTAssertEqual(
+            MPVLocalization.string("settings.title", localization: "zh-Hans"),
+            "播放设置"
+        )
+        XCTAssertEqual(
+            MPVLocalization.string("settings.title", localization: "zh-Hant"),
+            "Playback Settings"
+        )
+        XCTAssertEqual(
+            MPVLocalization.string(
+                "status.buffering",
+                localization: "zh-Hans",
+                arguments: [42]
+            ),
+            "正在缓冲 42%"
+        )
     }
 
     @MainActor

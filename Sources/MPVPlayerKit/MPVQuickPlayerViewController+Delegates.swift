@@ -25,7 +25,10 @@ extension MPVQuickPlayerViewController: MPVPlayerDelegate {
         }
         updateStatusLabel()
         if state == .error {
-            presentMessage(title: "Playback Error", message: "The video could not be played.")
+            presentMessage(
+                title: mpvLocalized("playback.error.title"),
+                message: mpvLocalized("playback.error.message")
+            )
         }
     }
 
@@ -67,14 +70,17 @@ extension MPVQuickPlayerViewController: UIDocumentPickerDelegate {
         }
 
         presentAfterCurrentSheet { controller in
-            let alert = controller.actionSheet(title: "Subtitle Style", sourceView: controller.subtitleButton)
-            alert.addAction(UIAlertAction(title: "Use Subtitle File Style", style: .default) { [weak controller] _ in
+            let alert = controller.actionSheet(
+                title: mpvLocalized("subtitle.style"),
+                sourceView: controller.subtitleButton
+            )
+            alert.addAction(UIAlertAction(title: mpvLocalized("subtitle.style.use_file"), style: .default) { [weak controller] _ in
                 controller?.loadExternalSubtitle(from: url, usesOriginalStyle: true)
             })
-            alert.addAction(UIAlertAction(title: "Use Player Style", style: .default) { [weak controller] _ in
+            alert.addAction(UIAlertAction(title: mpvLocalized("subtitle.style.use_player"), style: .default) { [weak controller] _ in
                 controller?.loadExternalSubtitle(from: url, usesOriginalStyle: false)
             })
-            alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
             controller.present(alert, animated: true)
         }
     }

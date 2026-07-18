@@ -120,7 +120,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
         closeButton.tintColor = .white
         closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
-        closeButton.accessibilityLabel = "Close player"
+        closeButton.accessibilityLabel = mpvLocalized("accessibility.close_player")
         closeButton.addTarget(self, action: #selector(closePlayer), for: .touchUpInside)
         topBar.addSubview(closeButton)
 
@@ -132,7 +132,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
         loadingIndicator.color = .white
         loadingIndicator.hidesWhenStopped = true
-        loadingIndicator.accessibilityLabel = "Loading video"
+        loadingIndicator.accessibilityLabel = mpvLocalized("accessibility.loading_video")
         loadingIndicator.accessibilityIdentifier = "MPVQuickPlayer.loadingIndicator"
         view.addSubview(loadingIndicator)
 
@@ -140,7 +140,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         view.addSubview(controlsView)
 
         playButton.tintColor = .white
-        playButton.accessibilityLabel = "Play or pause"
+        playButton.accessibilityLabel = mpvLocalized("accessibility.play_pause")
         playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
         playButton.addTarget(self, action: #selector(togglePlayback), for: .touchUpInside)
         controlsView.addSubview(playButton)
@@ -167,10 +167,30 @@ public final class MPVQuickPlayerViewController: UIViewController {
         trackButtonStack.spacing = 14
         controlsView.addSubview(trackButtonStack)
 
-        configureControlButton(videoButton, symbol: "film", label: "Video track", action: #selector(chooseVideoTrack))
-        configureControlButton(audioButton, symbol: "waveform", label: "Audio track", action: #selector(chooseAudioTrack))
-        configureControlButton(subtitleButton, symbol: "captions.bubble", label: "Subtitles", action: #selector(chooseSubtitleTrack))
-        configureControlButton(settingsButton, symbol: "gearshape", label: "Playback settings", action: #selector(showSettings))
+        configureControlButton(
+            videoButton,
+            symbol: "film",
+            label: mpvLocalized("accessibility.video_track"),
+            action: #selector(chooseVideoTrack)
+        )
+        configureControlButton(
+            audioButton,
+            symbol: "waveform",
+            label: mpvLocalized("accessibility.audio_track"),
+            action: #selector(chooseAudioTrack)
+        )
+        configureControlButton(
+            subtitleButton,
+            symbol: "captions.bubble",
+            label: mpvLocalized("accessibility.subtitles"),
+            action: #selector(chooseSubtitleTrack)
+        )
+        configureControlButton(
+            settingsButton,
+            symbol: "gearshape",
+            label: mpvLocalized("accessibility.playback_settings"),
+            action: #selector(showSettings)
+        )
 
         systemVolumeView.alpha = 0.001
         systemVolumeView.isUserInteractionEnabled = false

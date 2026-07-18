@@ -1,0 +1,68 @@
+"accessibility.close_player" = "关闭播放器";
+"accessibility.loading_video" = "正在加载视频";
+"accessibility.play_pause" = "播放或暂停";
+"accessibility.video_track" = "视频轨道";
+"accessibility.audio_track" = "音频轨道";
+"accessibility.subtitles" = "字幕";
+"accessibility.playback_settings" = "播放设置";
+
+"common.cancel" = "取消";
+"common.ok" = "确定";
+"common.apply" = "应用";
+"common.off" = "关闭";
+"common.custom" = "自定义…";
+
+"playback.error.title" = "播放错误";
+"playback.error.message" = "无法播放此视频。";
+
+"settings.title" = "播放设置";
+"settings.playback_speed" = "播放速度";
+"settings.playback_speed.value" = "播放速度 · %@";
+"settings.video_quality" = "视频质量";
+"settings.video_quality.value" = "视频质量 · %@";
+"settings.frame_interpolation" = "帧插值";
+"settings.frame_interpolation.value" = "帧插值 · %@";
+"settings.enable_debanding" = "启用色带抑制";
+"settings.disable_debanding" = "关闭色带抑制";
+"settings.fit_video" = "适应画面";
+"settings.fill_screen" = "填满屏幕";
+
+"quality.power_saver" = "节能";
+"quality.balanced" = "均衡";
+"quality.high" = "高质量";
+"interpolation.off" = "关闭";
+"interpolation.standard" = "标准";
+"interpolation.smooth" = "流畅";
+"interpolation.high" = "高质量";
+
+"subtitle.delay" = "字幕延迟";
+"subtitle.delay.value" = "字幕延迟 · %@";
+"subtitle.delay.prompt" = "请输入 -60 到 60 之间的秒数，正数表示延迟显示字幕。";
+"subtitle.delay.zero" = "0秒";
+"subtitle.delay.format" = "%+.2g秒";
+"subtitle.style" = "字幕样式";
+"subtitle.style.default" = "默认";
+"subtitle.style.large" = "大字号";
+"subtitle.style.high_contrast" = "高对比度";
+"subtitle.style.use_file" = "使用字幕文件样式";
+"subtitle.style.use_player" = "使用播放器样式";
+"subtitle.load_external" = "加载外部字幕…";
+"subtitle.cancel_load" = "取消加载字幕";
+"subtitle.loading" = "正在加载字幕…";
+"subtitle.error.title" = "字幕错误";
+"subtitle.error.message" = "无法加载外部字幕。";
+
+"track.video" = "视频轨道";
+"track.audio" = "音频轨道";
+"track.subtitle" = "字幕轨道";
+"track.none" = "当前没有可用轨道。";
+
+"status.buffering" = "正在缓冲 %d%%";
+"status.ready" = "就绪";
+"status.playing" = "正在播放";
+"status.paused" = "已暂停";
+"status.finished" = "播放结束";
+"status.playback_error" = "播放错误";
+"status.decoder_initializing" = "正在初始化解码器";
+"status.hardware_decoding" = "硬件解码";
+"status.software_decoding" = "软件解码";

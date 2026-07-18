@@ -152,43 +152,69 @@ extension MPVQuickPlayerViewController {
         return value + "×"
     }
 
-    static func videoQualityTitle(_ quality: MPVVideoQuality) -> String {
-        switch quality {
-        case .powerSaving: "Power Saver"
-        case .balanced: "Balanced"
-        case .highQuality: "High Quality"
+    static func videoQualityTitle(
+        _ quality: MPVVideoQuality,
+        localization: String? = nil
+    ) -> String {
+        let key = switch quality {
+        case .powerSaving: "quality.power_saver"
+        case .balanced: "quality.balanced"
+        case .highQuality: "quality.high"
         }
+        return localizedTitle(key, localization: localization)
     }
 
-    static func interpolationTitle(_ quality: MPVInterpolationQuality) -> String {
-        switch quality {
-        case .off: "Off"
-        case .standard: "Standard"
-        case .smooth: "Smooth"
-        case .highQuality: "High Quality"
+    static func interpolationTitle(
+        _ quality: MPVInterpolationQuality,
+        localization: String? = nil
+    ) -> String {
+        let key = switch quality {
+        case .off: "interpolation.off"
+        case .standard: "interpolation.standard"
+        case .smooth: "interpolation.smooth"
+        case .highQuality: "interpolation.high"
         }
+        return localizedTitle(key, localization: localization)
     }
 
-    static func delayTitle(_ delay: TimeInterval) -> String {
-        if abs(delay) < 0.001 { return "0s" }
-        return String(format: "%+.2gs", delay)
+    static func delayTitle(
+        _ delay: TimeInterval,
+        localization: String? = nil
+    ) -> String {
+        let localization = localization ?? MPVLocalization.localizationIdentifier()
+        if abs(delay) < 0.001 {
+            return MPVLocalization.string("subtitle.delay.zero", localization: localization)
+        }
+        return MPVLocalization.string(
+            "subtitle.delay.format",
+            localization: localization,
+            arguments: [delay]
+        )
+    }
+
+    private static func localizedTitle(
+        _ key: String,
+        localization: String?
+    ) -> String {
+        guard let localization else { return mpvLocalized(key) }
+        return MPVLocalization.string(key, localization: localization)
     }
 
     func updateStatusLabel() {
         let stateTitle: String
         switch playbackState {
-        case .buffering: stateTitle = "Buffering \(bufferingProgress)%"
-        case .readyToPlay: stateTitle = "Ready"
-        case .bufferFinished: stateTitle = "Playing"
-        case .paused: stateTitle = "Paused"
-        case .playedToTheEnd: stateTitle = "Finished"
-        case .error: stateTitle = "Playback Error"
+        case .buffering: stateTitle = mpvLocalized("status.buffering", bufferingProgress)
+        case .readyToPlay: stateTitle = mpvLocalized("status.ready")
+        case .bufferFinished: stateTitle = mpvLocalized("status.playing")
+        case .paused: stateTitle = mpvLocalized("status.paused")
+        case .playedToTheEnd: stateTitle = mpvLocalized("status.finished")
+        case .error: stateTitle = mpvLocalized("status.playback_error")
         }
         let decoderTitle: String
         switch decoderMode {
-        case .initializing: decoderTitle = "Decoder initializing"
-        case .hardware: decoderTitle = "Hardware decoding"
-        case .software: decoderTitle = "Software decoding"
+        case .initializing: decoderTitle = mpvLocalized("status.decoder_initializing")
+        case .hardware: decoderTitle = mpvLocalized("status.hardware_decoding")
+        case .software: decoderTitle = mpvLocalized("status.software_decoding")
         }
         statusLabel.text = "\(stateTitle) · \(decoderTitle) · \(Self.rateTitle(playbackRate))"
     }

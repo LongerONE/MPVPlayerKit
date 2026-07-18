@@ -4,6 +4,7 @@ import PackageDescription
 
 let package = Package(
     name: "MPVPlayerKit",
+    defaultLocalization: "en",
     platforms: [
         .iOS(.v15),
     ],

@@ -1,0 +1,68 @@
+"accessibility.close_player" = "Close player";
+"accessibility.loading_video" = "Loading video";
+"accessibility.play_pause" = "Play or pause";
+"accessibility.video_track" = "Video track";
+"accessibility.audio_track" = "Audio track";
+"accessibility.subtitles" = "Subtitles";
+"accessibility.playback_settings" = "Playback settings";
+
+"common.cancel" = "Cancel";
+"common.ok" = "OK";
+"common.apply" = "Apply";
+"common.off" = "Off";
+"common.custom" = "Custom…";
+
+"playback.error.title" = "Playback Error";
+"playback.error.message" = "The video could not be played.";
+
+"settings.title" = "Playback Settings";
+"settings.playback_speed" = "Playback Speed";
+"settings.playback_speed.value" = "Playback Speed · %@";
+"settings.video_quality" = "Video Quality";
+"settings.video_quality.value" = "Video Quality · %@";
+"settings.frame_interpolation" = "Frame Interpolation";
+"settings.frame_interpolation.value" = "Frame Interpolation · %@";
+"settings.enable_debanding" = "Enable Debanding";
+"settings.disable_debanding" = "Disable Debanding";
+"settings.fit_video" = "Fit Video";
+"settings.fill_screen" = "Fill Screen";
+
+"quality.power_saver" = "Power Saver";
+"quality.balanced" = "Balanced";
+"quality.high" = "High Quality";
+"interpolation.off" = "Off";
+"interpolation.standard" = "Standard";
+"interpolation.smooth" = "Smooth";
+"interpolation.high" = "High Quality";
+
+"subtitle.delay" = "Subtitle Delay";
+"subtitle.delay.value" = "Subtitle Delay · %@";
+"subtitle.delay.prompt" = "Enter seconds from -60 to 60. Positive values delay subtitles.";
+"subtitle.delay.zero" = "0s";
+"subtitle.delay.format" = "%+.2gs";
+"subtitle.style" = "Subtitle Style";
+"subtitle.style.default" = "Default";
+"subtitle.style.large" = "Large";
+"subtitle.style.high_contrast" = "High Contrast";
+"subtitle.style.use_file" = "Use Subtitle File Style";
+"subtitle.style.use_player" = "Use Player Style";
+"subtitle.load_external" = "Load External Subtitle…";
+"subtitle.cancel_load" = "Cancel Subtitle Load";
+"subtitle.loading" = "Loading subtitle…";
+"subtitle.error.title" = "Subtitle Error";
+"subtitle.error.message" = "The external subtitle could not be loaded.";
+
+"track.video" = "Video Track";
+"track.audio" = "Audio Track";
+"track.subtitle" = "Subtitle Track";
+"track.none" = "No tracks are currently available.";
+
+"status.buffering" = "Buffering %d%%";
+"status.ready" = "Ready";
+"status.playing" = "Playing";
+"status.paused" = "Paused";
+"status.finished" = "Finished";
+"status.playback_error" = "Playback Error";
+"status.decoder_initializing" = "Decoder initializing";
+"status.hardware_decoding" = "Hardware decoding";
+"status.software_decoding" = "Software decoding";
