@@ -5,6 +5,9 @@
 "accessibility.audio_track" = "音频轨道";
 "accessibility.subtitles" = "字幕";
 "accessibility.playback_settings" = "播放设置";
+"accessibility.force_landscape" = "强制横屏";
+"accessibility.enabled" = "已开启";
+"accessibility.disabled" = "已关闭";
 
 "common.cancel" = "取消";
 "common.ok" = "确定";

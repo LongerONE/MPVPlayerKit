@@ -214,6 +214,25 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(controller.subtitleStyle, .highContrast)
     }
 
+    func testQuickPlayerCanStartAndRemainLockedInLandscape() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
+        let controller = MPVQuickPlayerViewController(
+            url: url,
+            autoplay: false,
+            forceLandscape: true
+        )
+
+        XCTAssertTrue(controller.isLandscapeForced)
+        XCTAssertEqual(controller.supportedInterfaceOrientations, .landscapeRight)
+        XCTAssertEqual(controller.preferredInterfaceOrientationForPresentation, .landscapeRight)
+
+        controller.setForceLandscape(false)
+
+        XCTAssertFalse(controller.isLandscapeForced)
+        XCTAssertEqual(controller.supportedInterfaceOrientations, .all)
+        XCTAssertEqual(controller.preferredInterfaceOrientationForPresentation, .portrait)
+    }
+
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
         let style = MPVSubtitleStyle(
             fontSize: 200,
@@ -241,6 +260,7 @@ final class MPVPlayerModelTests: XCTestCase {
             "waveform",
             "captions.bubble",
             "gearshape",
+            "rectangle.landscape.rotate",
             "sun.max.fill",
             "speaker.wave.2.fill",
         ].forEach { symbol in

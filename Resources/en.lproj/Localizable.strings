@@ -5,6 +5,9 @@
 "accessibility.audio_track" = "Audio track";
 "accessibility.subtitles" = "Subtitles";
 "accessibility.playback_settings" = "Playback settings";
+"accessibility.force_landscape" = "Force landscape";
+"accessibility.enabled" = "On";
+"accessibility.disabled" = "Off";
 
 "common.cancel" = "Cancel";
 "common.ok" = "OK";

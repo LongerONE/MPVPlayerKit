@@ -21,6 +21,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public let player: MPVPlayer
     public var autoplay: Bool
     public var gestureOptions: MPVQuickPlayerGestureOptions = .all
+    public internal(set) var isLandscapeForced: Bool
     public internal(set) var playbackRate = 1.0
     public internal(set) var videoQuality: MPVVideoQuality
     public internal(set) var debandEnabled: Bool
@@ -30,6 +31,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
     let topBar = UIView()
     let closeButton = UIButton(type: .system)
+    let orientationButton = UIButton(type: .system)
     let statusLabel = UILabel()
     let controlsView = UIView()
     let playButton = UIButton(type: .system)
@@ -66,9 +68,14 @@ public final class MPVQuickPlayerViewController: UIViewController {
         case volume
     }
 
-    public init(configuration: MPVPlayerConfiguration, autoplay: Bool = true) {
+    public init(
+        configuration: MPVPlayerConfiguration,
+        autoplay: Bool = true,
+        forceLandscape: Bool = false
+    ) {
         player = MPVPlayer(configuration: configuration)
         self.autoplay = autoplay
+        isLandscapeForced = forceLandscape
         videoQuality = configuration.videoQuality
         debandEnabled = configuration.debandEnabled
         interpolationOptions = configuration.interpolationOptions
@@ -76,16 +83,33 @@ public final class MPVQuickPlayerViewController: UIViewController {
         player.delegate = self
     }
 
-    public convenience init(url: URL, autoplay: Bool = true) {
+    public convenience init(
+        url: URL,
+        autoplay: Bool = true,
+        forceLandscape: Bool = false
+    ) {
         self.init(
             configuration: MPVPlayerConfiguration(url: url),
-            autoplay: autoplay
+            autoplay: autoplay,
+            forceLandscape: forceLandscape
         )
     }
 
     @available(*, unavailable)
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+
+    public override var shouldAutorotate: Bool {
+        true
+    }
+
+    public override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
+        isLandscapeForced ? .landscapeRight : .all
+    }
+
+    public override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
+        isLandscapeForced ? .landscapeRight : .portrait
     }
 
     public override func viewDidLoad() {
@@ -97,6 +121,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        applyPreferredOrientationIfNeeded()
         if autoplay, player.isPlaying == false {
             player.play()
         }
@@ -123,6 +148,14 @@ public final class MPVQuickPlayerViewController: UIViewController {
         closeButton.accessibilityLabel = mpvLocalized("accessibility.close_player")
         closeButton.addTarget(self, action: #selector(closePlayer), for: .touchUpInside)
         topBar.addSubview(closeButton)
+
+        orientationButton.tintColor = .white
+        orientationButton.setImage(UIImage(systemName: "rectangle.landscape.rotate"), for: .normal)
+        orientationButton.accessibilityLabel = mpvLocalized("accessibility.force_landscape")
+        orientationButton.accessibilityIdentifier = "MPVQuickPlayer.orientationButton"
+        orientationButton.addTarget(self, action: #selector(toggleForcedLandscape), for: .touchUpInside)
+        topBar.addSubview(orientationButton)
+        updateOrientationButton()
 
         statusLabel.textColor = .white
         statusLabel.font = .systemFont(ofSize: 12, weight: .medium)
@@ -240,6 +273,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
             player.playbackView,
             topBar,
             closeButton,
+            orientationButton,
             statusLabel,
             loadingIndicator,
             controlsView,
@@ -274,7 +308,12 @@ public final class MPVQuickPlayerViewController: UIViewController {
             closeButton.widthAnchor.constraint(equalToConstant: 36),
             closeButton.heightAnchor.constraint(equalToConstant: 36),
 
-            statusLabel.leadingAnchor.constraint(greaterThanOrEqualTo: closeButton.trailingAnchor, constant: 12),
+            orientationButton.leadingAnchor.constraint(equalTo: closeButton.trailingAnchor, constant: 8),
+            orientationButton.centerYAnchor.constraint(equalTo: closeButton.centerYAnchor),
+            orientationButton.widthAnchor.constraint(equalToConstant: 36),
+            orientationButton.heightAnchor.constraint(equalToConstant: 36),
+
+            statusLabel.leadingAnchor.constraint(greaterThanOrEqualTo: orientationButton.trailingAnchor, constant: 12),
             statusLabel.trailingAnchor.constraint(equalTo: topSafeArea.trailingAnchor, constant: -12),
             statusLabel.centerYAnchor.constraint(equalTo: closeButton.centerYAnchor),
 
@@ -344,6 +383,9 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
     @objc private func closePlayer() {
         player.stop()
+        if isLandscapeForced {
+            setForceLandscape(false)
+        }
         if let navigationController,
            navigationController.viewControllers.first !== self {
             navigationController.popViewController(animated: true)

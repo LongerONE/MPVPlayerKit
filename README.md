@@ -72,11 +72,20 @@ The legacy `smoothPlaybackEnabled` configuration remains supported and maps to t
 For apps that do not need custom controls:
 
 ```swift
-let playerViewController = MPVQuickPlayerViewController(url: videoURL)
+let playerViewController = MPVQuickPlayerViewController(
+    url: videoURL,
+    forceLandscape: true
+)
 present(playerViewController, animated: true)
 ```
 
-The quick interface provides play/pause, seeking, time display, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, frame interpolation, fit/fill display modes, decoder and buffering status, and a centered loading indicator. Its compact control bar uses SF Symbols with accessibility labels.
+The quick interface provides play/pause, seeking, time display, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, frame interpolation, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses SF Symbols with accessibility labels. The host app must include landscape-right in its supported interface orientations.
+
+Landscape lock can also be changed while the player is visible:
+
+```swift
+playerViewController.setForceLandscape(true)
+```
 
 It also supports full-screen pan gestures: horizontal seeking, brightness on the left half and system volume on the right half. Each gesture can be disabled when the host app owns that interaction:
 
