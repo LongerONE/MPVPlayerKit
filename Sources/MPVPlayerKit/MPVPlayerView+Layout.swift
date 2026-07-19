@@ -9,6 +9,12 @@ import libmpv
 #error("MPVPlayerKit requires MPVKit's Libmpv module.")
 #endif
 
+struct MPVMetalLayerGeometry: Equatable {
+    let layerBounds: CGRect
+    let drawableSize: CGSize
+    let contentsScale: CGFloat
+}
+
 extension MPVPlayerView {
     func setContentModeSnapshot(_ contentModeSnapshot: MPVContentModeSnapshot) {
         contentModeSnapshotLock.lock()
@@ -49,35 +55,130 @@ extension MPVPlayerView {
             return
         }
 
-        let scale = UIScreen.main.nativeScale
-        let layerBounds = CGRect(origin: .zero, size: bounds.size)
-        let drawableSize = CGSize(
-            width: bounds.size.width * scale,
-            height: bounds.size.height * scale
+        let geometry = MPVMetalLayerGeometry(
+            layerBounds: CGRect(origin: .zero, size: bounds.size),
+            drawableSize: CGSize(
+                width: bounds.size.width * UIScreen.main.nativeScale,
+                height: bounds.size.height * UIScreen.main.nativeScale
+            ),
+            contentsScale: UIScreen.main.nativeScale
         )
         let geometryChanged = hasMetalGeometryChanged(
-            layerBounds: layerBounds,
-            drawableSize: drawableSize
+            layerBounds: geometry.layerBounds,
+            drawableSize: geometry.drawableSize
         )
 
-        if mpv != nil, geometryChanged {
-            animateGeometryTransitionOut(targetSize: layerBounds.size, reason: "layout")
+        guard geometryChanged else { return }
+
+        guard mpv != nil else {
+            applyMetalLayerGeometry(geometry)
+            return
         }
 
+        pendingMetalLayerGeometry = geometry
+        guard isMetalGeometryTransitionInProgress == false else { return }
+        animateGeometryTransitionOut(targetSize: geometry.layerBounds.size, reason: "layout")
+        beginMetalGeometryTransition()
+    }
+
+    private func applyMetalLayerGeometry(_ geometry: MPVMetalLayerGeometry) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
-        metalLayer.frame = layerBounds
-        metalLayer.contentsScale = scale
-        metalLayer.drawableSize = drawableSize
+        metalLayer.frame = geometry.layerBounds
+        metalLayer.contentsScale = geometry.contentsScale
+        metalLayer.drawableSize = geometry.drawableSize
         CATransaction.commit()
 
-        lastAppliedLayerBounds = layerBounds
-        lastAppliedDrawableSize = drawableSize
+        lastAppliedLayerBounds = geometry.layerBounds
+        lastAppliedDrawableSize = geometry.drawableSize
+        mpvDebugLog(
+            "metal geometry applied bounds=\(geometry.layerBounds) "
+                + "drawable=\(geometry.drawableSize) scale=\(geometry.contentsScale)"
+        )
+    }
 
-        if mpv != nil, geometryChanged {
-            mpvDebugLog("metal geometry changed bounds=\(layerBounds) drawable=\(drawableSize) scale=\(scale)")
-            applyContentMode(contentMode)
-            scheduleVideoOutputRefresh(drawableSize: drawableSize, layerBounds: layerBounds, contentMode: contentMode)
+    private func beginMetalGeometryTransition() {
+        isMetalGeometryTransitionInProgress = true
+        queue.async { [weak self] in
+            guard let self, let mpv = self.mpv, self.stopped == false else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.applyPendingMetalGeometryWithoutVideoOutput()
+                }
+                return
+            }
+            self.mpvDebugLog("metal geometry transition suspending video output")
+            let suspendResult = mpv_set_property_string(mpv, MPVProperty.videoID, "no")
+            self.checkError(
+                suspendResult,
+                operation: "layout transition vid=no",
+                notifyOnFailure: false
+            )
+            guard suspendResult >= 0 else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.cancelMetalGeometryTransitionAfterSuspendFailure()
+                }
+                return
+            }
+            DispatchQueue.main.async { [weak self] in
+                self?.applyPendingMetalGeometryAndResumeVideoOutput()
+            }
+        }
+    }
+
+    private func applyPendingMetalGeometryWithoutVideoOutput() {
+        if let geometry = pendingMetalLayerGeometry {
+            pendingMetalLayerGeometry = nil
+            applyMetalLayerGeometry(geometry)
+        }
+        isMetalGeometryTransitionInProgress = false
+        animateGeometryTransitionIn()
+    }
+
+    private func cancelMetalGeometryTransitionAfterSuspendFailure() {
+        pendingMetalLayerGeometry = nil
+        isMetalGeometryTransitionInProgress = false
+        animateGeometryTransitionIn()
+    }
+
+    private func applyPendingMetalGeometryAndResumeVideoOutput() {
+        guard let geometry = pendingMetalLayerGeometry else {
+            isMetalGeometryTransitionInProgress = false
+            animateGeometryTransitionIn()
+            return
+        }
+        pendingMetalLayerGeometry = nil
+        applyMetalLayerGeometry(geometry)
+
+        let contentModeSnapshot = currentContentModeSnapshot()
+        queue.async { [weak self] in
+            guard let self, let mpv = self.mpv, self.stopped == false else {
+                DispatchQueue.main.async { [weak self] in
+                    self?.finishMetalGeometryTransition()
+                }
+                return
+            }
+            self.checkError(
+                mpv_set_property_string(mpv, MPVProperty.videoID, "auto"),
+                operation: "layout transition vid=auto",
+                notifyOnFailure: false
+            )
+            self.applyContentMode(contentModeSnapshot)
+            self.mpvDebugLog(
+                "metal geometry transition resumed video output "
+                    + "bounds=\(geometry.layerBounds) drawable=\(geometry.drawableSize)"
+            )
+            DispatchQueue.main.async { [weak self] in
+                self?.finishMetalGeometryTransition()
+            }
+        }
+    }
+
+    private func finishMetalGeometryTransition() {
+        isMetalGeometryTransitionInProgress = false
+        if pendingMetalLayerGeometry != nil {
+            beginMetalGeometryTransition()
+        } else {
+            animateGeometryTransitionIn()
         }
     }
 
@@ -92,41 +193,6 @@ extension MPVPlayerView {
             || abs(lastAppliedLayerBounds.height - layerBounds.height) > 0.5
             || abs(lastAppliedDrawableSize.width - drawableSize.width) > 0.5
             || abs(lastAppliedDrawableSize.height - drawableSize.height) > 0.5
-    }
-
-    func scheduleVideoOutputRefresh(drawableSize: CGSize, layerBounds: CGRect, contentMode: UIView.ContentMode) {
-        videoOutputRefreshWorkItem?.cancel()
-        let workItem = DispatchWorkItem { [weak self] in
-            self?.refreshVideoOutputAfterGeometryChange(
-                drawableSize: drawableSize,
-                layerBounds: layerBounds,
-                contentMode: contentMode
-            )
-        }
-        videoOutputRefreshWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: workItem)
-    }
-
-    func refreshVideoOutputAfterGeometryChange(drawableSize: CGSize, layerBounds: CGRect, contentMode: UIView.ContentMode) {
-        queue.async { [weak self] in
-            guard let self, let mpv = self.mpv, self.stopped == false else { return }
-            self.mpvDebugLog("video output refresh begin bounds=\(layerBounds) drawable=\(drawableSize)")
-            self.checkError(
-                mpv_set_option_string(mpv, "vid", "no"),
-                operation: "layout refresh vid=no",
-                notifyOnFailure: false
-            )
-            self.checkError(
-                mpv_set_option_string(mpv, "vid", "auto"),
-                operation: "layout refresh vid=auto",
-                notifyOnFailure: false
-            )
-            self.applyContentMode(contentMode)
-            self.mpvDebugLog("video output refresh end bounds=\(layerBounds) drawable=\(drawableSize)")
-            DispatchQueue.main.async { [weak self] in
-                self?.animateGeometryTransitionIn()
-            }
-        }
     }
 
     func animateGeometryTransitionOut(targetSize: CGSize, reason: String) {

@@ -369,8 +369,8 @@ extension MPVPlayerView {
     func destroyMPVHandle(reason: String, sendStopCommand: Bool = true) {
         setDecoderMode(.initializing)
         stopTimeTimer()
-        videoOutputRefreshWorkItem?.cancel()
-        videoOutputRefreshWorkItem = nil
+        pendingMetalLayerGeometry = nil
+        isMetalGeometryTransitionInProgress = false
         lastLoggedSubtitleText = ""
         hasLoggedSubtitleTextEvent = false
         resetGeometryTransitionAnimation()

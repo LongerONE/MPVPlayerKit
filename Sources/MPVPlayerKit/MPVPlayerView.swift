@@ -257,7 +257,8 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var repeatedMPVLogMessageCounts: [String: Int] = [:]
     var lastAppliedLayerBounds = CGRect.null
     var lastAppliedDrawableSize = CGSize.zero
-    var videoOutputRefreshWorkItem: DispatchWorkItem?
+    var pendingMetalLayerGeometry: MPVMetalLayerGeometry?
+    var isMetalGeometryTransitionInProgress = false
     var geometryTransitionOverlayView: UIView?
     var geometryTransitionPreparedTargetSize = CGSize.zero
     let geometryTransitionFallbackAlpha: CGFloat = 0.58
@@ -351,8 +352,8 @@ public final class MPVPlayerView: UIView {
         activeSetupProfileIndex = 0
         lastAppliedLayerBounds = CGRect.null
         lastAppliedDrawableSize = .zero
-        videoOutputRefreshWorkItem?.cancel()
-        videoOutputRefreshWorkItem = nil
+        pendingMetalLayerGeometry = nil
+        isMetalGeometryTransitionInProgress = false
         geometryTransitionPreparedTargetSize = .zero
         resetGeometryTransitionAnimation()
         currentTime = 0.0
