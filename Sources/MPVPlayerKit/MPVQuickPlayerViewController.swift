@@ -29,6 +29,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public internal(set) var subtitleDelay: TimeInterval = 0
     public internal(set) var subtitleStyle = MPVSubtitleStyle.defaultStyle
 
+    let contentView = UIView()
     let topBar = UIView()
     let closeButton = UIButton(type: .system)
     let orientationButton = UIButton(type: .system)
@@ -60,6 +61,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var bufferingProgress = 0
     var pendingSubtitleRequestID: UUID?
     var isCancellingSubtitleLoad = false
+    var isUsingManualLandscape: Bool
 
     enum PanDirection {
         case none
@@ -76,6 +78,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         player = MPVPlayer(configuration: configuration)
         self.autoplay = autoplay
         isLandscapeForced = forceLandscape
+        isUsingManualLandscape = forceLandscape && Self.applicationSupportsLandscape == false
         videoQuality = configuration.videoQuality
         debandEnabled = configuration.debandEnabled
         interpolationOptions = configuration.interpolationOptions
@@ -105,11 +108,14 @@ public final class MPVQuickPlayerViewController: UIViewController {
     }
 
     public override var supportedInterfaceOrientations: UIInterfaceOrientationMask {
-        isLandscapeForced ? .landscapeRight : .all
+        if isUsingManualLandscape {
+            return .portrait
+        }
+        return isLandscapeForced ? .landscapeRight : .all
     }
 
     public override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation {
-        isLandscapeForced ? .landscapeRight : .portrait
+        isLandscapeForced && isUsingManualLandscape == false ? .landscapeRight : .portrait
     }
 
     public override func viewDidLoad() {
@@ -127,6 +133,11 @@ public final class MPVQuickPlayerViewController: UIViewController {
         }
     }
 
+    public override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        layoutOrientationContentView()
+    }
+
     public override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         if isBeingDismissed || navigationController?.isBeingDismissed == true {
@@ -136,12 +147,14 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
     func configureViews() {
         view.backgroundColor = .black
+        contentView.backgroundColor = .black
+        view.addSubview(contentView)
         player.playbackView.backgroundColor = .black
         player.contentMode = .scaleAspectFit
-        view.addSubview(player.playbackView)
+        contentView.addSubview(player.playbackView)
 
         topBar.backgroundColor = UIColor.black.withAlphaComponent(0.55)
-        view.addSubview(topBar)
+        contentView.addSubview(topBar)
 
         closeButton.tintColor = .white
         closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
@@ -167,10 +180,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
         loadingIndicator.hidesWhenStopped = true
         loadingIndicator.accessibilityLabel = mpvLocalized("accessibility.loading_video")
         loadingIndicator.accessibilityIdentifier = "MPVQuickPlayer.loadingIndicator"
-        view.addSubview(loadingIndicator)
+        contentView.addSubview(loadingIndicator)
 
         controlsView.backgroundColor = UIColor.black.withAlphaComponent(0.72)
-        view.addSubview(controlsView)
+        contentView.addSubview(controlsView)
 
         playButton.tintColor = .white
         playButton.accessibilityLabel = mpvLocalized("accessibility.play_pause")
@@ -227,13 +240,13 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
         systemVolumeView.alpha = 0.001
         systemVolumeView.isUserInteractionEnabled = false
-        view.addSubview(systemVolumeView)
+        contentView.addSubview(systemVolumeView)
 
         gestureHUD.alpha = 0
         gestureHUD.isUserInteractionEnabled = false
         gestureHUD.layer.cornerRadius = 12
         gestureHUD.clipsToBounds = true
-        view.addSubview(gestureHUD)
+        contentView.addSubview(gestureHUD)
 
         gestureHUDIcon.tintColor = .white
         gestureHUDIcon.contentMode = .scaleAspectFit
@@ -293,14 +306,14 @@ public final class MPVQuickPlayerViewController: UIViewController {
         let controlsSafeArea = controlsView.safeAreaLayoutGuide
         let hudContentView = gestureHUD.contentView
         NSLayoutConstraint.activate([
-            player.playbackView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            player.playbackView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            player.playbackView.topAnchor.constraint(equalTo: view.topAnchor),
-            player.playbackView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            player.playbackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            player.playbackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            player.playbackView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            player.playbackView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-            topBar.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            topBar.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            topBar.topAnchor.constraint(equalTo: view.topAnchor),
+            topBar.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            topBar.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            topBar.topAnchor.constraint(equalTo: contentView.topAnchor),
 
             closeButton.leadingAnchor.constraint(equalTo: topSafeArea.leadingAnchor, constant: 12),
             closeButton.topAnchor.constraint(equalTo: topSafeArea.topAnchor, constant: 8),
@@ -317,12 +330,12 @@ public final class MPVQuickPlayerViewController: UIViewController {
             statusLabel.trailingAnchor.constraint(equalTo: topSafeArea.trailingAnchor, constant: -12),
             statusLabel.centerYAnchor.constraint(equalTo: closeButton.centerYAnchor),
 
-            loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            loadingIndicator.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            loadingIndicator.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
 
-            controlsView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            controlsView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            controlsView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            controlsView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            controlsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            controlsView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
             playButton.leadingAnchor.constraint(equalTo: controlsSafeArea.leadingAnchor, constant: 12),
             playButton.topAnchor.constraint(equalTo: controlsView.topAnchor, constant: 10),
@@ -341,13 +354,13 @@ public final class MPVQuickPlayerViewController: UIViewController {
             trackButtonStack.trailingAnchor.constraint(equalTo: progressSlider.trailingAnchor),
             trackButtonStack.centerYAnchor.constraint(equalTo: timeLabel.centerYAnchor),
 
-            systemVolumeView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            systemVolumeView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            systemVolumeView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            systemVolumeView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
             systemVolumeView.widthAnchor.constraint(equalToConstant: 1),
             systemVolumeView.heightAnchor.constraint(equalToConstant: 1),
 
-            gestureHUD.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            gestureHUD.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            gestureHUD.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            gestureHUD.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
             gestureHUD.widthAnchor.constraint(equalToConstant: 220),
 
             gestureHUDIcon.topAnchor.constraint(equalTo: hudContentView.topAnchor, constant: 14),
@@ -370,7 +383,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePanGesture(_:)))
         panGesture.cancelsTouchesInView = false
         panGesture.delegate = self
-        view.addGestureRecognizer(panGesture)
+        contentView.addGestureRecognizer(panGesture)
     }
 
     @objc private func togglePlayback() {

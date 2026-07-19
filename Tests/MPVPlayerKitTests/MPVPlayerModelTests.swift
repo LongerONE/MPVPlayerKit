@@ -214,7 +214,7 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(controller.subtitleStyle, .highContrast)
     }
 
-    func testQuickPlayerCanStartAndRemainLockedInLandscape() throws {
+    func testQuickPlayerCanForceLandscapeWhenHostOnlySupportsPortrait() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(
             url: url,
@@ -223,14 +223,31 @@ final class MPVPlayerModelTests: XCTestCase {
         )
 
         XCTAssertTrue(controller.isLandscapeForced)
-        XCTAssertEqual(controller.supportedInterfaceOrientations, .landscapeRight)
-        XCTAssertEqual(controller.preferredInterfaceOrientationForPresentation, .landscapeRight)
+        XCTAssertFalse(MPVQuickPlayerViewController.supportsLandscape(orientationNames: [
+            "UIInterfaceOrientationPortrait",
+        ]))
+        XCTAssertTrue(MPVQuickPlayerViewController.supportsLandscape(orientationNames: [
+            "UIInterfaceOrientationPortrait",
+            "UIInterfaceOrientationLandscapeRight",
+        ]))
+
+        controller.loadViewIfNeeded()
+        controller.view.bounds = CGRect(x: 0, y: 0, width: 390, height: 844)
+        controller.isUsingManualLandscape = true
+        controller.layoutOrientationContentView()
+
+        XCTAssertEqual(controller.supportedInterfaceOrientations, .portrait)
+        XCTAssertEqual(controller.preferredInterfaceOrientationForPresentation, .portrait)
+        XCTAssertEqual(controller.contentView.bounds.width, 844)
+        XCTAssertEqual(controller.contentView.bounds.height, 390)
+        XCTAssertNotEqual(controller.contentView.transform, .identity)
 
         controller.setForceLandscape(false)
 
         XCTAssertFalse(controller.isLandscapeForced)
         XCTAssertEqual(controller.supportedInterfaceOrientations, .all)
         XCTAssertEqual(controller.preferredInterfaceOrientationForPresentation, .portrait)
+        XCTAssertEqual(controller.contentView.transform, .identity)
     }
 
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {

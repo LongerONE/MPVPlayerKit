@@ -79,7 +79,7 @@ let playerViewController = MPVQuickPlayerViewController(
 present(playerViewController, animated: true)
 ```
 
-The quick interface provides play/pause, seeking, time display, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, frame interpolation, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses SF Symbols with accessibility labels. The host app must include landscape-right in its supported interface orientations.
+The quick interface provides play/pause, seeking, time display, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, frame interpolation, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses SF Symbols with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
 
 Landscape lock can also be changed while the player is visible:
 
