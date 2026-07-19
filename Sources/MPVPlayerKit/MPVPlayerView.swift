@@ -369,14 +369,112 @@ public final class MPVPlayerView: UIView {
 }
 
 final class MPVPlayerMetalLayer: CAMetalLayer {
+    private func beginBackgroundMutation() -> Bool {
+        guard Thread.isMainThread == false else { return false }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        return true
+    }
+
+    private func commitBackgroundMutation(_ transactionWasStarted: Bool) {
+        guard transactionWasStarted else { return }
+        CATransaction.commit()
+    }
+
+    override var pixelFormat: MTLPixelFormat {
+        get { super.pixelFormat }
+        set {
+            let transactionWasStarted = beginBackgroundMutation()
+            super.pixelFormat = newValue
+            commitBackgroundMutation(transactionWasStarted)
+        }
+    }
+
+    override var maximumDrawableCount: Int {
+        get { super.maximumDrawableCount }
+        set {
+            let transactionWasStarted = beginBackgroundMutation()
+            super.maximumDrawableCount = newValue
+            commitBackgroundMutation(transactionWasStarted)
+        }
+    }
+
+    override var minificationFilter: CALayerContentsFilter {
+        get { super.minificationFilter }
+        set {
+            let transactionWasStarted = beginBackgroundMutation()
+            super.minificationFilter = newValue
+            commitBackgroundMutation(transactionWasStarted)
+        }
+    }
+
+    override var magnificationFilter: CALayerContentsFilter {
+        get { super.magnificationFilter }
+        set {
+            let transactionWasStarted = beginBackgroundMutation()
+            super.magnificationFilter = newValue
+            commitBackgroundMutation(transactionWasStarted)
+        }
+    }
+
+    override var contentsGravity: CALayerContentsGravity {
+        get { super.contentsGravity }
+        set {
+            let transactionWasStarted = beginBackgroundMutation()
+            super.contentsGravity = newValue
+            commitBackgroundMutation(transactionWasStarted)
+        }
+    }
+
+    override var framebufferOnly: Bool {
+        get { super.framebufferOnly }
+        set {
+            let transactionWasStarted = beginBackgroundMutation()
+            super.framebufferOnly = newValue
+            commitBackgroundMutation(transactionWasStarted)
+        }
+    }
+
+    override var isOpaque: Bool {
+        get { super.isOpaque }
+        set {
+            let transactionWasStarted = beginBackgroundMutation()
+            super.isOpaque = newValue
+            commitBackgroundMutation(transactionWasStarted)
+        }
+    }
+
+    override var colorspace: CGColorSpace? {
+        get { super.colorspace }
+        set {
+            let transactionWasStarted = beginBackgroundMutation()
+            super.colorspace = newValue
+            commitBackgroundMutation(transactionWasStarted)
+        }
+    }
+
     override var drawableSize: CGSize {
         get {
             super.drawableSize
         }
         set {
             if Int(newValue.width) > 1, Int(newValue.height) > 1 {
+                let transactionWasStarted = beginBackgroundMutation()
                 super.drawableSize = newValue
+                commitBackgroundMutation(transactionWasStarted)
             }
         }
+    }
+
+    override func setNeedsDisplay() {
+        let transactionWasStarted = beginBackgroundMutation()
+        super.setNeedsDisplay()
+        commitBackgroundMutation(transactionWasStarted)
+    }
+
+    override func setNeedsDisplay(_ rect: CGRect) {
+        let transactionWasStarted = beginBackgroundMutation()
+        super.setNeedsDisplay(rect)
+        commitBackgroundMutation(transactionWasStarted)
     }
 }

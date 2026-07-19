@@ -29,9 +29,9 @@ extension MPVQuickPlayerViewController {
         updateOrientationButton()
         invalidateSupportedInterfaceOrientations()
         if isUsingManualLandscape {
-            applyManualLandscape(animated: true)
+            applyManualLandscape()
         } else {
-            restoreManualLandscape(animated: true)
+            restoreManualLandscape()
             requestInterfaceOrientation(forced ? .landscapeRight : .portrait)
         }
     }
@@ -46,7 +46,7 @@ extension MPVQuickPlayerViewController {
         isUsingManualLandscape = Self.applicationSupportsLandscape == false
         invalidateSupportedInterfaceOrientations()
         if isUsingManualLandscape {
-            applyManualLandscape(animated: false)
+            applyManualLandscape()
         } else {
             requestInterfaceOrientation(.landscapeRight)
         }
@@ -67,10 +67,13 @@ extension MPVQuickPlayerViewController {
         if #available(iOS 16.0, *) {
             let mask: UIInterfaceOrientationMask = orientation == .portrait ? .portrait : .landscapeRight
             windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { [weak self] _ in
-                guard orientation != .portrait, let self else { return }
-                isUsingManualLandscape = true
-                invalidateSupportedInterfaceOrientations()
-                applyManualLandscape(animated: true)
+                guard orientation != .portrait else { return }
+                DispatchQueue.main.async { [weak self] in
+                    guard let self, isLandscapeForced else { return }
+                    isUsingManualLandscape = true
+                    invalidateSupportedInterfaceOrientations()
+                    applyManualLandscape()
+                }
             }
         } else {
             UIDevice.current.setValue(orientation.rawValue, forKey: "orientation")
@@ -86,46 +89,38 @@ extension MPVQuickPlayerViewController {
 
     func layoutOrientationContentView() {
         let rootBounds = view.bounds
-        contentView.transform = .identity
+        let shouldRotate = isUsingManualLandscape
+            && isLandscapeForced
+            && rootBounds.height > rootBounds.width
+        let targetSize = shouldRotate
+            ? CGSize(width: rootBounds.height, height: rootBounds.width)
+            : rootBounds.size
+        let targetBounds = CGRect(origin: .zero, size: targetSize)
+        let targetCenter = CGPoint(x: rootBounds.midX, y: rootBounds.midY)
+        let targetTransform = shouldRotate
+            ? CGAffineTransform(rotationAngle: .pi / 2)
+            : .identity
 
-        guard isUsingManualLandscape, isLandscapeForced, rootBounds.height > rootBounds.width else {
-            contentView.frame = rootBounds
-            return
-        }
+        guard contentView.bounds != targetBounds
+                || contentView.center != targetCenter
+                || contentView.transform != targetTransform else { return }
 
-        contentView.bounds = CGRect(
-            origin: .zero,
-            size: CGSize(width: rootBounds.height, height: rootBounds.width)
-        )
-        contentView.center = CGPoint(x: rootBounds.midX, y: rootBounds.midY)
-        contentView.transform = CGAffineTransform(rotationAngle: .pi / 2)
-    }
-
-    private func applyManualLandscape(animated: Bool) {
-        view.setNeedsLayout()
-        let updates = { [weak self] in
-            self?.layoutOrientationContentView()
-            self?.contentView.layoutIfNeeded()
-        }
-        if animated {
-            UIView.animate(withDuration: 0.3, animations: updates)
-        } else {
-            updates()
-        }
-    }
-
-    private func restoreManualLandscape(animated: Bool) {
-        guard isViewLoaded else { return }
-        let updates = { [weak self] in
-            guard let self else { return }
-            contentView.transform = .identity
-            contentView.frame = view.bounds
+        UIView.performWithoutAnimation {
+            contentView.bounds = targetBounds
+            contentView.center = targetCenter
+            contentView.transform = targetTransform
             contentView.layoutIfNeeded()
         }
-        if animated {
-            UIView.animate(withDuration: 0.3, animations: updates)
-        } else {
-            updates()
-        }
+    }
+
+    private func applyManualLandscape() {
+        guard isViewLoaded else { return }
+        view.setNeedsLayout()
+        layoutOrientationContentView()
+    }
+
+    private func restoreManualLandscape() {
+        guard isViewLoaded else { return }
+        layoutOrientationContentView()
     }
 }

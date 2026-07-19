@@ -242,6 +242,15 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(controller.contentView.bounds.height, 390)
         XCTAssertNotEqual(controller.contentView.transform, .identity)
 
+        let landscapeBounds = controller.contentView.bounds
+        let landscapeCenter = controller.contentView.center
+        let landscapeTransform = controller.contentView.transform
+        controller.layoutOrientationContentView()
+
+        XCTAssertEqual(controller.contentView.bounds, landscapeBounds)
+        XCTAssertEqual(controller.contentView.center, landscapeCenter)
+        XCTAssertEqual(controller.contentView.transform, landscapeTransform)
+
         controller.setForceLandscape(false)
 
         XCTAssertFalse(controller.isLandscapeForced)
