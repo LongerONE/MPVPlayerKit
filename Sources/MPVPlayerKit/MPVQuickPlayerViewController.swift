@@ -83,6 +83,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         debandEnabled = configuration.debandEnabled
         interpolationOptions = configuration.interpolationOptions
         super.init(nibName: nil, bundle: nil)
+        modalPresentationCapturesStatusBarAppearance = true
         player.delegate = self
     }
 
@@ -105,6 +106,14 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
     public override var shouldAutorotate: Bool {
         true
+    }
+
+    public override var prefersStatusBarHidden: Bool {
+        true
+    }
+
+    public override var preferredStatusBarUpdateAnimation: UIStatusBarAnimation {
+        .fade
     }
 
     public override var supportedInterfaceOrientations: UIInterfaceOrientationMask {

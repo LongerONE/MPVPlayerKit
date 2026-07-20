@@ -198,6 +198,9 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(controller.videoQuality, .highQuality)
         XCTAssertTrue(controller.debandEnabled)
         XCTAssertEqual(controller.interpolationOptions, .smooth)
+        XCTAssertTrue(controller.prefersStatusBarHidden)
+        XCTAssertEqual(controller.preferredStatusBarUpdateAnimation, .fade)
+        XCTAssertTrue(controller.modalPresentationCapturesStatusBarAppearance)
 
         controller.setPlaybackRate(1.5)
         controller.setVideoQuality(.powerSaving)
