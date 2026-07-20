@@ -62,6 +62,11 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var pendingSubtitleRequestID: UUID?
     var isCancellingSubtitleLoad = false
     var isUsingManualLandscape: Bool
+    var arePlaybackControlsHidden = false
+    var closeButtonLeadingConstraint: NSLayoutConstraint!
+    var statusLabelTrailingConstraint: NSLayoutConstraint!
+    var playButtonLeadingConstraint: NSLayoutConstraint!
+    var progressSliderTrailingConstraint: NSLayoutConstraint!
 
     enum PanDirection {
         case none
@@ -145,6 +150,12 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         layoutOrientationContentView()
+        updatePlaybackControlSafeAreaInsets()
+    }
+
+    public override func viewSafeAreaInsetsDidChange() {
+        super.viewSafeAreaInsetsDidChange()
+        updatePlaybackControlSafeAreaInsets()
     }
 
     public override func viewDidDisappear(_ animated: Bool) {
@@ -314,6 +325,22 @@ public final class MPVQuickPlayerViewController: UIViewController {
         let topSafeArea = topBar.safeAreaLayoutGuide
         let controlsSafeArea = controlsView.safeAreaLayoutGuide
         let hudContentView = gestureHUD.contentView
+        closeButtonLeadingConstraint = closeButton.leadingAnchor.constraint(
+            equalTo: topBar.leadingAnchor,
+            constant: 12
+        )
+        statusLabelTrailingConstraint = statusLabel.trailingAnchor.constraint(
+            equalTo: topBar.trailingAnchor,
+            constant: -12
+        )
+        playButtonLeadingConstraint = playButton.leadingAnchor.constraint(
+            equalTo: controlsView.leadingAnchor,
+            constant: 12
+        )
+        progressSliderTrailingConstraint = progressSlider.trailingAnchor.constraint(
+            equalTo: controlsView.trailingAnchor,
+            constant: -12
+        )
         NSLayoutConstraint.activate([
             player.playbackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             player.playbackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
@@ -324,7 +351,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
             topBar.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             topBar.topAnchor.constraint(equalTo: contentView.topAnchor),
 
-            closeButton.leadingAnchor.constraint(equalTo: topSafeArea.leadingAnchor, constant: 12),
+            closeButtonLeadingConstraint,
             closeButton.topAnchor.constraint(equalTo: topSafeArea.topAnchor, constant: 8),
             closeButton.bottomAnchor.constraint(equalTo: topBar.bottomAnchor, constant: -8),
             closeButton.widthAnchor.constraint(equalToConstant: 36),
@@ -336,7 +363,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
             orientationButton.heightAnchor.constraint(equalToConstant: 36),
 
             statusLabel.leadingAnchor.constraint(greaterThanOrEqualTo: orientationButton.trailingAnchor, constant: 12),
-            statusLabel.trailingAnchor.constraint(equalTo: topSafeArea.trailingAnchor, constant: -12),
+            statusLabelTrailingConstraint,
             statusLabel.centerYAnchor.constraint(equalTo: closeButton.centerYAnchor),
 
             loadingIndicator.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
@@ -346,13 +373,13 @@ public final class MPVQuickPlayerViewController: UIViewController {
             controlsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             controlsView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-            playButton.leadingAnchor.constraint(equalTo: controlsSafeArea.leadingAnchor, constant: 12),
+            playButtonLeadingConstraint,
             playButton.topAnchor.constraint(equalTo: controlsView.topAnchor, constant: 10),
             playButton.widthAnchor.constraint(equalToConstant: 36),
             playButton.heightAnchor.constraint(equalToConstant: 36),
 
             progressSlider.leadingAnchor.constraint(equalTo: playButton.trailingAnchor, constant: 8),
-            progressSlider.trailingAnchor.constraint(equalTo: controlsSafeArea.trailingAnchor, constant: -12),
+            progressSliderTrailingConstraint,
             progressSlider.centerYAnchor.constraint(equalTo: playButton.centerYAnchor),
 
             timeLabel.leadingAnchor.constraint(equalTo: progressSlider.leadingAnchor),
@@ -389,10 +416,43 @@ public final class MPVQuickPlayerViewController: UIViewController {
     }
 
     func configureGestures() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleContentTap))
+        tapGesture.cancelsTouchesInView = false
+        tapGesture.delegate = self
+        contentView.addGestureRecognizer(tapGesture)
+
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePanGesture(_:)))
         panGesture.cancelsTouchesInView = false
         panGesture.delegate = self
         contentView.addGestureRecognizer(panGesture)
+    }
+
+    @objc private func handleContentTap() {
+        setPlaybackControlsHidden(arePlaybackControlsHidden == false, animated: true)
+    }
+
+    func setPlaybackControlsHidden(_ hidden: Bool, animated: Bool) {
+        guard arePlaybackControlsHidden != hidden else { return }
+        arePlaybackControlsHidden = hidden
+        topBar.isUserInteractionEnabled = hidden == false
+        controlsView.isUserInteractionEnabled = hidden == false
+        topBar.accessibilityElementsHidden = hidden
+        controlsView.accessibilityElementsHidden = hidden
+
+        let updates = { [topBar, controlsView] in
+            topBar.alpha = hidden ? 0 : 1
+            controlsView.alpha = hidden ? 0 : 1
+        }
+        if animated {
+            UIView.animate(
+                withDuration: 0.2,
+                delay: 0,
+                options: [.beginFromCurrentState, .curveEaseInOut],
+                animations: updates
+            )
+        } else {
+            updates()
+        }
     }
 
     @objc private func togglePlayback() {

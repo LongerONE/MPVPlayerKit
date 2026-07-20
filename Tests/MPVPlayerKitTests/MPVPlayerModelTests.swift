@@ -245,6 +245,14 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(controller.contentView.bounds.height, 390)
         XCTAssertNotEqual(controller.contentView.transform, .identity)
 
+        let manualInsets = MPVQuickPlayerViewController.playbackControlHorizontalInsets(
+            rootBounds: controller.view.bounds,
+            rootSafeAreaInsets: UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0),
+            usesManualLandscape: true
+        )
+        XCTAssertEqual(manualInsets.left, 59)
+        XCTAssertEqual(manualInsets.right, 34)
+
         let landscapeBounds = controller.contentView.bounds
         let landscapeCenter = controller.contentView.center
         let landscapeTransform = controller.contentView.transform
@@ -260,6 +268,26 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(controller.supportedInterfaceOrientations, .all)
         XCTAssertEqual(controller.preferredInterfaceOrientationForPresentation, .portrait)
         XCTAssertEqual(controller.contentView.transform, .identity)
+    }
+
+    func testQuickPlayerCanHideAndRestorePlaybackControls() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
+        let controller = MPVQuickPlayerViewController(url: url, autoplay: false)
+        controller.loadViewIfNeeded()
+
+        controller.setPlaybackControlsHidden(true, animated: false)
+        XCTAssertTrue(controller.arePlaybackControlsHidden)
+        XCTAssertEqual(controller.topBar.alpha, 0)
+        XCTAssertEqual(controller.controlsView.alpha, 0)
+        XCTAssertFalse(controller.topBar.isUserInteractionEnabled)
+        XCTAssertFalse(controller.controlsView.isUserInteractionEnabled)
+
+        controller.setPlaybackControlsHidden(false, animated: false)
+        XCTAssertFalse(controller.arePlaybackControlsHidden)
+        XCTAssertEqual(controller.topBar.alpha, 1)
+        XCTAssertEqual(controller.controlsView.alpha, 1)
+        XCTAssertTrue(controller.topBar.isUserInteractionEnabled)
+        XCTAssertTrue(controller.controlsView.isUserInteractionEnabled)
     }
 
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {

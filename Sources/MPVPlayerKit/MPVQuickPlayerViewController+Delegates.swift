@@ -4,12 +4,29 @@ import UniformTypeIdentifiers
 
 extension MPVQuickPlayerViewController: UIGestureRecognizerDelegate {
     public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer is UITapGestureRecognizer {
+            return true
+        }
         guard gestureOptions.isEmpty == false else { return false }
         let location = gestureRecognizer.location(in: view)
-        guard controlsView.frame.contains(location) == false else { return false }
+        let controlsFrame = controlsView.convert(controlsView.bounds, to: view)
+        guard controlsFrame.contains(location) == false else { return false }
         guard let panGesture = gestureRecognizer as? UIPanGestureRecognizer else { return true }
         let velocity = panGesture.velocity(in: view)
         return abs(velocity.x) > 1 || abs(velocity.y) > 1
+    }
+
+    public func gestureRecognizer(
+        _ gestureRecognizer: UIGestureRecognizer,
+        shouldReceive touch: UITouch
+    ) -> Bool {
+        guard gestureRecognizer is UITapGestureRecognizer else { return true }
+        var touchedView = touch.view
+        while let view = touchedView {
+            if view is UIControl { return false }
+            touchedView = view.superview
+        }
+        return true
     }
 }
 
