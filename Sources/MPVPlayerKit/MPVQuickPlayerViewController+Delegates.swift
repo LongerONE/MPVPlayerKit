@@ -12,7 +12,7 @@ extension MPVQuickPlayerViewController: UIGestureRecognizerDelegate {
         let controlsFrame = controlsView.convert(controlsView.bounds, to: view)
         guard controlsFrame.contains(location) == false else { return false }
         guard let panGesture = gestureRecognizer as? UIPanGestureRecognizer else { return true }
-        let velocity = panGesture.velocity(in: view)
+        let velocity = panGesture.velocity(in: contentView)
         return abs(velocity.x) > 1 || abs(velocity.y) > 1
     }
 

@@ -245,6 +245,16 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(controller.contentView.bounds.height, 390)
         XCTAssertNotEqual(controller.contentView.transform, .identity)
 
+        let rootStart = CGPoint(x: controller.view.bounds.midX, y: 100)
+        let rootEnd = CGPoint(x: controller.view.bounds.midX, y: 220)
+        let contentStart = controller.contentView.convert(rootStart, from: controller.view)
+        let contentEnd = controller.contentView.convert(rootEnd, from: controller.view)
+        let contentTranslation = CGPoint(
+            x: contentEnd.x - contentStart.x,
+            y: contentEnd.y - contentStart.y
+        )
+        XCTAssertGreaterThan(abs(contentTranslation.x), abs(contentTranslation.y))
+
         let manualInsets = MPVQuickPlayerViewController.playbackControlHorizontalInsets(
             rootBounds: controller.view.bounds,
             rootSafeAreaInsets: UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0),

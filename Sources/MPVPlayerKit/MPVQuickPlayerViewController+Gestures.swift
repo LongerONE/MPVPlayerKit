@@ -4,12 +4,12 @@ import UniformTypeIdentifiers
 
 extension MPVQuickPlayerViewController {
     @objc func handlePanGesture(_ gesture: UIPanGestureRecognizer) {
-        let translation = gesture.translation(in: view)
+        let translation = gesture.translation(in: contentView)
 
         switch gesture.state {
         case .began:
             panDirection = .none
-            panStartLocation = gesture.location(in: view)
+            panStartLocation = gesture.location(in: contentView)
             panStartTime = player.currentTime
             panTargetTime = panStartTime
             panStartBrightness = UIScreen.main.brightness
@@ -44,10 +44,10 @@ extension MPVQuickPlayerViewController {
         }
         guard verticalDistance >= horizontalDistance * 1.25 else { return .none }
 
-        if panStartLocation.x < view.bounds.midX, gestureOptions.contains(.brightness) {
+        if panStartLocation.x < contentView.bounds.midX, gestureOptions.contains(.brightness) {
             return .brightness
         }
-        if panStartLocation.x >= view.bounds.midX, gestureOptions.contains(.volume) {
+        if panStartLocation.x >= contentView.bounds.midX, gestureOptions.contains(.volume) {
             return .volume
         }
         return .none
@@ -58,7 +58,7 @@ extension MPVQuickPlayerViewController {
         case .seeking:
             let delta = Self.seekTimeDelta(
                 translationX: translation.x,
-                viewWidth: view.bounds.width,
+                viewWidth: contentView.bounds.width,
                 duration: player.duration
             )
             panTargetTime = min(max(panStartTime + delta, 0), player.duration)
@@ -72,7 +72,7 @@ extension MPVQuickPlayerViewController {
             let value = Self.verticalValue(
                 startValue: panStartBrightness,
                 translationY: translation.y,
-                viewHeight: view.bounds.height
+                viewHeight: contentView.bounds.height
             )
             UIScreen.main.brightness = value
             showGestureHUD(icon: "sun.max.fill", text: "\(Int((value * 100).rounded()))%", progress: Float(value))
@@ -80,7 +80,7 @@ extension MPVQuickPlayerViewController {
             let value = Float(Self.verticalValue(
                 startValue: CGFloat(panStartVolume),
                 translationY: translation.y,
-                viewHeight: view.bounds.height
+                viewHeight: contentView.bounds.height
             ))
             systemVolumeSlider?.setValue(value, animated: false)
             systemVolumeSlider?.sendActions(for: .valueChanged)
