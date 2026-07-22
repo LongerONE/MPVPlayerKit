@@ -454,6 +454,27 @@ final class MPVPlayerModelTests: XCTestCase {
     }
 
     @MainActor
+    func testMetalLayerRoutesRendererThreadMutationsToMainThread() async {
+        let layer = MPVPlayerMetalLayer()
+
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                layer.pixelFormat = .bgra8Unorm
+                layer.maximumDrawableCount = 3
+                layer.drawableSize = CGSize(width: 320, height: 180)
+                layer.setNeedsDisplay()
+                DispatchQueue.main.async {
+                    continuation.resume()
+                }
+            }
+        }
+
+        XCTAssertEqual(layer.pixelFormat, .bgra8Unorm)
+        XCTAssertEqual(layer.maximumDrawableCount, 3)
+        XCTAssertEqual(layer.drawableSize, CGSize(width: 320, height: 180))
+    }
+
+    @MainActor
     func testSimulatorSoftwareProfileDisablesLavcDirectRendering() {
         #if targetEnvironment(simulator)
         let playerView = MPVPlayerView(frame: .zero)
