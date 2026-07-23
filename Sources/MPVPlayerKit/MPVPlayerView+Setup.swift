@@ -369,6 +369,7 @@ extension MPVPlayerView {
     func destroyMPVHandle(reason: String, sendStopCommand: Bool = true) {
         setDecoderMode(.initializing)
         stopTimeTimer()
+        clearMediaTracksCache()
         pendingMetalLayerGeometry = nil
         isMetalGeometryTransitionInProgress = false
         lastLoggedSubtitleText = ""

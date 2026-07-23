@@ -59,6 +59,8 @@ extension MPVPlayerView {
                 switch event.pointee.event_id {
                 case MPV_EVENT_PROPERTY_CHANGE:
                     self.handlePropertyChange(event)
+                case MPV_EVENT_FILE_LOADED:
+                    self.refreshMediaTracksCache()
                 case MPV_EVENT_PLAYBACK_RESTART:
                     self.hasPlaybackRestarted = true
                     self.mpvDebugLog("event playback-restart profile=\(self.activeProfileDescription)")

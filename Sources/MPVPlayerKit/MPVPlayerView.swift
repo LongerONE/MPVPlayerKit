@@ -197,6 +197,8 @@ public final class MPVPlayerView: UIView {
     let queueSpecificKey = DispatchSpecificKey<Void>()
     let contentModeSnapshotLock = NSLock()
     var contentModeSnapshot: MPVContentModeSnapshot = .fit
+    nonisolated let mediaTracksCacheLock = NSLock()
+    nonisolated(unsafe) var mediaTracksCache: [[String: Any]] = []
     nonisolated(unsafe) var mpv: OpaquePointer?
     var timeTimer: DispatchSourceTimer?
     var hasReportedReadyToPlay = false

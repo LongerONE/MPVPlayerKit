@@ -295,7 +295,32 @@ extension MPVPlayerView {
         return url.isFileURL ? url.standardizedFileURL.path : url.absoluteString
     }
 
-    func readMediaTracks(mediaType requestedType: String?) -> [[String: Any]] {
+    nonisolated func refreshMediaTracksCache() {
+        dispatchPrecondition(condition: .onQueue(queue))
+        let tracks = readMediaTracks(mediaType: nil)
+        mediaTracksCacheLock.lock()
+        mediaTracksCache = tracks
+        mediaTracksCacheLock.unlock()
+        mpvDebugLog("refreshed media tracks cache count=\(tracks.count)")
+    }
+
+    nonisolated func cachedMediaTracks(mediaType requestedType: String?) -> [[String: Any]] {
+        mediaTracksCacheLock.lock()
+        let tracks = mediaTracksCache
+        mediaTracksCacheLock.unlock()
+        guard let requestedType else {
+            return tracks
+        }
+        return tracks.filter { $0["mpvType"] as? String == requestedType }
+    }
+
+    nonisolated func clearMediaTracksCache() {
+        mediaTracksCacheLock.lock()
+        mediaTracksCache.removeAll(keepingCapacity: false)
+        mediaTracksCacheLock.unlock()
+    }
+
+    nonisolated func readMediaTracks(mediaType requestedType: String?) -> [[String: Any]] {
         guard let count = getInt64("track-list/count"), count > 0 else {
             return []
         }
@@ -349,7 +374,7 @@ extension MPVPlayerView {
         return tracks
     }
 
-    func mediaTrackName(
+    nonisolated func mediaTrackName(
         id: Int64,
         mpvType: String,
         title: String?,
@@ -383,7 +408,7 @@ extension MPVPlayerView {
         return "\(kind) \(id) · \(details.joined(separator: " · "))"
     }
 
-    func avMediaTypeRawValue(for mpvType: String) -> String {
+    nonisolated func avMediaTypeRawValue(for mpvType: String) -> String {
         switch mpvType {
         case "video":
             return AVMediaType.video.rawValue
@@ -409,7 +434,7 @@ extension MPVPlayerView {
         }
     }
 
-    func isImageSubtitleCodec(_ codec: String?) -> Bool {
+    nonisolated func isImageSubtitleCodec(_ codec: String?) -> Bool {
         guard let codec = codec?.lowercased() else {
             return false
         }
