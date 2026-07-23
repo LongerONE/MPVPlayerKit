@@ -260,12 +260,17 @@ extension MPVPlayerView {
         return success
     }
 
-    func subtitleTrackIDs() -> Set<Int64> {
+    nonisolated func subtitleTrackIDs() -> Set<Int64> {
         guard let count = getInt64("track-list/count"), count > 0 else { return [] }
-        return Set((0..<Int(count)).compactMap { index in
-            guard getString("track-list/\(index)/type") == "sub" else { return nil }
-            return getInt64("track-list/\(index)/id")
-        })
+        var trackIDs = Set<Int64>()
+        for index in 0..<Int(count) {
+            guard getString("track-list/\(index)/type") == "sub",
+                  let trackID = getInt64("track-list/\(index)/id") else {
+                continue
+            }
+            trackIDs.insert(trackID)
+        }
+        return trackIDs
     }
 
     nonisolated func externalSubtitleTrackID(

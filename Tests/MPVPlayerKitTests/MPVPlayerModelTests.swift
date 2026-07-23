@@ -546,6 +546,40 @@ final class MPVPlayerModelTests: XCTestCase {
     }
 
     @MainActor
+    func testSubtitleSourceAndArgumentsCanBePreparedOnMPVQueue() async {
+        let playerView = MPVPlayerView(frame: .zero)
+        let transfer = TestUnsafeTransfer(value: playerView)
+
+        let result = await withCheckedContinuation { continuation in
+            playerView.queue.async {
+                let remoteSource = transfer.value.normalizedMPVSource(
+                    "https://example.com/Stream.srt?token=value"
+                )
+                let localSource = transfer.value.normalizedMPVSource(
+                    "file:///tmp/External%20Subtitle.srt"
+                )
+                let cargs = transfer.value.makeOwnedCArgs("sub-add", [remoteSource, "auto"])
+                var arguments: [String?] = []
+                for pointer in cargs {
+                    if let pointer {
+                        arguments.append(String(cString: pointer))
+                    } else {
+                        arguments.append(nil)
+                    }
+                }
+                for pointer in cargs where pointer != nil {
+                    free(UnsafeMutablePointer(mutating: pointer!))
+                }
+                continuation.resume(returning: (remoteSource, localSource, arguments))
+            }
+        }
+
+        XCTAssertEqual(result.0, "https://example.com/Stream.srt?token=value")
+        XCTAssertEqual(result.1, "/tmp/External Subtitle.srt")
+        XCTAssertEqual(result.2, ["sub-add", result.0, "auto", nil])
+    }
+
+    @MainActor
     func testRuntimeVideoOptionHelpersCanRunOnMPVQueue() async {
         let playerView = MPVPlayerView(frame: .zero)
         let transfer = TestUnsafeTransfer(value: playerView)

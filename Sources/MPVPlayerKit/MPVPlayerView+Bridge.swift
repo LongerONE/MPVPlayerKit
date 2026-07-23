@@ -41,6 +41,25 @@ extension MPVPlayerView {
         return stringArgs
     }
 
+    nonisolated func normalizedMPVSource(_ source: String) -> String {
+        guard let url = URL(string: source) else {
+            return source
+        }
+        return url.isFileURL ? url.path : url.absoluteString
+    }
+
+    nonisolated func makeOwnedCArgs(_ command: String, _ args: [String?]) -> [UnsafePointer<CChar>?] {
+        var cargs: [UnsafePointer<CChar>?] = []
+        for argument in makeCArgs(command, args) {
+            guard let argument else {
+                cargs.append(nil)
+                continue
+            }
+            cargs.append(UnsafePointer<CChar>(strdup(argument)))
+        }
+        return cargs
+    }
+
     func makeMPVHTTPHeaderFields() -> (fields: [String], skippedAuthHeaders: Int) {
         var fields: [String] = []
         var skippedAuthHeaders = 0

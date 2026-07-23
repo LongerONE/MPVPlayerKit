@@ -162,7 +162,7 @@ extension MPVPlayerView {
         }
     }
 
-    func loadSubtitleOnMPVQueue(
+    nonisolated func loadSubtitleOnMPVQueue(
         requestID: String,
         urlString: String,
         usesOriginalStyle: Bool
@@ -201,7 +201,7 @@ extension MPVPlayerView {
             loadedExternalSubtitleIDs.removeValue(forKey: urlString)
         }
 
-        let source = URL(string: urlString).map { $0.isFileURL ? $0.path : $0.absoluteString } ?? urlString
+        let source = normalizedMPVSource(urlString)
         let userdata = nextSubtitleLoadUserdata
         nextSubtitleLoadUserdata &+= 1
         pendingExternalSubtitleLoad = PendingExternalSubtitleLoad(
@@ -214,7 +214,7 @@ extension MPVPlayerView {
             previousSelection: previousSelection,
             requestIDs: [requestID]
         )
-        var cargs = makeCArgs("sub-add", [source, "auto"]).map { $0.flatMap { UnsafePointer<CChar>(strdup($0)) } }
+        var cargs = makeOwnedCArgs("sub-add", [source, "auto"])
         defer {
             for pointer in cargs where pointer != nil {
                 free(UnsafeMutablePointer(mutating: pointer!))
