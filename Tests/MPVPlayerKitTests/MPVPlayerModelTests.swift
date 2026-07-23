@@ -441,6 +441,27 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertFalse(MPVPictureInPicturePlaybackMath.timeRange(duration: 0).isValid)
     }
 
+    func testPictureInPictureOnlyKeepsFrameUpdatesWhileStartingOrActive() {
+        XCTAssertFalse(
+            MPVPictureInPictureFrameUpdatePolicy.shouldKeepUpdating(
+                isActive: false,
+                isWaitingForStart: false
+            )
+        )
+        XCTAssertTrue(
+            MPVPictureInPictureFrameUpdatePolicy.shouldKeepUpdating(
+                isActive: false,
+                isWaitingForStart: true
+            )
+        )
+        XCTAssertTrue(
+            MPVPictureInPictureFrameUpdatePolicy.shouldKeepUpdating(
+                isActive: true,
+                isWaitingForStart: false
+            )
+        )
+    }
+
     func testPictureInPictureFrameBuildsDisplayableSampleBuffer() throws {
         let frame = MPVPictureInPictureFrame(
             width: 2,
@@ -459,6 +480,23 @@ final class MPVPlayerModelTests: XCTestCase {
             accuracy: 0.001
         )
         XCTAssertNotNil(CMSampleBufferGetImageBuffer(sampleBuffer))
+    }
+
+    func testPictureInPictureFrameBuildsSampleBufferFromDetachedTask() async {
+        let frame = MPVPictureInPictureFrame(
+            width: 2,
+            height: 1,
+            stride: 8,
+            pixels: Data([0, 0, 255, 255, 0, 255, 0, 255]),
+            presentationTime: 0,
+            subtitleText: nil
+        )
+
+        let didBuildSampleBuffer = await Task.detached {
+            frame.makeSampleBuffer() != nil
+        }.value
+
+        XCTAssertTrue(didBuildSampleBuffer)
     }
 
     func testPictureInPictureFrameCompositesSubtitleWithoutGPUOutput() throws {

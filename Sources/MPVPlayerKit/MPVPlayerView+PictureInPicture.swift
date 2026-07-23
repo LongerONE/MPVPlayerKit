@@ -32,6 +32,15 @@ enum MPVPictureInPicturePlaybackMath {
     }
 }
 
+enum MPVPictureInPictureFrameUpdatePolicy {
+    static func shouldKeepUpdating(
+        isActive: Bool,
+        isWaitingForStart: Bool
+    ) -> Bool {
+        isActive || isWaitingForStart
+    }
+}
+
 @MainActor
 final class MPVPictureInPictureCoordinator:
     NSObject,
@@ -47,11 +56,16 @@ final class MPVPictureInPictureCoordinator:
         )
         return AVPictureInPictureController(contentSource: source)
     }()
+    private let frameProcessingQueue = DispatchQueue(
+        label: "com.mpvplayerkit.picture-in-picture.frames",
+        qos: .userInitiated
+    )
     private var frameTimer: DispatchSourceTimer?
     private var isCapturingFrame = false
     private var shouldStartAfterFirstFrame = false
     private var consecutiveFrameCaptureFailures = 0
     private var frameCaptureRequestSequence: UInt64 = 0
+    private var frameCaptureGeneration: UInt64 = 0
     private var playbackTimebase: CMTimebase?
     nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
 
@@ -303,7 +317,7 @@ final class MPVPictureInPictureCoordinator:
         frameTimer?.setEventHandler {}
         frameTimer?.cancel()
         frameTimer = nil
-        isCapturingFrame = false
+        frameCaptureGeneration &+= 1
     }
 
     private func resumeAutomaticReadinessUpdates() {
@@ -316,6 +330,7 @@ final class MPVPictureInPictureCoordinator:
         guard playerView.isPlaying || shouldStartAfterFirstFrame else { return }
         frameCaptureRequestSequence &+= 1
         let requestSequence = frameCaptureRequestSequence
+        let captureGeneration = frameCaptureGeneration
         let shouldLog = requestSequence <= 10 || requestSequence.isMultiple(of: 30)
         if shouldLog {
             playerView.mpvDebugLog(
@@ -326,37 +341,51 @@ final class MPVPictureInPictureCoordinator:
         }
         installSourceLayerIfNeeded()
         isCapturingFrame = true
+        let frameProcessingQueue = frameProcessingQueue
         playerView.capturePictureInPictureFrame { [weak self] frame in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.isCapturingFrame = false
-                if shouldLog {
-                    self.playerView?.mpvDebugLog(
-                        "pip coordinator capture=completion sequence=\(requestSequence) "
-                            + "hasFrame=\(frame != nil)"
-                    )
-                }
-                guard let frame, let sampleBuffer = frame.makeSampleBuffer() else {
-                    self.handleFrameCaptureFailure()
-                    return
-                }
-                self.handleFrameCaptureSuccess()
-                self.synchronizePlaybackTimebase(to: frame.presentationTime)
-                if #available(iOS 17.0, *) {
-                    let renderer = self.sampleBufferDisplayLayer.sampleBufferRenderer
-                    if renderer.status == .failed {
-                        renderer.flush()
+            frameProcessingQueue.async {
+                let sampleBuffer = frame?.makeSampleBuffer()
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.isCapturingFrame = false
+                    guard captureGeneration == self.frameCaptureGeneration else {
+                        return
                     }
-                    renderer.enqueue(sampleBuffer)
-                } else {
-                    if self.sampleBufferDisplayLayer.status == .failed {
-                        self.sampleBufferDisplayLayer.flush()
+                    if shouldLog {
+                        self.playerView?.mpvDebugLog(
+                            "pip coordinator capture=completion sequence=\(requestSequence) "
+                                + "hasFrame=\(frame != nil)"
+                        )
                     }
-                    self.sampleBufferDisplayLayer.enqueue(sampleBuffer)
-                }
-                if self.shouldStartAfterFirstFrame {
-                    self.shouldStartAfterFirstFrame = false
-                    self.controller.startPictureInPicture()
+                    guard let frame, let sampleBuffer else {
+                        self.handleFrameCaptureFailure()
+                        return
+                    }
+                    self.handleFrameCaptureSuccess()
+                    self.synchronizePlaybackTimebase(to: frame.presentationTime)
+                    if #available(iOS 17.0, *) {
+                        let renderer = self.sampleBufferDisplayLayer.sampleBufferRenderer
+                        if renderer.status == .failed {
+                            renderer.flush()
+                        }
+                        renderer.enqueue(sampleBuffer)
+                    } else {
+                        if self.sampleBufferDisplayLayer.status == .failed {
+                            self.sampleBufferDisplayLayer.flush()
+                        }
+                        self.sampleBufferDisplayLayer.enqueue(sampleBuffer)
+                    }
+                    let wasWaitingForStart = self.shouldStartAfterFirstFrame
+                    if wasWaitingForStart {
+                        self.shouldStartAfterFirstFrame = false
+                        self.controller.startPictureInPicture()
+                    }
+                    if MPVPictureInPictureFrameUpdatePolicy.shouldKeepUpdating(
+                        isActive: self.controller.isPictureInPictureActive,
+                        isWaitingForStart: wasWaitingForStart
+                    ) == false {
+                        self.stopFrameUpdates()
+                    }
                 }
             }
         }
