@@ -55,13 +55,27 @@ extension MPVPlayerView {
             return
         }
 
+        updateMetalLayerGeometry(
+            for: CGRect(origin: .zero, size: bounds.size),
+            scale: UIScreen.main.nativeScale,
+            transitionReason: "layout",
+            animated: true
+        )
+    }
+
+    func updateMetalLayerGeometry(
+        for targetBounds: CGRect,
+        scale: CGFloat,
+        transitionReason: String,
+        animated: Bool
+    ) {
         let geometry = MPVMetalLayerGeometry(
-            layerBounds: CGRect(origin: .zero, size: bounds.size),
+            layerBounds: CGRect(origin: .zero, size: targetBounds.size),
             drawableSize: CGSize(
-                width: bounds.size.width * UIScreen.main.nativeScale,
-                height: bounds.size.height * UIScreen.main.nativeScale
+                width: targetBounds.size.width * scale,
+                height: targetBounds.size.height * scale
             ),
-            contentsScale: UIScreen.main.nativeScale
+            contentsScale: scale
         )
         let geometryChanged = hasMetalGeometryChanged(
             layerBounds: geometry.layerBounds,
@@ -77,7 +91,14 @@ extension MPVPlayerView {
 
         pendingMetalLayerGeometry = geometry
         guard isMetalGeometryTransitionInProgress == false else { return }
-        animateGeometryTransitionOut(targetSize: geometry.layerBounds.size, reason: "layout")
+        if animated {
+            animateGeometryTransitionOut(
+                targetSize: geometry.layerBounds.size,
+                reason: transitionReason
+            )
+        } else {
+            resetGeometryTransitionAnimation(reason: transitionReason)
+        }
         beginMetalGeometryTransition()
     }
 

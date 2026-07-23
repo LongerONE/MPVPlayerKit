@@ -320,6 +320,31 @@ final class MPVPlayerModelTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testPictureInPictureUsesWindowSizedMetalDrawable() {
+        let playerView = MPVPlayerView(
+            frame: CGRect(x: 0, y: 0, width: 390, height: 844)
+        )
+        let pictureInPictureLayer = CALayer()
+        let pictureInPictureBounds = CGRect(x: 0, y: 0, width: 320, height: 180)
+
+        playerView.displayMetalLayerForPictureInPicture(
+            in: pictureInPictureLayer,
+            bounds: pictureInPictureBounds,
+            scale: 2
+        )
+
+        XCTAssertTrue(playerView.metalLayer.superlayer === pictureInPictureLayer)
+        XCTAssertEqual(playerView.metalLayer.frame, pictureInPictureBounds)
+        XCTAssertEqual(playerView.metalLayer.drawableSize, CGSize(width: 640, height: 360))
+        XCTAssertEqual(playerView.pictureInPicturePreferredContentSize, CGSize(width: 16, height: 9))
+
+        playerView.restoreMetalLayerAfterPictureInPicture()
+
+        XCTAssertTrue(playerView.metalLayer.superlayer === playerView.layer)
+        XCTAssertEqual(playerView.metalLayer.frame.size, playerView.bounds.size)
+    }
+
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
         let style = MPVSubtitleStyle(
             fontSize: 200,

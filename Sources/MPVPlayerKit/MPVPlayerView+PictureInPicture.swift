@@ -22,6 +22,7 @@ final class MPVPictureInPictureContentViewController:
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = .black
+        view.layer.masksToBounds = true
     }
 
     override func viewWillAppear(_ animated: Bool) {
@@ -175,10 +176,7 @@ public extension MPVPlayerView {
 
 extension MPVPlayerView {
     var pictureInPicturePreferredContentSize: CGSize {
-        guard bounds.width > 1, bounds.height > 1 else {
-            return CGSize(width: 16, height: 9)
-        }
-        return bounds.size
+        CGSize(width: 16, height: 9)
     }
 
     private var pictureInPictureCoordinatorInstance: MPVPictureInPictureCoordinator? {
@@ -199,10 +197,18 @@ extension MPVPlayerView {
         scale: CGFloat
     ) {
         isRenderingInPictureInPicture = true
-        applyPictureInPictureMetalLayerGeometry(
-            containerLayer: containerLayer,
-            bounds: bounds,
-            scale: scale
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if metalLayer.superlayer !== containerLayer {
+            metalLayer.removeFromSuperlayer()
+            containerLayer.addSublayer(metalLayer)
+        }
+        CATransaction.commit()
+        updateMetalLayerGeometry(
+            for: bounds,
+            scale: scale,
+            transitionReason: "picture-in-picture",
+            animated: false
         )
     }
 
@@ -211,30 +217,11 @@ extension MPVPlayerView {
         isRenderingInPictureInPicture = false
         metalLayer.removeFromSuperlayer()
         layer.addSublayer(metalLayer)
-        lastAppliedLayerBounds = .null
-        lastAppliedDrawableSize = .zero
-        updateMetalLayerGeometryIfNeeded()
-    }
-
-    private func applyPictureInPictureMetalLayerGeometry(
-        containerLayer: CALayer,
-        bounds: CGRect,
-        scale: CGFloat
-    ) {
-        CATransaction.begin()
-        CATransaction.setDisableActions(true)
-        if metalLayer.superlayer !== containerLayer {
-            metalLayer.removeFromSuperlayer()
-            containerLayer.addSublayer(metalLayer)
-        }
-        metalLayer.frame = bounds
-        metalLayer.contentsScale = scale
-        metalLayer.drawableSize = CGSize(
-            width: bounds.width * scale,
-            height: bounds.height * scale
+        updateMetalLayerGeometry(
+            for: CGRect(origin: .zero, size: bounds.size),
+            scale: UIScreen.main.nativeScale,
+            transitionReason: "picture-in-picture-restore",
+            animated: false
         )
-        CATransaction.commit()
-        lastAppliedLayerBounds = bounds
-        lastAppliedDrawableSize = metalLayer.drawableSize
     }
 }
