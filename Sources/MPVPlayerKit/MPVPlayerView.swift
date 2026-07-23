@@ -125,11 +125,19 @@ enum MPVContentModeSnapshot {
 @objc(MPVPlayerView)
 public final class MPVPlayerView: UIView {
     static let sharedMetalVideoOutputOptions: [(String, String)] = [
-        ("vo", "gpu-next"),
+        // gpu-next/libplacebo can release MoltenVK staging buffers while Metal
+        // screenshot readback still has an in-flight command buffer. PiP uses
+        // screenshot-raw, so keep the compatibility renderer on every iOS
+        // target until that lifetime issue is fixed upstream.
+        ("vo", "gpu"),
         ("gpu-api", "vulkan"),
         ("gpu-context", "moltenvk"),
         ("blend-subtitles", "video"),
         ("gpu-shader-cache", "yes"),
+        // Dynamic color-space hints rebuild the MoltenVK swapchain. In
+        // particular, SDR BT.709 can be promoted to a Display-P3 10-bit
+        // surface immediately before PiP performs screenshot readback.
+        ("target-colorspace-hint", "no"),
         ("tone-mapping", "bt.2446a"),
         ("hdr-compute-peak", "auto"),
         ("allow-delayed-peak-detect", "yes"),
@@ -139,14 +147,10 @@ public final class MPVPlayerView: UIView {
 
     static let edrMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [
         ("fbo-format", "rgba16f"),
-        ("target-colorspace-hint", "yes"),
-        ("target-colorspace-hint-mode", "source"),
     ]
 
     static let dolbyVisionEDRMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [
         ("fbo-format", "rgba16f"),
-        ("target-colorspace-hint", "yes"),
-        ("target-colorspace-hint-mode", "source-dynamic"),
     ]
 
     static let sdrMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [
@@ -299,30 +303,16 @@ public final class MPVPlayerView: UIView {
         backgroundColor = .black
         metalLayer.framebufferOnly = true
         metalLayer.needsDisplayOnBoundsChange = true
+        // Keep one stable SDR CAMetalLayer configuration for MoltenVK.
+        // target-colorspace-hint driven EDR changes can replace the swapchain
+        // while PiP screenshot readback still references its Metal buffers.
+        usesExtendedDynamicRangeOutput = false
+        metalLayer.pixelFormat = .bgra8Unorm_srgb
+        metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
         #if os(iOS)
-        #if targetEnvironment(simulator)
-        // The simulator Metal driver has much tighter shared-memory limits than
-        // real devices. SDR output also matches the compatibility GPU renderer
-        // used by the simulator setup profile.
-        usesExtendedDynamicRangeOutput = false
-        metalLayer.pixelFormat = .bgra8Unorm_srgb
-        metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
-        #else
         if #available(iOS 16.0, *) {
-            usesExtendedDynamicRangeOutput = true
-            metalLayer.pixelFormat = .rgba16Float
-            metalLayer.colorspace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)
-            metalLayer.wantsExtendedDynamicRangeContent = true
-        } else {
-            usesExtendedDynamicRangeOutput = false
-            metalLayer.pixelFormat = .bgra8Unorm_srgb
-            metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
+            metalLayer.wantsExtendedDynamicRangeContent = false
         }
-        #endif
-        #else
-        usesExtendedDynamicRangeOutput = false
-        metalLayer.pixelFormat = .bgra8Unorm_srgb
-        metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
         #endif
         metalLayer.backgroundColor = UIColor.black.cgColor
         let outputDescription = usesExtendedDynamicRangeOutput ? "EDR-scRGB" : "SDR-sRGB"

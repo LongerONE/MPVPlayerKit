@@ -94,13 +94,7 @@ extension MPVPlayerView {
             colorOptions = Self.sdrMetalVideoOutputOptions
         }
         #if targetEnvironment(simulator)
-        // gpu-next uploads software-decoded frames through libplacebo PBOs.
-        // MTLSimDriver rejects that shared-memory allocation for 10-bit HEVC.
-        // Keep Vulkan embedding, but use mpv's compatibility GPU renderer.
-        let simulatorColorOptions = colorOptions.map { option in
-            option.0 == "vo" ? ("vo", "gpu") : option
-        }
-        return simulatorColorOptions + [
+        return colorOptions + [
             ("gpu-dumb-mode", "yes"),
         ] + videoQualityPreset.options + videoRenderOptions
         #else

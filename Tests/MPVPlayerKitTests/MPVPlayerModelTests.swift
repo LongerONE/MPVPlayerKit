@@ -522,6 +522,27 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(options["vd-lavc-dr"], "no")
     }
 
+    @MainActor
+    func testMetalRendererKeepsStableSDRSurfaceForPictureInPictureReadback() {
+        let playerView = MPVPlayerView(frame: .zero)
+        let options = Dictionary(
+            uniqueKeysWithValues: MPVPlayerView.sdrMetalVideoOutputOptions
+        )
+
+        XCTAssertEqual(options["vo"], "gpu")
+        XCTAssertEqual(options["gpu-api"], "vulkan")
+        XCTAssertEqual(options["gpu-context"], "moltenvk")
+        XCTAssertEqual(options["target-colorspace-hint"], "no")
+        XCTAssertEqual(options["target-trc"], "srgb")
+        XCTAssertEqual(options["target-prim"], "bt.709")
+        XCTAssertFalse(playerView.usesExtendedDynamicRangeOutput)
+        XCTAssertEqual(playerView.metalLayer.pixelFormat, .bgra8Unorm_srgb)
+        XCTAssertEqual(
+            playerView.metalLayer.colorspace?.name,
+            CGColorSpace.sRGB
+        )
+    }
+
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
         let style = MPVSubtitleStyle(
             fontSize: 200,
@@ -823,7 +844,7 @@ final class MPVPlayerModelTests: XCTestCase {
     }
 
     @MainActor
-    func testSimulatorUsesCompatibilityGPURenderer() {
+    func testSimulatorAddsDumbModeToCompatibilityGPURenderer() {
         #if targetEnvironment(simulator)
         let playerView = MPVPlayerView(frame: .zero)
         let softwareProfile = playerView.makeSetupProfiles().first {
