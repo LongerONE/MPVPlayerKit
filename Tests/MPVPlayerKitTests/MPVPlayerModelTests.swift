@@ -1,4 +1,5 @@
 import CoreFoundation
+import CoreMedia
 import XCTest
 import UIKit
 @testable import MPVPlayerKit
@@ -360,6 +361,60 @@ final class MPVPlayerModelTests: XCTestCase {
 
         XCTAssertTrue(playerView.metalLayer.superlayer === playerView.layer)
         XCTAssertEqual(playerView.metalLayer.frame.size, playerView.bounds.size)
+    }
+
+    func testPictureInPictureSkipClampsToPlayableRange() {
+        XCTAssertEqual(
+            MPVPictureInPicturePlaybackMath.clampedSeekTime(
+                currentTime: 10,
+                duration: 100,
+                interval: -15
+            ),
+            0
+        )
+        XCTAssertEqual(
+            MPVPictureInPicturePlaybackMath.clampedSeekTime(
+                currentTime: 95,
+                duration: 100,
+                interval: 15
+            ),
+            100
+        )
+        XCTAssertEqual(
+            MPVPictureInPicturePlaybackMath.clampedSeekTime(
+                currentTime: 40,
+                duration: 100,
+                interval: 15
+            ),
+            55
+        )
+    }
+
+    func testPictureInPictureReportsFinitePlaybackRange() {
+        let range = MPVPictureInPicturePlaybackMath.timeRange(duration: 125.5)
+
+        XCTAssertEqual(range.start.seconds, 0)
+        XCTAssertEqual(range.duration.seconds, 125.5, accuracy: 0.001)
+        XCTAssertFalse(MPVPictureInPicturePlaybackMath.timeRange(duration: 0).isValid)
+    }
+
+    func testPictureInPictureFrameBuildsDisplayableSampleBuffer() throws {
+        let frame = MPVPictureInPictureFrame(
+            width: 2,
+            height: 1,
+            stride: 8,
+            pixels: Data([0, 0, 255, 255, 0, 255, 0, 255]),
+            presentationTime: 12.5
+        )
+
+        let sampleBuffer = try XCTUnwrap(frame.makeSampleBuffer())
+
+        XCTAssertEqual(
+            CMSampleBufferGetPresentationTimeStamp(sampleBuffer).seconds,
+            12.5,
+            accuracy: 0.001
+        )
+        XCTAssertNotNil(CMSampleBufferGetImageBuffer(sampleBuffer))
     }
 
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
