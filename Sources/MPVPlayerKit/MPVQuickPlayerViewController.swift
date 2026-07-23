@@ -1,3 +1,4 @@
+import AVFoundation
 import AVKit
 import MediaPlayer
 import UIKit
@@ -144,6 +145,9 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         applyPreferredOrientationIfNeeded()
+        if player.isPictureInPictureSupported {
+            _ = preparePictureInPicturePlayback()
+        }
         if autoplay, player.isPlaying == false {
             player.play()
         }
@@ -479,7 +483,31 @@ public final class MPVQuickPlayerViewController: UIViewController {
     }
 
     @objc private func startPictureInPicture() {
+        guard preparePictureInPicturePlayback() else { return }
         player.startPictureInPicture()
+    }
+
+    @discardableResult
+    func preparePictureInPicturePlayback(
+        activateAudioSession: @MainActor () throws -> Void = MPVQuickPlayerViewController
+            .activateMoviePlaybackAudioSession
+    ) -> Bool {
+        guard player.isPictureInPictureSupported else { return false }
+        do {
+            try activateAudioSession()
+            player.allowsAutomaticPictureInPictureFromInline = true
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    static func activateMoviePlaybackAudioSession() throws {
+        let audioSession = AVAudioSession.sharedInstance()
+        if audioSession.category != .playback || audioSession.mode != .moviePlayback {
+            try audioSession.setCategory(.playback, mode: .moviePlayback)
+        }
+        try audioSession.setActive(true)
     }
 
     @objc private func closePlayer() {

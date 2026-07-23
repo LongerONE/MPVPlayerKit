@@ -336,6 +336,16 @@ final class MPVPlayerModelTests: XCTestCase {
             controller.pictureInPictureButton.isEnabled,
             controller.player.isPictureInPictureSupported
         )
+        if controller.player.isPictureInPictureSupported {
+            XCTAssertTrue(
+                controller.preparePictureInPicturePlayback(
+                    activateAudioSession: {}
+                )
+            )
+            XCTAssertTrue(
+                controller.player.allowsAutomaticPictureInPictureFromInline
+            )
+        }
     }
 
     @MainActor
