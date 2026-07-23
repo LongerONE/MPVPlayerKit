@@ -498,6 +498,19 @@ final class MPVPlayerModelTests: XCTestCase {
         )
     }
 
+    func testPictureInPictureWaitsForFirstPlaybackFrameBeforeScreenshot() {
+        XCTAssertFalse(
+            MPVPlayerView.isPictureInPictureFrameCaptureReady(
+                hasPlaybackRestarted: false
+            )
+        )
+        XCTAssertTrue(
+            MPVPlayerView.isPictureInPictureFrameCaptureReady(
+                hasPlaybackRestarted: true
+            )
+        )
+    }
+
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
         let style = MPVSubtitleStyle(
             fontSize: 200,

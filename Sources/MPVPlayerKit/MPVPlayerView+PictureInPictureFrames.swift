@@ -189,11 +189,21 @@ extension MPVPlayerView {
         ["video"],
     ]
 
+    nonisolated static func isPictureInPictureFrameCaptureReady(
+        hasPlaybackRestarted: Bool
+    ) -> Bool {
+        hasPlaybackRestarted
+    }
+
     nonisolated func capturePictureInPictureFrame(
         completion: @escaping @Sendable (MPVPictureInPictureFrame?) -> Void
     ) {
         queue.async { [weak self] in
-            guard let self, let mpv = self.mpv else {
+            guard let self,
+                  Self.isPictureInPictureFrameCaptureReady(
+                      hasPlaybackRestarted: self.hasPlaybackRestarted
+                  ),
+                  let mpv = self.mpv else {
                 completion(nil)
                 return
             }
