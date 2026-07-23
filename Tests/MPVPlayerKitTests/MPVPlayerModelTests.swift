@@ -496,6 +496,10 @@ final class MPVPlayerModelTests: XCTestCase {
                 ["video"],
             ]
         )
+        let options = Dictionary(
+            uniqueKeysWithValues: MPVPlayerView.sharedMetalVideoOutputOptions
+        )
+        XCTAssertEqual(options["screenshot-sw"], "yes")
     }
 
     func testPictureInPictureWaitsForFirstPlaybackFrameBeforeScreenshot() {

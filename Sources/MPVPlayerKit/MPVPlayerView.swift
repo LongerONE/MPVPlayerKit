@@ -134,6 +134,12 @@ public final class MPVPlayerView: UIView {
         ("gpu-context", "moltenvk"),
         ("blend-subtitles", "video"),
         ("gpu-shader-cache", "yes"),
+        // PiP calls screenshot-raw repeatedly. The default GPU screenshot path
+        // can return a shared Metal buffer before MoltenVK's command buffer has
+        // released it, then mpv_free_node_contents trips Metal validation.
+        // Software screenshots avoid VO readback; subtitles are composited by
+        // MPVPictureInPictureFrame after the raw video frame is copied.
+        ("screenshot-sw", "yes"),
         // Dynamic color-space hints rebuild the MoltenVK swapchain. In
         // particular, SDR BT.709 can be promoted to a Display-P3 10-bit
         // surface immediately before PiP performs screenshot readback.
