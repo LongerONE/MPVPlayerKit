@@ -527,24 +527,54 @@ final class MPVPlayerModelTests: XCTestCase {
     }
 
     @MainActor
-    func testMetalRendererKeepsStableSDRSurfaceForPictureInPictureReadback() {
+    func testMetalRendererPreservesEDRWhilePictureInPictureUsesSoftwareReadback() {
         let playerView = MPVPlayerView(frame: .zero)
-        let options = Dictionary(
+        let sharedOptions = Dictionary(
+            uniqueKeysWithValues: MPVPlayerView.sharedMetalVideoOutputOptions
+        )
+        let edrOptions = Dictionary(
+            uniqueKeysWithValues: MPVPlayerView.edrMetalVideoOutputOptions
+        )
+        let dolbyVisionOptions = Dictionary(
+            uniqueKeysWithValues: MPVPlayerView.dolbyVisionEDRMetalVideoOutputOptions
+        )
+        let sdrOptions = Dictionary(
             uniqueKeysWithValues: MPVPlayerView.sdrMetalVideoOutputOptions
         )
 
-        XCTAssertEqual(options["vo"], "gpu")
-        XCTAssertEqual(options["gpu-api"], "vulkan")
-        XCTAssertEqual(options["gpu-context"], "moltenvk")
-        XCTAssertEqual(options["target-colorspace-hint"], "no")
-        XCTAssertEqual(options["target-trc"], "srgb")
-        XCTAssertEqual(options["target-prim"], "bt.709")
+        XCTAssertEqual(sharedOptions["vo"], "gpu-next")
+        XCTAssertEqual(sharedOptions["gpu-api"], "vulkan")
+        XCTAssertEqual(sharedOptions["gpu-context"], "moltenvk")
+        XCTAssertEqual(sharedOptions["screenshot-sw"], "yes")
+        XCTAssertNil(sharedOptions["target-colorspace-hint"])
+        XCTAssertEqual(edrOptions["target-colorspace-hint"], "yes")
+        XCTAssertEqual(edrOptions["target-colorspace-hint-mode"], "source")
+        XCTAssertEqual(dolbyVisionOptions["target-colorspace-hint"], "yes")
+        XCTAssertEqual(
+            dolbyVisionOptions["target-colorspace-hint-mode"],
+            "source-dynamic"
+        )
+        XCTAssertEqual(sdrOptions["target-trc"], "srgb")
+        XCTAssertEqual(sdrOptions["target-prim"], "bt.709")
+
+        #if targetEnvironment(simulator)
         XCTAssertFalse(playerView.usesExtendedDynamicRangeOutput)
         XCTAssertEqual(playerView.metalLayer.pixelFormat, .bgra8Unorm_srgb)
         XCTAssertEqual(
             playerView.metalLayer.colorspace?.name,
             CGColorSpace.sRGB
         )
+        #else
+        if #available(iOS 16.0, *) {
+            XCTAssertTrue(playerView.usesExtendedDynamicRangeOutput)
+            XCTAssertEqual(playerView.metalLayer.pixelFormat, .rgba16Float)
+            XCTAssertEqual(
+                playerView.metalLayer.colorspace?.name,
+                CGColorSpace.extendedLinearSRGB
+            )
+            XCTAssertTrue(playerView.metalLayer.wantsExtendedDynamicRangeContent)
+        }
+        #endif
     }
 
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
@@ -848,7 +878,7 @@ final class MPVPlayerModelTests: XCTestCase {
     }
 
     @MainActor
-    func testSimulatorAddsDumbModeToCompatibilityGPURenderer() {
+    func testSimulatorAddsDumbModeWhileKeepingAnSDRSurface() {
         #if targetEnvironment(simulator)
         let playerView = MPVPlayerView(frame: .zero)
         let softwareProfile = playerView.makeSetupProfiles().first {
@@ -858,7 +888,7 @@ final class MPVPlayerModelTests: XCTestCase {
             uniqueKeysWithValues: softwareProfile?.options ?? []
         )
 
-        XCTAssertEqual(options["vo"], "gpu")
+        XCTAssertEqual(options["vo"], "gpu-next")
         XCTAssertEqual(options["gpu-api"], "vulkan")
         XCTAssertEqual(options["gpu-context"], "moltenvk")
         XCTAssertEqual(options["gpu-dumb-mode"], "yes")
