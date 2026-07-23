@@ -437,7 +437,8 @@ final class MPVPlayerModelTests: XCTestCase {
             height: 1,
             stride: 8,
             pixels: Data([0, 0, 255, 255, 0, 255, 0, 255]),
-            presentationTime: 12.5
+            presentationTime: 12.5,
+            subtitleText: nil
         )
 
         let sampleBuffer = try XCTUnwrap(frame.makeSampleBuffer())
@@ -450,12 +451,39 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertNotNil(CMSampleBufferGetImageBuffer(sampleBuffer))
     }
 
-    func testPictureInPictureScreenshotUsesCompatibleVideoAspectArguments() {
+    func testPictureInPictureFrameCompositesSubtitleWithoutGPUOutput() throws {
+        let width = 320
+        let height = 180
+        let frame = MPVPictureInPictureFrame(
+            width: width,
+            height: height,
+            stride: width * 4,
+            pixels: Data(repeating: 0, count: width * height * 4),
+            presentationTime: 0,
+            subtitleText: "Picture in Picture subtitle"
+        )
+
+        let sampleBuffer = try XCTUnwrap(frame.makeSampleBuffer())
+        let pixelBuffer = try XCTUnwrap(CMSampleBufferGetImageBuffer(sampleBuffer))
+        CVPixelBufferLockBaseAddress(pixelBuffer, .readOnly)
+        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, .readOnly) }
+        let byteCount = CVPixelBufferGetBytesPerRow(pixelBuffer) * height
+        let bytes = UnsafeRawBufferPointer(
+            start: CVPixelBufferGetBaseAddress(pixelBuffer),
+            count: byteCount
+        )
+
+        XCTAssertTrue(bytes.enumerated().contains { offset, byte in
+            offset % 4 != 3 && byte != 0
+        })
+    }
+
+    func testPictureInPictureScreenshotAvoidsGPUCompositedOutput() {
         XCTAssertEqual(
             MPVPlayerView.pictureInPictureScreenshotArgumentCandidates,
             [
-                ["subtitles", "bgra"],
-                ["subtitles"],
+                ["video", "bgra"],
+                ["video"],
             ]
         )
     }

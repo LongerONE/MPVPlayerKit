@@ -1,5 +1,6 @@
 import AVFoundation
 import CoreMedia
+import CoreText
 import CoreVideo
 #if canImport(Libmpv)
 import Libmpv
@@ -15,6 +16,7 @@ struct MPVPictureInPictureFrame: @unchecked Sendable {
     let stride: Int
     let pixels: Data
     let presentationTime: TimeInterval
+    let subtitleText: String?
 
     func makeSampleBuffer() -> CMSampleBuffer? {
         guard width > 0, height > 0, stride >= width * 4 else { return nil }
@@ -42,13 +44,22 @@ struct MPVPictureInPictureFrame: @unchecked Sendable {
         pixels.withUnsafeBytes { source in
             guard let sourceBase = source.baseAddress else { return }
             for row in 0..<height {
+                let destinationRow = destination.advanced(by: row * destinationStride)
                 memcpy(
-                    destination.advanced(by: row * destinationStride),
+                    destinationRow,
                     sourceBase.advanced(by: row * stride),
                     bytesPerRow
                 )
+                for pixel in 0..<width {
+                    destinationRow.storeBytes(
+                        of: UInt8.max,
+                        toByteOffset: pixel * 4 + 3,
+                        as: UInt8.self
+                    )
+                }
             }
         }
+        drawSubtitle(in: pixelBuffer)
 
         var formatDescription: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(
@@ -94,6 +105,74 @@ struct MPVPictureInPictureFrame: @unchecked Sendable {
         }
         return sampleBuffer
     }
+
+    private func drawSubtitle(in pixelBuffer: CVPixelBuffer) {
+        guard let subtitleText,
+              subtitleText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false,
+              let baseAddress = CVPixelBufferGetBaseAddress(pixelBuffer),
+              let colorSpace = CGColorSpace(name: CGColorSpace.sRGB),
+              let context = CGContext(
+                  data: baseAddress,
+                  width: width,
+                  height: height,
+                  bitsPerComponent: 8,
+                  bytesPerRow: CVPixelBufferGetBytesPerRow(pixelBuffer),
+                  space: colorSpace,
+                  bitmapInfo: CGBitmapInfo.byteOrder32Little.rawValue
+                      | CGImageAlphaInfo.premultipliedFirst.rawValue
+              ) else {
+            return
+        }
+
+        let fontSize = min(max(CGFloat(height) * 0.065, 16), 52)
+        let font = CTFontCreateWithName("HelveticaNeue-Bold" as CFString, fontSize, nil)
+        var alignment = CTTextAlignment.center
+        let paragraphStyle = withUnsafePointer(to: &alignment) { alignmentPointer in
+            let paragraphSettings = [
+                CTParagraphStyleSetting(
+                    spec: .alignment,
+                    valueSize: MemoryLayout<CTTextAlignment>.size,
+                    value: UnsafeRawPointer(alignmentPointer)
+                ),
+            ]
+            return CTParagraphStyleCreate(
+                paragraphSettings,
+                paragraphSettings.count
+            )
+        }
+        let attributes: [NSAttributedString.Key: Any] = [
+            NSAttributedString.Key(kCTFontAttributeName as String): font,
+            NSAttributedString.Key(kCTForegroundColorAttributeName as String):
+                CGColor(gray: 1, alpha: 1),
+            NSAttributedString.Key(kCTStrokeColorAttributeName as String):
+                CGColor(gray: 0, alpha: 1),
+            NSAttributedString.Key(kCTStrokeWidthAttributeName as String): -3,
+            NSAttributedString.Key(kCTParagraphStyleAttributeName as String):
+                paragraphStyle,
+        ]
+        let attributedText = NSAttributedString(
+            string: subtitleText,
+            attributes: attributes
+        )
+        let framesetter = CTFramesetterCreateWithAttributedString(attributedText)
+        let maximumWidth = CGFloat(width) * 0.9
+        let suggestedSize = CTFramesetterSuggestFrameSizeWithConstraints(
+            framesetter,
+            CFRange(),
+            nil,
+            CGSize(width: maximumWidth, height: CGFloat(height) * 0.35),
+            nil
+        )
+        let textRect = CGRect(
+            x: (CGFloat(width) - maximumWidth) / 2,
+            y: max(CGFloat(height) * 0.08, 12),
+            width: maximumWidth,
+            height: ceil(suggestedSize.height)
+        )
+        let path = CGPath(rect: textRect, transform: nil)
+        let frame = CTFramesetterCreateFrame(framesetter, CFRange(), path, nil)
+        CTFrameDraw(frame, context)
+    }
 }
 
 private struct MPVPictureInPictureRawFrame {
@@ -105,9 +184,9 @@ private struct MPVPictureInPictureRawFrame {
 }
 
 extension MPVPlayerView {
-    static let pictureInPictureScreenshotArgumentCandidates = [
-        ["subtitles", "bgra"],
-        ["subtitles"],
+    nonisolated static let pictureInPictureScreenshotArgumentCandidates = [
+        ["video", "bgra"],
+        ["video"],
     ]
 
     nonisolated func capturePictureInPictureFrame(
@@ -139,7 +218,8 @@ extension MPVPlayerView {
                     height: rawFrame.height,
                     stride: rawFrame.stride,
                     pixels: rawFrame.pixels,
-                    presentationTime: max(0, self.getDouble(MPVProperty.timePosition))
+                    presentationTime: max(0, self.getDouble(MPVProperty.timePosition)),
+                    subtitleText: self.getString(MPVProperty.subtitleText)
                 ))
                 return
             }
