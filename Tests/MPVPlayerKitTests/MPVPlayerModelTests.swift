@@ -363,6 +363,27 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(playerView.metalLayer.frame.size, playerView.bounds.size)
     }
 
+    @MainActor
+    func testPictureInPictureCoversInlinePlaybackUntilItStops() {
+        let playerView = MPVPlayerView(
+            frame: CGRect(x: 0, y: 0, width: 390, height: 219)
+        )
+
+        playerView.setInlinePlaybackCoveredForPictureInPicture(true)
+
+        XCTAssertTrue(
+            playerView.pictureInPictureInlineCoverLayer.superlayer === playerView.layer
+        )
+        XCTAssertEqual(
+            playerView.pictureInPictureInlineCoverLayer.frame,
+            playerView.bounds
+        )
+
+        playerView.setInlinePlaybackCoveredForPictureInPicture(false)
+
+        XCTAssertNil(playerView.pictureInPictureInlineCoverLayer.superlayer)
+    }
+
     func testPictureInPictureSkipClampsToPlayableRange() {
         XCTAssertEqual(
             MPVPictureInPicturePlaybackMath.fixedSkipInterval(

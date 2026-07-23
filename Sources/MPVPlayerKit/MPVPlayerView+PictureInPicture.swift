@@ -86,6 +86,7 @@ final class MPVPictureInPictureCoordinator:
     deinit {
         frameTimer?.cancel()
         observers.forEach(NotificationCenter.default.removeObserver)
+        playerView?.setInlinePlaybackCoveredForPictureInPicture(false)
     }
 
     func start() {
@@ -108,6 +109,7 @@ final class MPVPictureInPictureCoordinator:
     func pictureInPictureControllerDidStartPictureInPicture(
         _ pictureInPictureController: AVPictureInPictureController
     ) {
+        playerView?.setInlinePlaybackCoveredForPictureInPicture(true)
         startFrameUpdates(every: .milliseconds(100))
         postStateChange(isActive: true)
     }
@@ -118,6 +120,7 @@ final class MPVPictureInPictureCoordinator:
     ) {
         shouldStartAfterFirstFrame = false
         stopFrameUpdates()
+        playerView?.setInlinePlaybackCoveredForPictureInPicture(false)
         resumeAutomaticReadinessUpdates()
         postStateChange(isActive: false)
     }
@@ -126,6 +129,7 @@ final class MPVPictureInPictureCoordinator:
         _ pictureInPictureController: AVPictureInPictureController
     ) {
         stopFrameUpdates()
+        playerView?.setInlinePlaybackCoveredForPictureInPicture(false)
         resumeAutomaticReadinessUpdates()
         postStateChange(isActive: false)
     }
@@ -402,6 +406,21 @@ public extension MPVPlayerView {
 extension MPVPlayerView {
     var pictureInPicturePreferredContentSize: CGSize {
         CGSize(width: 16, height: 9)
+    }
+
+    func setInlinePlaybackCoveredForPictureInPicture(_ covered: Bool) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        if covered {
+            pictureInPictureInlineCoverLayer.frame = bounds
+            pictureInPictureInlineCoverLayer.backgroundColor = UIColor.black.cgColor
+            if pictureInPictureInlineCoverLayer.superlayer !== layer {
+                layer.addSublayer(pictureInPictureInlineCoverLayer)
+            }
+        } else {
+            pictureInPictureInlineCoverLayer.removeFromSuperlayer()
+        }
+        CATransaction.commit()
     }
 
     private var pictureInPictureCoordinatorInstance: MPVPictureInPictureCoordinator? {
