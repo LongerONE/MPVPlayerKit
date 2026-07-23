@@ -105,6 +105,11 @@ private struct MPVPictureInPictureRawFrame {
 }
 
 extension MPVPlayerView {
+    static let pictureInPictureScreenshotArgumentCandidates = [
+        ["subtitles", "bgra"],
+        ["subtitles"],
+    ]
+
     nonisolated func capturePictureInPictureFrame(
         completion: @escaping @Sendable (MPVPictureInPictureFrame?) -> Void
     ) {
@@ -114,43 +119,65 @@ extension MPVPlayerView {
                 return
             }
 
-            var cargs = self.makeCArgs(
-                "screenshot-raw",
-                ["scaled+subtitles", "bgra"]
-            ).map {
-                $0.flatMap { UnsafePointer<CChar>(strdup($0)) }
-            }
-            defer {
-                for pointer in cargs where pointer != nil {
-                    free(UnsafeMutablePointer(mutating: pointer!))
+            var lastStatus = MPV_ERROR_INVALID_PARAMETER.rawValue
+            for arguments in Self.pictureInPictureScreenshotArgumentCandidates {
+                let capture = self.pictureInPictureScreenshot(
+                    handle: mpv,
+                    arguments: arguments
+                )
+                lastStatus = capture.status
+                guard capture.status >= 0 else {
+                    if capture.status == MPV_ERROR_INVALID_PARAMETER.rawValue {
+                        continue
+                    }
+                    break
                 }
+                guard let rawFrame = capture.frame else { continue }
+                self.pictureInPictureScreenshotErrorCount = 0
+                completion(MPVPictureInPictureFrame(
+                    width: rawFrame.width,
+                    height: rawFrame.height,
+                    stride: rawFrame.stride,
+                    pixels: rawFrame.pixels,
+                    presentationTime: max(0, self.getDouble(MPVProperty.timePosition))
+                ))
+                return
             }
 
-            var result = mpv_node()
-            let status = mpv_command_ret(mpv, &cargs, &result)
-            guard status >= 0 else {
+            if self.pictureInPictureScreenshotErrorCount == 0 {
                 self.checkError(
-                    status,
+                    lastStatus,
                     operation: "picture-in-picture screenshot",
                     notifyOnFailure: false
                 )
-                completion(nil)
-                return
             }
-            defer { mpv_free_node_contents(&result) }
-            guard let rawFrame = Self.pictureInPictureRawFrame(from: result),
-                  rawFrame.format == "bgr0" || rawFrame.format == "bgra" else {
-                completion(nil)
-                return
-            }
-            completion(MPVPictureInPictureFrame(
-                width: rawFrame.width,
-                height: rawFrame.height,
-                stride: rawFrame.stride,
-                pixels: rawFrame.pixels,
-                presentationTime: max(0, self.getDouble(MPVProperty.timePosition))
-            ))
+            self.pictureInPictureScreenshotErrorCount += 1
+            completion(nil)
         }
+    }
+
+    private nonisolated func pictureInPictureScreenshot(
+        handle: OpaquePointer,
+        arguments: [String]
+    ) -> (status: Int32, frame: MPVPictureInPictureRawFrame?) {
+        var cargs = makeCArgs("screenshot-raw", arguments).map {
+            $0.flatMap { UnsafePointer<CChar>(strdup($0)) }
+        }
+        defer {
+            for pointer in cargs where pointer != nil {
+                free(UnsafeMutablePointer(mutating: pointer!))
+            }
+        }
+
+        var result = mpv_node()
+        let status = mpv_command_ret(handle, &cargs, &result)
+        guard status >= 0 else { return (status, nil) }
+        defer { mpv_free_node_contents(&result) }
+        guard let frame = Self.pictureInPictureRawFrame(from: result),
+              frame.format == "bgr0" || frame.format == "bgra" else {
+            return (status, nil)
+        }
+        return (status, frame)
     }
 
     private nonisolated static func pictureInPictureRawFrame(

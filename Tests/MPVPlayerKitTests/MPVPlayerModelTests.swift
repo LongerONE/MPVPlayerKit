@@ -429,6 +429,16 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertNotNil(CMSampleBufferGetImageBuffer(sampleBuffer))
     }
 
+    func testPictureInPictureScreenshotUsesCompatibleVideoAspectArguments() {
+        XCTAssertEqual(
+            MPVPlayerView.pictureInPictureScreenshotArgumentCandidates,
+            [
+                ["subtitles", "bgra"],
+                ["subtitles"],
+            ]
+        )
+    }
+
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
         let style = MPVSubtitleStyle(
             fontSize: 200,

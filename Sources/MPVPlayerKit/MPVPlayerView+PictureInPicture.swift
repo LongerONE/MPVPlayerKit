@@ -50,6 +50,7 @@ final class MPVPictureInPictureCoordinator:
     private var frameTimer: DispatchSourceTimer?
     private var isCapturingFrame = false
     private var shouldStartAfterFirstFrame = false
+    private var consecutiveFrameCaptureFailures = 0
     private var playbackTimebase: CMTimebase?
     nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
 
@@ -306,26 +307,43 @@ final class MPVPictureInPictureCoordinator:
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isCapturingFrame = false
-                if let frame, let sampleBuffer = frame.makeSampleBuffer() {
-                    self.synchronizePlaybackTimebase(to: frame.presentationTime)
-                    if #available(iOS 17.0, *) {
-                        let renderer = self.sampleBufferDisplayLayer.sampleBufferRenderer
-                        if renderer.status == .failed {
-                            renderer.flush()
-                        }
-                        renderer.enqueue(sampleBuffer)
-                    } else {
-                        if self.sampleBufferDisplayLayer.status == .failed {
-                            self.sampleBufferDisplayLayer.flush()
-                        }
-                        self.sampleBufferDisplayLayer.enqueue(sampleBuffer)
+                guard let frame, let sampleBuffer = frame.makeSampleBuffer() else {
+                    self.handleFrameCaptureFailure()
+                    return
+                }
+                self.handleFrameCaptureSuccess()
+                self.synchronizePlaybackTimebase(to: frame.presentationTime)
+                if #available(iOS 17.0, *) {
+                    let renderer = self.sampleBufferDisplayLayer.sampleBufferRenderer
+                    if renderer.status == .failed {
+                        renderer.flush()
                     }
-                    if self.shouldStartAfterFirstFrame {
-                        self.shouldStartAfterFirstFrame = false
-                        self.controller.startPictureInPicture()
+                    renderer.enqueue(sampleBuffer)
+                } else {
+                    if self.sampleBufferDisplayLayer.status == .failed {
+                        self.sampleBufferDisplayLayer.flush()
                     }
+                    self.sampleBufferDisplayLayer.enqueue(sampleBuffer)
+                }
+                if self.shouldStartAfterFirstFrame {
+                    self.shouldStartAfterFirstFrame = false
+                    self.controller.startPictureInPicture()
                 }
             }
+        }
+    }
+
+    private func handleFrameCaptureFailure() {
+        consecutiveFrameCaptureFailures += 1
+        guard consecutiveFrameCaptureFailures == 3 else { return }
+        startFrameUpdates(every: .milliseconds(500))
+    }
+
+    private func handleFrameCaptureSuccess() {
+        guard consecutiveFrameCaptureFailures > 0 else { return }
+        consecutiveFrameCaptureFailures = 0
+        if controller.isPictureInPictureActive {
+            startFrameUpdates(every: .milliseconds(100))
         }
     }
 

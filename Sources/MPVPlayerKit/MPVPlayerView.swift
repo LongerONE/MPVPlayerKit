@@ -263,6 +263,7 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var lastLoggedSubtitleText = ""
     nonisolated(unsafe) var hasLoggedSubtitleTextEvent = false
     nonisolated(unsafe) var repeatedMPVLogMessageCounts: [String: Int] = [:]
+    nonisolated(unsafe) var pictureInPictureScreenshotErrorCount = 0
     var lastAppliedLayerBounds = CGRect.null
     var lastAppliedDrawableSize = CGSize.zero
     var pendingMetalLayerGeometry: MPVMetalLayerGeometry?
