@@ -43,6 +43,9 @@ extension MPVPlayerView {
     }
 
     @objc public func stop() {
+        clientSubtitleLoadTasks.values.forEach { $0.cancel() }
+        clientSubtitleLoadTasks.removeAll()
+        clientSubtitleController.clear()
         stopPictureInPicture()
         setDecoderMode(.initializing)
         guard stopped == false else {
@@ -118,6 +121,9 @@ extension MPVPlayerView {
         let isImageSubtitle = boolValue(options["isImageSubtitle"])
         let usesNativeSubtitleRendering = boolValue(options["usesNativeSubtitleRendering"])
         let usesOriginalStyle = boolValue(options["usesOriginalStyle"])
+        if mediaType == "sub" {
+            clearClientSubtitle()
+        }
         queue.async { [weak self] in
             guard let self else { return }
             if mediaType == "sub" {
@@ -225,6 +231,8 @@ extension MPVPlayerView {
 
     @objc public func setSubtitleVisible(_ options: NSDictionary) {
         let visible = boolValue(options["visible"])
+        applyClientSubtitleVisibility(visible)
+        let nativeVisible = clientSubtitleController.hasSelection ? false : visible
         queue.async { [weak self] in
             guard let self else { return }
             _ = self.beginNewSubtitleSelection(reason: visible ? "visibility-on" : "visibility-off")
@@ -233,7 +241,7 @@ extension MPVPlayerView {
                 previous: snapshot,
                 targetUsesOriginalStyle: snapshot.usesOriginalStyle,
                 targetSubtitleID: snapshot.subtitleID,
-                targetVisibility: visible
+                targetVisibility: nativeVisible
             )
             if success { self.activeExternalSubtitleActivation = nil }
             self.mpvDebugLog("setSubtitleVisible visible=\(visible) transactionSuccess=\(success)")
@@ -248,6 +256,16 @@ extension MPVPlayerView {
     }
 
     @objc public func updateSubtitleStyle(_ options: NSDictionary) {
+        applyClientSubtitleStyle(MPVSubtitleStyle(
+            fontSize: (options["fontSize"] as? NSNumber)?.doubleValue ?? 38,
+            bold: boolValue(options["bold"]),
+            textColor: options["textColor"] as? String ?? "#FFFFFFFF",
+            outlineSize: (options["outlineSize"] as? NSNumber)?.doubleValue ?? 0,
+            outlineColor: options["outlineColor"] as? String ?? "#FF000000",
+            shadowOffset: (options["shadowOffset"] as? NSNumber)?.doubleValue ?? 0,
+            backgroundColor: options["backgroundColor"] as? String ?? "#00000000",
+            bottomOffset: (options["bottomOffset"] as? NSNumber)?.doubleValue ?? 34
+        ))
         let values = [
             MPVProperty.subtitleFontSize: decimalString(options["fontSize"], fallback: 38),
             MPVProperty.subtitleBold: boolValue(options["bold"]) ? "yes" : "no",
@@ -286,6 +304,7 @@ extension MPVPlayerView {
 
     @objc public func updateSubtitleDelay(_ value: NSNumber) {
         let delay = value.doubleValue
+        applyClientSubtitleDelay(delay.isFinite ? delay : 0)
         queue.async { [weak self] in
             guard let self else { return }
             self.subtitleDelayValue = delay.isFinite ? delay : 0

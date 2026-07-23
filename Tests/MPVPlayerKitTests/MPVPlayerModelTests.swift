@@ -1,3 +1,4 @@
+import CoreFoundation
 import XCTest
 import UIKit
 @testable import MPVPlayerKit
@@ -315,6 +316,7 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertTrue(controller.controlsView.isUserInteractionEnabled)
     }
 
+    @MainActor
     func testQuickPlayerExposesPictureInPictureControl() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false)
@@ -376,6 +378,71 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(style.bottomOffset, 0)
         XCTAssertEqual((style.bridgeDictionary["fontSize"] as? NSNumber)?.doubleValue, 120)
         XCTAssertEqual((style.bridgeDictionary["bold"] as? NSNumber)?.boolValue, true)
+    }
+
+    func testSubtitleDocumentDecodesUTF8SRTAndCleansASSOverrides() throws {
+        let source = """
+        1
+        00:00:05,000 --> 00:00:08,000
+        {\\an8\\pos(960,100)}English
+
+        2
+        00:00:05,000 --> 00:00:08,000
+        {\\an2\\pos(960,980)}中文字幕
+        """
+        let document = try MPVSubtitleDocument.decode(
+            Data(source.utf8),
+            sourceURL: URL(fileURLWithPath: "/tmp/test.srt")
+        )
+
+        XCTAssertEqual(document.format, .subRip)
+        XCTAssertEqual(document.cues.count, 1)
+        XCTAssertEqual(document.cues[0].text, "English\n中文字幕")
+        XCTAssertEqual(document.cues(at: 6).map(\.text), ["English\n中文字幕"])
+        XCTAssertTrue(document.cues(at: 9).isEmpty)
+    }
+
+    func testSubtitleDocumentDecodesGB18030SRT() throws {
+        let encoding = String.Encoding(
+            rawValue: CFStringConvertEncodingToNSStringEncoding(CFStringEncoding(0x0632))
+        )
+        let source = "1\n00:00:00,000 --> 00:00:02,000\n中文字幕\n"
+        let data = try XCTUnwrap(source.data(using: encoding))
+        let document = try MPVSubtitleDocument.decode(
+            data,
+            sourceURL: URL(fileURLWithPath: "/tmp/test.srt")
+        )
+
+        XCTAssertEqual(document.cues.first?.text, "中文字幕")
+    }
+
+    @MainActor
+    func testPlayerViewExposesReplaceableClientSubtitleRenderer() {
+        final class Renderer: MPVSubtitleRenderer {
+            let view = UIView()
+            var presentations: [MPVSubtitlePresentation] = []
+
+            func render(_ presentation: MPVSubtitlePresentation) {
+                presentations.append(presentation)
+            }
+
+            func clear() {
+                presentations.append(MPVSubtitlePresentation(cues: [], style: .defaultStyle))
+            }
+        }
+
+        let renderer = Renderer()
+        let playerView = MPVPlayerView(frame: .zero)
+        playerView.useClientSubtitleRenderer(renderer)
+        playerView.selectClientSubtitle(MPVSubtitleDocument(
+            format: .subRip,
+            cues: [MPVSubtitleCue(startTime: 1, endTime: 3, text: "Hello")]
+        ))
+        playerView.updateClientSubtitle(at: 2)
+
+        XCTAssertTrue(playerView.clientSubtitleRenderer === renderer)
+        XCTAssertEqual(renderer.presentations.last?.cues.first?.text, "Hello")
+        XCTAssertTrue(renderer.view.superview === playerView)
     }
 
     func testQuickPlayerUsesAvailableSFSymbolControls() {

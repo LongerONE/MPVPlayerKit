@@ -44,6 +44,7 @@ extension MPVPlayerView {
                 self.hasReportedReadyToPlay = true
                 self.notifyState(.readyToPlay)
             }
+            self.updateClientSubtitle(at: self.currentTime)
             self.notifyTime(currentTime: self.currentTime, duration: self.duration)
         }
     }

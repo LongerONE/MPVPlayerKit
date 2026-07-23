@@ -7,7 +7,9 @@ An iOS 15+ Swift Package that wraps [MPVKit](https://github.com/mpvkit/MPVKit) w
 - HTTP and local video playback
 - Play, pause, stop, exact seek and playback-rate control
 - Audio, video and subtitle track discovery and selection
-- External subtitle loading, visibility and delay control
+- Framework-owned SRT/VTT parsing, timing, styling and default rendering
+- Replaceable client subtitle renderer for custom application UI
+- External ASS/SSA loading through MPV with original-style support
 - Picture in Picture for custom and quick-player interfaces
 - A reusable rendering view for custom player interfaces
 - An optional ready-to-present `MPVQuickPlayerViewController`
@@ -57,6 +59,43 @@ Picture in Picture is also available through `startPictureInPicture()`,
 `allowsAutomaticPictureInPictureFromInline` when the host app wants the system
 to enter Picture in Picture as playback moves to the background. The host app
 must enable the Audio, AirPlay, and Picture in Picture background mode.
+
+## Client-rendered subtitles
+
+SRT and WebVTT files loaded without original styling use the framework subtitle
+pipeline. `MPVSubtitleDocument` handles UTF-8, UTF-16 and GB18030 text, normalizes
+embedded ASS overrides, and provides time-based cue lookup. The built-in
+`MPVDefaultSubtitleRenderer` is installed automatically:
+
+```swift
+player.loadClientSubtitle(from: subtitleURL) { success in
+    print("Subtitle loaded:", success)
+}
+```
+
+Applications can supply their own renderer while leaving parsing and timing in
+the framework:
+
+```swift
+@MainActor
+final class AppSubtitleRenderer: MPVSubtitleRenderer {
+    let view = UIView()
+
+    func render(_ presentation: MPVSubtitlePresentation) {
+        // Render presentation.cues using the application's own UI.
+    }
+
+    func clear() {
+        // Remove the current subtitle.
+    }
+}
+
+player.useClientSubtitleRenderer(AppSubtitleRenderer())
+```
+
+`MPVQuickPlayerViewController` uses the same pipeline through its public
+`player`, so its external SRT/VTT picker works without application-side subtitle
+layers.
 
 ## Frame interpolation
 

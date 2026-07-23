@@ -216,6 +216,8 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var debandEnabled = false
     nonisolated(unsafe) var interpolationOptions = MPVInterpolationOptions.off
     nonisolated(unsafe) var subtitleDelayValue = 0.0
+    let clientSubtitleController = MPVSubtitlePresentationController()
+    var clientSubtitleLoadTasks: [String: Task<Void, Never>] = [:]
     nonisolated(unsafe) var subtitleStyleValues: [String: String] = [
         MPVProperty.subtitleFontSize: "38.000",
         MPVProperty.subtitleBold: "no",
@@ -279,6 +281,7 @@ public final class MPVPlayerView: UIView {
         super.init(frame: frame)
         queue.setSpecific(key: queueSpecificKey, value: ())
         setupLayer()
+        clientSubtitleController.install(in: self)
     }
 
     public convenience init(url: URL, headers: [String: String], userAgent: String?) {
@@ -331,6 +334,7 @@ public final class MPVPlayerView: UIView {
     }
 
     deinit {
+        clientSubtitleLoadTasks.values.forEach { $0.cancel() }
         stop()
     }
 
@@ -371,6 +375,7 @@ public final class MPVPlayerView: UIView {
 
     public override func layoutSubviews() {
         super.layoutSubviews()
+        clientSubtitleController.update(at: currentTime, force: true)
         guard isRenderingInPictureInPicture == false else { return }
         updateMetalLayerGeometryIfNeeded()
     }

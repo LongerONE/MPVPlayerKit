@@ -406,6 +406,22 @@ public final class MPVPlayer: NSObject {
         playbackView.setSubtitleVisible(["visible": NSNumber(value: visible)] as NSDictionary)
     }
 
+    public var clientSubtitleRenderer: any MPVSubtitleRenderer {
+        playbackView.clientSubtitleRenderer
+    }
+
+    public func useClientSubtitleRenderer(_ renderer: any MPVSubtitleRenderer) {
+        playbackView.useClientSubtitleRenderer(renderer)
+    }
+
+    public func selectClientSubtitle(_ document: MPVSubtitleDocument?) {
+        playbackView.selectClientSubtitle(document)
+    }
+
+    public func clearClientSubtitle() {
+        playbackView.clearClientSubtitle()
+    }
+
     public func setSubtitleDelay(_ delay: TimeInterval) {
         playbackView.updateSubtitleDelay(NSNumber(value: delay))
     }
@@ -424,16 +440,48 @@ public final class MPVPlayer: NSObject {
             completion: completion,
             timeout: timeout
         )
-        playbackView.loadSubtitle([
+        let options = [
             "requestID": requestID.uuidString,
             "url": url.absoluteString,
             "usesOriginalStyle": NSNumber(value: usesOriginalStyle),
+        ] as NSDictionary
+        if usesOriginalStyle == false,
+           ["srt", "vtt"].contains(url.pathExtension.lowercased()) {
+            playbackView.loadClientSubtitle(options)
+        } else {
+            playbackView.loadSubtitle(options)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeout)
+        return requestID
+    }
+
+    @discardableResult
+    public func loadClientSubtitle(
+        from url: URL,
+        headers: [String: String] = [:],
+        completion: @escaping (Bool) -> Void
+    ) -> UUID {
+        let requestID = UUID()
+        let timeout = DispatchWorkItem { [weak self] in
+            self?.finishSubtitleLoad(requestID: requestID.uuidString, success: false)
+        }
+        pendingSubtitleLoads[requestID.uuidString] = PendingSubtitleLoad(
+            completion: completion,
+            timeout: timeout
+        )
+        playbackView.loadClientSubtitle([
+            "requestID": requestID.uuidString,
+            "url": url.absoluteString,
+            "headers": headers,
         ] as NSDictionary)
         DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeout)
         return requestID
     }
 
     public func cancelExternalSubtitleLoad(_ requestID: UUID) {
+        playbackView.cancelClientSubtitleLoad([
+            "requestID": requestID.uuidString,
+        ] as NSDictionary)
         playbackView.cancelSubtitleLoad([
             "requestID": requestID.uuidString,
         ] as NSDictionary)
