@@ -4,6 +4,13 @@ import QuartzCore
 import UIKit
 
 enum MPVPictureInPicturePlaybackMath {
+    static let skipInterval: TimeInterval = 15
+
+    static func fixedSkipInterval(requestedInterval: TimeInterval) -> TimeInterval {
+        guard requestedInterval != 0 else { return 0 }
+        return requestedInterval < 0 ? -skipInterval : skipInterval
+    }
+
     static func clampedSeekTime(
         currentTime: TimeInterval,
         duration: TimeInterval,
@@ -43,6 +50,7 @@ final class MPVPictureInPictureCoordinator:
     private var frameTimer: DispatchSourceTimer?
     private var isCapturingFrame = false
     private var shouldStartAfterFirstFrame = false
+    private var playbackTimebase: CMTimebase?
     nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
 
     var allowsAutomaticStartFromInline: Bool {
@@ -67,6 +75,7 @@ final class MPVPictureInPictureCoordinator:
         self.allowsAutomaticStartFromInline = allowsAutomaticStartFromInline
         sampleBufferDisplayLayer.videoGravity = .resizeAspect
         super.init()
+        configurePlaybackTimebase()
         controller.delegate = self
         controller.canStartPictureInPictureAutomaticallyFromInline = allowsAutomaticStartFromInline
         installSourceLayer(in: playerView)
@@ -137,6 +146,7 @@ final class MPVPictureInPictureCoordinator:
         } else {
             playerView?.pause()
         }
+        synchronizePlaybackTimebase()
         invalidatePlaybackState()
     }
 
@@ -169,12 +179,15 @@ final class MPVPictureInPictureCoordinator:
         let target = MPVPictureInPicturePlaybackMath.clampedSeekTime(
             currentTime: playerView.currentTime,
             duration: playerView.duration,
-            interval: skipInterval.seconds
+            interval: MPVPictureInPicturePlaybackMath.fixedSkipInterval(
+                requestedInterval: skipInterval.seconds
+            )
         )
         _ = playerView.seek([
             "time": target,
             "autoPlay": false,
         ])
+        synchronizePlaybackTimebase(to: target)
         captureAndEnqueueFrame()
         invalidatePlaybackState()
         completion()
@@ -214,10 +227,41 @@ final class MPVPictureInPictureCoordinator:
                 queue: .main
             ) { [weak self] _ in
                 MainActor.assumeIsolated {
+                    self?.synchronizePlaybackTimebase()
                     self?.invalidatePlaybackState()
                 }
             })
         }
+    }
+
+    private func configurePlaybackTimebase() {
+        var timebase: CMTimebase?
+        guard CMTimebaseCreateWithSourceClock(
+            allocator: kCFAllocatorDefault,
+            sourceClock: CMClockGetHostTimeClock(),
+            timebaseOut: &timebase
+        ) == noErr, let timebase else {
+            return
+        }
+        playbackTimebase = timebase
+        sampleBufferDisplayLayer.controlTimebase = timebase
+        synchronizePlaybackTimebase()
+    }
+
+    private func synchronizePlaybackTimebase(to time: TimeInterval? = nil) {
+        guard let playbackTimebase, let playerView else { return }
+        let currentTime = time ?? playerView.currentTime
+        CMTimebaseSetTime(
+            playbackTimebase,
+            time: CMTime(
+                seconds: max(0, currentTime),
+                preferredTimescale: 600
+            )
+        )
+        CMTimebaseSetRate(
+            playbackTimebase,
+            rate: playerView.isPlaying ? 1 : 0
+        )
     }
 
     private func invalidatePlaybackState() {
@@ -263,6 +307,7 @@ final class MPVPictureInPictureCoordinator:
                 guard let self else { return }
                 self.isCapturingFrame = false
                 if let frame, let sampleBuffer = frame.makeSampleBuffer() {
+                    self.synchronizePlaybackTimebase(to: frame.presentationTime)
                     if #available(iOS 17.0, *) {
                         let renderer = self.sampleBufferDisplayLayer.sampleBufferRenderer
                         if renderer.status == .failed {

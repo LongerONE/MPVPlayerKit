@@ -114,7 +114,10 @@ extension MPVPlayerView {
                 return
             }
 
-            var cargs = self.makeCArgs("screenshot-raw", ["window"]).map {
+            var cargs = self.makeCArgs(
+                "screenshot-raw",
+                ["scaled+subtitles", "bgra"]
+            ).map {
                 $0.flatMap { UnsafePointer<CChar>(strdup($0)) }
             }
             defer {

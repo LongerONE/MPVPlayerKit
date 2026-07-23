@@ -365,6 +365,18 @@ final class MPVPlayerModelTests: XCTestCase {
 
     func testPictureInPictureSkipClampsToPlayableRange() {
         XCTAssertEqual(
+            MPVPictureInPicturePlaybackMath.fixedSkipInterval(
+                requestedInterval: -10
+            ),
+            -15
+        )
+        XCTAssertEqual(
+            MPVPictureInPicturePlaybackMath.fixedSkipInterval(
+                requestedInterval: 10
+            ),
+            15
+        )
+        XCTAssertEqual(
             MPVPictureInPicturePlaybackMath.clampedSeekTime(
                 currentTime: 10,
                 duration: 100,
