@@ -8,6 +8,7 @@ An iOS 15+ Swift Package that wraps [MPVKit](https://github.com/mpvkit/MPVKit) w
 - Play, pause, stop, exact seek and playback-rate control
 - Audio, video and subtitle track discovery and selection
 - External subtitle loading, visibility and delay control
+- Picture in Picture for custom and quick-player interfaces
 - A reusable rendering view for custom player interfaces
 - An optional ready-to-present `MPVQuickPlayerViewController`
 
@@ -36,6 +37,7 @@ player.playbackView.frame = containerView.bounds
 player.play()
 
 player.seek(to: 120, autoPlay: true)
+player.startPictureInPicture()
 
 let audioTracks = player.tracks(ofType: .audio)
 if let track = audioTracks.first {
@@ -49,6 +51,12 @@ if let subtitle = subtitleTracks.first {
 ```
 
 Set `MPVPlayer.delegate` to receive state, time, buffering and decoder-mode updates.
+
+Picture in Picture is also available through `startPictureInPicture()`,
+`stopPictureInPicture()`, and `togglePictureInPicture()`. Set
+`allowsAutomaticPictureInPictureFromInline` when the host app wants the system
+to enter Picture in Picture as playback moves to the background. The host app
+must enable the Audio, AirPlay, and Picture in Picture background mode.
 
 ## Frame interpolation
 
@@ -79,7 +87,7 @@ let playerViewController = MPVQuickPlayerViewController(
 present(playerViewController, animated: true)
 ```
 
-The quick interface provides play/pause, seeking, time display, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, frame interpolation, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses SF Symbols with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
+The quick interface provides play/pause, seeking, time display, Picture in Picture, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, frame interpolation, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
 
 Landscape lock can also be changed while the player is visible:
 

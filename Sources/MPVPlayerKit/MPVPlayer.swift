@@ -291,6 +291,16 @@ public final class MPVPlayer: NSObject {
         get { playbackView.playerContentMode }
         set { playbackView.playerContentMode = newValue }
     }
+    public var isPictureInPictureSupported: Bool {
+        playbackView.isPictureInPictureSupported
+    }
+    public var isPictureInPictureActive: Bool {
+        playbackView.isPictureInPictureActive
+    }
+    public var allowsAutomaticPictureInPictureFromInline: Bool {
+        get { playbackView.allowsAutomaticPictureInPictureFromInline }
+        set { playbackView.allowsAutomaticPictureInPictureFromInline = newValue }
+    }
 
     private var observers: [NSObjectProtocol] = []
     private var pendingSubtitleLoads: [String: PendingSubtitleLoad] = [:]
@@ -332,6 +342,18 @@ public final class MPVPlayer: NSObject {
 
     public func stop() {
         playbackView.stop()
+    }
+
+    public func startPictureInPicture() {
+        playbackView.startPictureInPicture()
+    }
+
+    public func stopPictureInPicture() {
+        playbackView.stopPictureInPicture()
+    }
+
+    public func togglePictureInPicture() {
+        playbackView.togglePictureInPicture()
     }
 
     @discardableResult

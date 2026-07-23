@@ -30,6 +30,9 @@ enum MPVPlayerKitNotification {
     static let didUpdateBufferingProgress = Notification.Name("MPVPlayerViewDidUpdateBufferingProgress")
     static let didUpdateDecoderMode = Notification.Name("MPVPlayerViewDidUpdateDecoderMode")
     static let didLoadSubtitle = Notification.Name("MPVPlayerViewDidLoadSubtitle")
+    static let didChangePictureInPicture = Notification.Name(
+        "MPVPlayerViewDidChangePictureInPicture"
+    )
 }
 
 enum MPVPlayerKitNotificationKey {
@@ -184,6 +187,8 @@ public final class MPVPlayerView: UIView {
     }
 
     var metalLayer = MPVPlayerMetalLayer()
+    var pictureInPictureCoordinator: MPVPictureInPictureCoordinator?
+    var isRenderingInPictureInPicture = false
     var usesExtendedDynamicRangeOutput = false
     var url: URL?
     var headers: [String: String] = [:]
@@ -364,6 +369,7 @@ public final class MPVPlayerView: UIView {
 
     public override func layoutSubviews() {
         super.layoutSubviews()
+        guard isRenderingInPictureInPicture == false else { return }
         updateMetalLayerGeometryIfNeeded()
     }
 

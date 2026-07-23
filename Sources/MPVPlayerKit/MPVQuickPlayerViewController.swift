@@ -1,3 +1,4 @@
+import AVKit
 import MediaPlayer
 import UIKit
 import UniformTypeIdentifiers
@@ -42,6 +43,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     let videoButton = UIButton(type: .system)
     let audioButton = UIButton(type: .system)
     let subtitleButton = UIButton(type: .system)
+    let pictureInPictureButton = UIButton(type: .system)
     let settingsButton = UIButton(type: .system)
     let loadingIndicator = UIActivityIndicatorView(style: .large)
     let systemVolumeView = MPVolumeView(frame: .zero)
@@ -252,6 +254,19 @@ public final class MPVQuickPlayerViewController: UIViewController {
             action: #selector(chooseSubtitleTrack)
         )
         configureControlButton(
+            pictureInPictureButton,
+            symbol: "pip.enter",
+            label: mpvLocalized("accessibility.picture_in_picture"),
+            action: #selector(startPictureInPicture)
+        )
+        pictureInPictureButton.setImage(
+            AVPictureInPictureController.pictureInPictureButtonStartImage,
+            for: .normal
+        )
+        pictureInPictureButton.accessibilityIdentifier =
+            "MPVQuickPlayer.pictureInPictureButton"
+        pictureInPictureButton.isEnabled = player.isPictureInPictureSupported
+        configureControlButton(
             settingsButton,
             symbol: "gearshape",
             label: mpvLocalized("accessibility.playback_settings"),
@@ -461,6 +476,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
         } else {
             player.play()
         }
+    }
+
+    @objc private func startPictureInPicture() {
+        player.startPictureInPicture()
     }
 
     @objc private func closePlayer() {

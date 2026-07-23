@@ -43,6 +43,7 @@ extension MPVPlayerView {
     }
 
     @objc public func stop() {
+        stopPictureInPicture()
         setDecoderMode(.initializing)
         guard stopped == false else {
             mpvDebugLog("stop ignored already stopped")

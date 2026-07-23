@@ -300,6 +300,26 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertTrue(controller.controlsView.isUserInteractionEnabled)
     }
 
+    func testQuickPlayerExposesPictureInPictureControl() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
+        let controller = MPVQuickPlayerViewController(url: url, autoplay: false)
+        controller.loadViewIfNeeded()
+
+        XCTAssertTrue(
+            controller.trackButtonStack.arrangedSubviews.contains(
+                controller.pictureInPictureButton
+            )
+        )
+        XCTAssertEqual(
+            controller.pictureInPictureButton.accessibilityIdentifier,
+            "MPVQuickPlayer.pictureInPictureButton"
+        )
+        XCTAssertEqual(
+            controller.pictureInPictureButton.isEnabled,
+            controller.player.isPictureInPictureSupported
+        )
+    }
+
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
         let style = MPVSubtitleStyle(
             fontSize: 200,
