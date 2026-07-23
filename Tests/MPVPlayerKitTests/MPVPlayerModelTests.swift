@@ -30,6 +30,21 @@ final class MPVPlayerModelTests: XCTestCase {
         }
     }
 
+    func testMPVSetupReappliesSubtitleStyleAfterInitialization() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let setupSource = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/MPVPlayerKit/MPVPlayerView+Setup.swift"),
+            encoding: .utf8
+        )
+        let initializeRange = try XCTUnwrap(setupSource.range(of: "mpv_initialize(mpv)"))
+        let runtimeStyleRange = try XCTUnwrap(setupSource.range(of: "applyUserSubtitleStyleProperties()"))
+
+        XCTAssertLessThan(initializeRange.lowerBound, runtimeStyleRange.lowerBound)
+    }
+
     func testConfigurationCreatesBridgeValues() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let configuration = MPVPlayerConfiguration(

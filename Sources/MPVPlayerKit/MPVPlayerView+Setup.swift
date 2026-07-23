@@ -246,6 +246,13 @@ extension MPVPlayerView {
             destroyMPVHandle(reason: "profile-\(profile.name)-initialize-failed", sendStopCommand: false)
             return false
         }
+        // Some libmpv builds accept subtitle styling only as pre-initialization
+        // options, but do not apply the font size to a newly added text track.
+        // Reapply the cached values as runtime properties so the first SRT load
+        // uses the same style as a later settings change.
+        if applyUserSubtitleStyleProperties() == false {
+            mpvDebugLog("setupMPV could not apply runtime subtitle style profile=\(profile.name)")
+        }
         applyContentMode(currentContentModeSnapshot())
         mpvDebugLog("setupMPV initialized profile=\(profile.name)")
         logEffectiveVideoSettings(reason: "setup")
