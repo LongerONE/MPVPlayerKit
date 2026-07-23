@@ -32,32 +32,20 @@ extension MPVPlayerView {
     @objc public func loadClientSubtitle(_ options: NSDictionary) {
         guard let requestID = options["requestID"] as? String,
               let urlString = options["url"] as? String,
-              let url = URL(string: urlString) else {
-            notifyClientSubtitleLoad(requestID: options["requestID"] as? String ?? "", success: false)
+              urlString.isEmpty == false else {
             return
         }
-        clientSubtitleLoadTasks[requestID]?.cancel()
-        let headers = options["headers"] as? [String: String] ?? [:]
-        clientSubtitleLoadTasks[requestID] = Task { [weak self] in
-            do {
-                let document = try await MPVSubtitleDocument.load(from: url, headers: headers)
-                try Task.checkCancellation()
-                guard let self else { return }
-                selectClientSubtitle(document)
-                clientSubtitleController.isVisible = true
-                notifyClientSubtitleLoad(requestID: requestID, success: true)
-            } catch {
-                guard Task.isCancelled == false, let self else { return }
-                notifyClientSubtitleLoad(requestID: requestID, success: false)
-            }
-            self?.clientSubtitleLoadTasks[requestID] = nil
-        }
+        // Kept as an Objective-C compatibility entry point. Playback always
+        // delegates subtitle decoding and composition to libmpv.
+        loadSubtitle([
+            "requestID": requestID,
+            "url": urlString,
+            "usesOriginalStyle": options["usesOriginalStyle"] ?? NSNumber(value: false),
+        ] as NSDictionary)
     }
 
     @objc public func cancelClientSubtitleLoad(_ options: NSDictionary) {
-        guard let requestID = options["requestID"] as? String else { return }
-        clientSubtitleLoadTasks.removeValue(forKey: requestID)?.cancel()
-        notifyClientSubtitleLoad(requestID: requestID, success: false)
+        cancelSubtitleLoad(options)
     }
 
     func updateClientSubtitle(at time: TimeInterval) {
@@ -77,16 +65,5 @@ extension MPVPlayerView {
     func applyClientSubtitleStyle(_ style: MPVSubtitleStyle) {
         clientSubtitleController.style = style
         clientSubtitleController.update(at: currentTime, force: true)
-    }
-
-    private func notifyClientSubtitleLoad(requestID: String, success: Bool) {
-        NotificationCenter.default.post(
-            name: MPVPlayerKitNotification.didLoadSubtitle,
-            object: self,
-            userInfo: [
-                MPVPlayerKitNotificationKey.requestID: requestID,
-                MPVPlayerKitNotificationKey.success: success,
-            ]
-        )
     }
 }

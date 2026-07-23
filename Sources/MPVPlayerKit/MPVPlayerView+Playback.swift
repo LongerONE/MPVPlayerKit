@@ -43,8 +43,6 @@ extension MPVPlayerView {
     }
 
     @objc public func stop() {
-        clientSubtitleLoadTasks.values.forEach { $0.cancel() }
-        clientSubtitleLoadTasks.removeAll()
         clientSubtitleController.clear()
         stopPictureInPicture()
         setDecoderMode(.initializing)
@@ -153,6 +151,7 @@ extension MPVPlayerView {
             mpvDebugLog("loadSubtitle ignored missing url")
             return
         }
+        clearClientSubtitle()
         let usesOriginalStyle = boolValue(options["usesOriginalStyle"])
         queue.async { [weak self] in
             self?.loadSubtitleOnMPVQueue(
@@ -231,8 +230,7 @@ extension MPVPlayerView {
 
     @objc public func setSubtitleVisible(_ options: NSDictionary) {
         let visible = boolValue(options["visible"])
-        applyClientSubtitleVisibility(visible)
-        let nativeVisible = clientSubtitleController.hasSelection ? false : visible
+        clearClientSubtitle()
         queue.async { [weak self] in
             guard let self else { return }
             _ = self.beginNewSubtitleSelection(reason: visible ? "visibility-on" : "visibility-off")
@@ -241,7 +239,7 @@ extension MPVPlayerView {
                 previous: snapshot,
                 targetUsesOriginalStyle: snapshot.usesOriginalStyle,
                 targetSubtitleID: snapshot.subtitleID,
-                targetVisibility: nativeVisible
+                targetVisibility: visible
             )
             if success { self.activeExternalSubtitleActivation = nil }
             self.mpvDebugLog("setSubtitleVisible visible=\(visible) transactionSuccess=\(success)")

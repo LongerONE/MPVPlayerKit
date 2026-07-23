@@ -445,12 +445,7 @@ public final class MPVPlayer: NSObject {
             "url": url.absoluteString,
             "usesOriginalStyle": NSNumber(value: usesOriginalStyle),
         ] as NSDictionary
-        if usesOriginalStyle == false,
-           ["srt", "vtt"].contains(url.pathExtension.lowercased()) {
-            playbackView.loadClientSubtitle(options)
-        } else {
-            playbackView.loadSubtitle(options)
-        }
+        playbackView.loadSubtitle(options)
         DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeout)
         return requestID
     }
@@ -469,10 +464,10 @@ public final class MPVPlayer: NSObject {
             completion: completion,
             timeout: timeout
         )
-        playbackView.loadClientSubtitle([
+        playbackView.loadSubtitle([
             "requestID": requestID.uuidString,
             "url": url.absoluteString,
-            "headers": headers,
+            "usesOriginalStyle": NSNumber(value: false),
         ] as NSDictionary)
         DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeout)
         return requestID
