@@ -61,18 +61,32 @@ extension MPVPlayerView {
                 case MPV_EVENT_PROPERTY_CHANGE:
                     self.handlePropertyChange(event)
                 case MPV_EVENT_FILE_LOADED:
+                    self.mpvDebugLog(
+                        "event file-loaded profile=\(self.activeProfileDescription)"
+                    )
                     self.refreshMediaTracksCache()
                 case MPV_EVENT_PLAYBACK_RESTART:
+                    self.mpvDebugLog(
+                        "event playback-restart stage=begin "
+                            + "profile=\(self.activeProfileDescription) "
+                            + "captureSequence=\(self.pictureInPictureCaptureSequence)"
+                    )
                     self.hasPlaybackRestarted = true
-                    self.mpvDebugLog("event playback-restart profile=\(self.activeProfileDescription)")
+                    self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-begin")
                     self.refreshDecoderModeAfterPlaybackRestart()
+                    self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-end")
                     if self.hasLoggedVideoColorParameters == false {
                         self.hasLoggedVideoColorParameters = true
+                        self.mpvDebugLog("event playback-restart stage=color-diagnostics-begin")
                         self.logVideoColorParameters()
+                        self.mpvDebugLog("event playback-restart stage=color-diagnostics-end")
                     }
+                    self.mpvDebugLog("event playback-restart stage=end")
                 case MPV_EVENT_END_FILE:
+                    self.mpvDebugLog("event end-file stage=begin")
                     self.handleEndFile(event)
                 case MPV_EVENT_SHUTDOWN:
+                    self.mpvDebugLog("event shutdown")
                     self.notifyOnMain {
                         self.stopTimeTimer()
                         self.isPlaying = false

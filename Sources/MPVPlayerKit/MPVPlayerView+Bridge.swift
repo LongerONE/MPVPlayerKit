@@ -137,7 +137,19 @@ extension MPVPlayerView {
 
     nonisolated func mpvDebugLog(_ message: String) {
         #if DEBUG
-        print("MPVPlayerView[\(ObjectIdentifier(self))] \(message)")
+        let uptime = String(format: "%.6f", ProcessInfo.processInfo.systemUptime)
+        let executor: String
+        if Thread.isMainThread {
+            executor = "main"
+        } else if DispatchQueue.getSpecific(key: queueSpecificKey) != nil {
+            executor = "mpv"
+        } else {
+            executor = "other"
+        }
+        print(
+            "MPVPlayerView[\(ObjectIdentifier(self))] "
+                + "uptime=\(uptime) executor=\(executor) \(message)"
+        )
         #endif
     }
 

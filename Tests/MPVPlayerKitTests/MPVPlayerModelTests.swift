@@ -699,7 +699,19 @@ final class MPVPlayerModelTests: XCTestCase {
                     level: "info",
                     text: "glyph rendered"
                 )
-                continuation.resume(returning: shouldPrint)
+                let shouldPrintRenderer = transfer.value.shouldPrintMPVLogMessage(
+                    prefix: "vo/gpu-next/libplacebo",
+                    level: "verbose",
+                    text: "frame upload"
+                )
+                let shouldPrintDecoder = transfer.value.shouldPrintMPVLogMessage(
+                    prefix: "vd/ffmpeg",
+                    level: "verbose",
+                    text: "decoder frame"
+                )
+                continuation.resume(
+                    returning: shouldPrint && shouldPrintRenderer && shouldPrintDecoder
+                )
             }
         }
         XCTAssertTrue(shouldPrint)

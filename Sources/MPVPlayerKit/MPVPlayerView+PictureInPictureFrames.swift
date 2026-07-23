@@ -199,11 +199,29 @@ extension MPVPlayerView {
         completion: @escaping @Sendable (MPVPictureInPictureFrame?) -> Void
     ) {
         queue.async { [weak self] in
-            guard let self,
-                  Self.isPictureInPictureFrameCaptureReady(
-                      hasPlaybackRestarted: self.hasPlaybackRestarted
-                  ),
-                  let mpv = self.mpv else {
+            guard let self else {
+                completion(nil)
+                return
+            }
+
+            self.pictureInPictureCaptureSequence &+= 1
+            let sequence = self.pictureInPictureCaptureSequence
+            let shouldLog = sequence <= 10 || sequence.isMultiple(of: 30)
+            let isReady = Self.isPictureInPictureFrameCaptureReady(
+                hasPlaybackRestarted: self.hasPlaybackRestarted
+            )
+            if shouldLog {
+                self.mpvDebugLog(
+                    "pip capture stage=begin sequence=\(sequence) "
+                        + "ready=\(isReady) hasHandle=\(self.mpv != nil)"
+                )
+            }
+            guard isReady, let mpv = self.mpv else {
+                if shouldLog {
+                    self.mpvDebugLog(
+                        "pip capture stage=skipped sequence=\(sequence)"
+                    )
+                }
                 completion(nil)
                 return
             }
@@ -212,7 +230,9 @@ extension MPVPlayerView {
             for arguments in Self.pictureInPictureScreenshotArgumentCandidates {
                 let capture = self.pictureInPictureScreenshot(
                     handle: mpv,
-                    arguments: arguments
+                    arguments: arguments,
+                    sequence: sequence,
+                    shouldLog: shouldLog
                 )
                 lastStatus = capture.status
                 guard capture.status >= 0 else {
@@ -223,6 +243,13 @@ extension MPVPlayerView {
                 }
                 guard let rawFrame = capture.frame else { continue }
                 self.pictureInPictureScreenshotErrorCount = 0
+                if shouldLog {
+                    self.mpvDebugLog(
+                        "pip capture stage=success sequence=\(sequence) "
+                            + "width=\(rawFrame.width) height=\(rawFrame.height) "
+                            + "stride=\(rawFrame.stride) bytes=\(rawFrame.pixels.count)"
+                    )
+                }
                 completion(MPVPictureInPictureFrame(
                     width: rawFrame.width,
                     height: rawFrame.height,
@@ -242,13 +269,20 @@ extension MPVPlayerView {
                 )
             }
             self.pictureInPictureScreenshotErrorCount += 1
+            if shouldLog {
+                self.mpvDebugLog(
+                    "pip capture stage=failed sequence=\(sequence) status=\(lastStatus)"
+                )
+            }
             completion(nil)
         }
     }
 
     private nonisolated func pictureInPictureScreenshot(
         handle: OpaquePointer,
-        arguments: [String]
+        arguments: [String],
+        sequence: UInt64,
+        shouldLog: Bool
     ) -> (status: Int32, frame: MPVPictureInPictureRawFrame?) {
         var cargs = makeCArgs("screenshot-raw", arguments).map {
             $0.flatMap { UnsafePointer<CChar>(strdup($0)) }
@@ -260,10 +294,42 @@ extension MPVPlayerView {
         }
 
         var result = mpv_node()
+        let commandStart = ProcessInfo.processInfo.systemUptime
+        if shouldLog {
+            mpvDebugLog(
+                "pip screenshot stage=command-begin sequence=\(sequence) "
+                    + "arguments=\(arguments.joined(separator: ","))"
+            )
+        }
         let status = mpv_command_ret(handle, &cargs, &result)
+        let commandDuration = String(
+            format: "%.3f",
+            (ProcessInfo.processInfo.systemUptime - commandStart) * 1_000
+        )
+        if shouldLog {
+            mpvDebugLog(
+                "pip screenshot stage=command-end sequence=\(sequence) "
+                    + "status=\(status) durationMs=\(commandDuration)"
+            )
+        }
         guard status >= 0 else { return (status, nil) }
-        defer { mpv_free_node_contents(&result) }
-        guard let frame = Self.pictureInPictureRawFrame(from: result),
+
+        let frame = Self.pictureInPictureRawFrame(from: result)
+        if shouldLog {
+            let description = frame.map {
+                "format=\($0.format) width=\($0.width) height=\($0.height) "
+                    + "stride=\($0.stride) bytes=\($0.pixels.count)"
+            } ?? "frame=nil"
+            mpvDebugLog(
+                "pip screenshot stage=node-free-begin sequence=\(sequence) "
+                    + description
+            )
+        }
+        mpv_free_node_contents(&result)
+        if shouldLog {
+            mpvDebugLog("pip screenshot stage=node-free-end sequence=\(sequence)")
+        }
+        guard let frame,
               frame.format == "bgr0" || frame.format == "bgra" else {
             return (status, nil)
         }

@@ -70,7 +70,10 @@ extension MPVPlayerView {
         repeatedMPVLogMessageCounts[repetitionKey] = repetitionCount
         guard repetitionCount <= 3 || repetitionCount.isMultiple(of: 100) else { return }
         let repetitionSuffix = repetitionCount > 1 ? " repeated=\(repetitionCount)" : ""
-        print("mpv [\(prefix)] \(level): \(text)\(repetitionSuffix)")
+        mpvDebugLog(
+            "mpv log prefix=\(prefix) level=\(level) "
+                + "text=\(text)\(repetitionSuffix)"
+        )
         #endif
     }
 
@@ -83,7 +86,13 @@ extension MPVPlayerView {
         }
 
         let normalizedPrefix = prefix.lowercased()
-        if normalizedPrefix.contains("libass") || normalizedPrefix.contains("subtitle") || normalizedPrefix.hasPrefix("sub") {
+        if normalizedPrefix.contains("libass")
+            || normalizedPrefix.contains("subtitle")
+            || normalizedPrefix.hasPrefix("sub")
+            || normalizedPrefix.hasPrefix("vo/gpu")
+            || normalizedPrefix.hasPrefix("vd/")
+            || normalizedPrefix.contains("libplacebo")
+            || normalizedPrefix == "ffmpeg/video" {
             return true
         }
 
@@ -99,6 +108,24 @@ extension MPVPlayerView {
             "spir-v",
         ]
         return diagnosticKeywords.contains { normalizedText.contains($0) }
+    }
+
+    nonisolated func renderingDiagnosticDescription() -> String {
+        let propertyNames = [
+            "vo",
+            "gpu-api",
+            "gpu-context",
+            "hwdec",
+            "hwdec-current",
+            "vd-lavc-dr",
+            "fbo-format",
+            "target-colorspace-hint",
+            "target-colorspace-hint-mode",
+            "blend-subtitles",
+        ]
+        return propertyNames.map { name in
+            "\(name)=\(getString(name) ?? "<unavailable>")"
+        }.joined(separator: " ")
     }
 
     nonisolated func getDouble(_ name: String) -> Double {
@@ -136,13 +163,18 @@ extension MPVPlayerView {
     }
 
     nonisolated func refreshDecoderModeAfterPlaybackRestart() {
+        mpvDebugLog("decoder diagnostics read hwdec-current begin")
         guard let activeHWDec = getString(MPVProperty.hwdecCurrent)?
             .trimmingCharacters(in: .whitespacesAndNewlines),
               activeHWDec.isEmpty == false else {
+            mpvDebugLog("decoder diagnostics read hwdec-current unavailable")
             mpvDebugLog("decoder mode remains initializing because hwdec-current is unavailable profile=\(activeProfileDescription)")
             setDecoderMode(.initializing)
             return
         }
+        mpvDebugLog(
+            "decoder diagnostics read hwdec-current end value=\(activeHWDec)"
+        )
 
         let decoderMode: MPVPlayerDecoderMode = activeHWDec.caseInsensitiveCompare("no") == .orderedSame
             ? .software

@@ -264,6 +264,7 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var hasLoggedSubtitleTextEvent = false
     nonisolated(unsafe) var repeatedMPVLogMessageCounts: [String: Int] = [:]
     nonisolated(unsafe) var pictureInPictureScreenshotErrorCount = 0
+    nonisolated(unsafe) var pictureInPictureCaptureSequence: UInt64 = 0
     let pictureInPictureInlineCoverLayer = CALayer()
     var lastAppliedLayerBounds = CGRect.null
     var lastAppliedDrawableSize = CGSize.zero

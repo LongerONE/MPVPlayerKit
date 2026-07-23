@@ -51,6 +51,7 @@ final class MPVPictureInPictureCoordinator:
     private var isCapturingFrame = false
     private var shouldStartAfterFirstFrame = false
     private var consecutiveFrameCaptureFailures = 0
+    private var frameCaptureRequestSequence: UInt64 = 0
     private var playbackTimebase: CMTimebase?
     nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
 
@@ -275,6 +276,11 @@ final class MPVPictureInPictureCoordinator:
 
     private func startFrameUpdates(every interval: DispatchTimeInterval) {
         stopFrameUpdates()
+        playerView?.mpvDebugLog(
+            "pip coordinator timer=start interval=\(String(describing: interval)) "
+                + "active=\(controller.isPictureInPictureActive) "
+                + "automatic=\(allowsAutomaticStartFromInline)"
+        )
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(
             deadline: .now(),
@@ -291,6 +297,9 @@ final class MPVPictureInPictureCoordinator:
     }
 
     private func stopFrameUpdates() {
+        if frameTimer != nil {
+            playerView?.mpvDebugLog("pip coordinator timer=stop")
+        }
         frameTimer?.setEventHandler {}
         frameTimer?.cancel()
         frameTimer = nil
@@ -305,12 +314,28 @@ final class MPVPictureInPictureCoordinator:
     private func captureAndEnqueueFrame() {
         guard isCapturingFrame == false, let playerView else { return }
         guard playerView.isPlaying || shouldStartAfterFirstFrame else { return }
+        frameCaptureRequestSequence &+= 1
+        let requestSequence = frameCaptureRequestSequence
+        let shouldLog = requestSequence <= 10 || requestSequence.isMultiple(of: 30)
+        if shouldLog {
+            playerView.mpvDebugLog(
+                "pip coordinator capture=request sequence=\(requestSequence) "
+                    + "active=\(controller.isPictureInPictureActive) "
+                    + "shouldStart=\(shouldStartAfterFirstFrame)"
+            )
+        }
         installSourceLayerIfNeeded()
         isCapturingFrame = true
         playerView.capturePictureInPictureFrame { [weak self] frame in
             DispatchQueue.main.async {
                 guard let self else { return }
                 self.isCapturingFrame = false
+                if shouldLog {
+                    self.playerView?.mpvDebugLog(
+                        "pip coordinator capture=completion sequence=\(requestSequence) "
+                            + "hasFrame=\(frame != nil)"
+                    )
+                }
                 guard let frame, let sampleBuffer = frame.makeSampleBuffer() else {
                     self.handleFrameCaptureFailure()
                     return

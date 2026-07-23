@@ -173,6 +173,12 @@ extension MPVPlayerView {
 
     func setupMPV(url: URL, profile: MPVSetupProfile) -> Bool {
         mpvDebugLog("setupMPV profile begin name=\(profile.name) index=\(activeSetupProfileIndex + 1)/\(setupProfiles.count)")
+        let profileDescription = profile.options
+            .map { "\($0.0)=\($0.1)" }
+            .joined(separator: " ")
+        mpvDebugLog(
+            "setupMPV profile options name=\(profile.name) [\(profileDescription)]"
+        )
         performOnMPVQueueSync {
             currentSubtitleUsesOriginalStyle = false
             loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)
@@ -264,6 +270,10 @@ extension MPVPlayerView {
         }
         applyContentMode(currentContentModeSnapshot())
         mpvDebugLog("setupMPV initialized profile=\(profile.name)")
+        mpvDebugLog(
+            "render diagnostics reason=setup "
+                + renderingDiagnosticDescription()
+        )
         logEffectiveVideoSettings(reason: "setup")
         logEffectiveSubtitleConfiguration()
         checkError(
@@ -411,13 +421,16 @@ extension MPVPlayerView {
             }
             mpvDebugLog("destroyMPVHandle begin reason=\(reason) handle=\(mpv)")
             mpv_set_wakeup_callback(mpv, nil, nil)
+            mpvDebugLog("destroyMPVHandle stage=wakeup-cleared reason=\(reason)")
             self.mpv = nil
+            mpvDebugLog("destroyMPVHandle stage=handle-detached reason=\(reason)")
             if sendStopCommand {
                 let stopStatus = command("stop", handle: mpv, checkForErrors: false)
                 mpvDebugLog("destroyMPVHandle stop command status=\(stopStatus)")
             }
+            mpvDebugLog("destroyMPVHandle stage=terminate-begin reason=\(reason)")
             mpv_terminate_destroy(mpv)
-            mpvDebugLog("destroyMPVHandle end reason=\(reason)")
+            mpvDebugLog("destroyMPVHandle stage=terminate-end reason=\(reason)")
         }
     }
 
