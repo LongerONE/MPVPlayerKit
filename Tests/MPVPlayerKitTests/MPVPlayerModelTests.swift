@@ -511,6 +511,17 @@ final class MPVPlayerModelTests: XCTestCase {
         )
     }
 
+    func testDeviceDecodeOwnsFramesUntilMoltenVKFinishesUsingThem() {
+        let options = Dictionary(
+            uniqueKeysWithValues: MPVPlayerView.safeDecodeOptions(
+                hardwareDecodeMethod: MPVPlayerView.deviceHardwareDecodeMethod
+            )
+        )
+
+        XCTAssertEqual(options["hwdec"], "videotoolbox-copy")
+        XCTAssertEqual(options["vd-lavc-dr"], "no")
+    }
+
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
         let style = MPVSubtitleStyle(
             fontSize: 200,

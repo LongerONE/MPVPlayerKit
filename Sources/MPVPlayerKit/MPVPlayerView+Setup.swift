@@ -16,6 +16,20 @@ func mpvPlayerWakeupCallback(_ context: UnsafeMutableRawPointer?) {
 }
 
 extension MPVPlayerView {
+    nonisolated static let deviceHardwareDecodeMethod = "videotoolbox-copy"
+
+    nonisolated static func safeDecodeOptions(
+        hardwareDecodeMethod: String
+    ) -> [(String, String)] {
+        [
+            ("hwdec", hardwareDecodeMethod),
+            // Vulkan enables decoder direct rendering by default. Keeping decoded
+            // frames in ordinary system memory prevents MoltenVK from observing a
+            // VideoToolbox/staging buffer deallocation before its command completes.
+            ("vd-lavc-dr", "no"),
+        ]
+    }
+
     func setupMPV() {
         guard let url else {
             mpvDebugLog("setupMPV failed missing url")
@@ -43,17 +57,12 @@ extension MPVPlayerView {
         #if targetEnvironment(simulator)
         let hardwareDecode = "no"
         #else
-        let hardwareDecode = "videotoolbox"
+        let hardwareDecode = Self.deviceHardwareDecodeMethod
         #endif
 
-        var softwareDecodeOptions: [(String, String)] = [
-            ("hwdec", "no"),
-        ]
-        #if targetEnvironment(simulator)
-        // MTLSimDriver limits a single host-coherent allocation to 256 MB.
-        // Direct rendering can exceed it for 4K 10-bit software decoding.
-        softwareDecodeOptions.append(("vd-lavc-dr", "no"))
-        #endif
+        let softwareDecodeOptions = Self.safeDecodeOptions(
+            hardwareDecodeMethod: "no"
+        )
 
         let softwareProfile = MPVSetupProfile(
             name: "metal-software",
@@ -67,9 +76,9 @@ extension MPVPlayerView {
         return [
             MPVSetupProfile(
                 name: "metal-videotoolbox",
-                options: metalVideoOutputOptions + [
-                    ("hwdec", hardwareDecode),
-                ]
+                options: metalVideoOutputOptions + Self.safeDecodeOptions(
+                    hardwareDecodeMethod: hardwareDecode
+                )
             ),
             softwareProfile,
         ]
