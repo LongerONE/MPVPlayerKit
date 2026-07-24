@@ -65,6 +65,7 @@ extension MPVPlayerView {
                         "event file-loaded profile=\(self.activeProfileDescription)"
                     )
                     self.refreshMediaTracksCache()
+                    self.refreshPictureInPictureVideoDisplaySize()
                 case MPV_EVENT_PLAYBACK_RESTART:
                     self.mpvDebugLog(
                         "event playback-restart stage=begin "
@@ -80,7 +81,10 @@ extension MPVPlayerView {
                         self.logVideoColorParameters()
                         self.mpvDebugLog("event playback-restart stage=color-diagnostics-end")
                     }
+                    self.refreshPictureInPictureVideoDisplaySize()
                     self.mpvDebugLog("event playback-restart stage=end")
+                case MPV_EVENT_VIDEO_RECONFIG:
+                    self.refreshPictureInPictureVideoDisplaySize()
                 case MPV_EVENT_END_FILE:
                     self.mpvDebugLog("event end-file stage=begin")
                     self.handleEndFile(event)
@@ -435,6 +439,15 @@ extension MPVPlayerView {
             logSubtitleTextChange()
         default:
             break
+        }
+    }
+
+    nonisolated func refreshPictureInPictureVideoDisplaySize() {
+        let width = getInt64(MPVProperty.videoOutputDisplayWidth) ?? 0
+        let height = getInt64(MPVProperty.videoOutputDisplayHeight) ?? 0
+        let size = CGSize(width: CGFloat(width), height: CGFloat(height))
+        notifyOnMain {
+            self.updatePictureInPictureVideoDisplaySize(size)
         }
     }
 

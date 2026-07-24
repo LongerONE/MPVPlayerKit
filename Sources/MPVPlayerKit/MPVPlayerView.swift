@@ -71,6 +71,8 @@ enum MPVProperty {
     static let subtitleBackColor = "sub-back-color"
     static let subtitleBorderStyle = "sub-border-style"
     static let subtitleMarginY = "sub-margin-y"
+    static let videoOutputDisplayWidth = "video-out-params/dw"
+    static let videoOutputDisplayHeight = "video-out-params/dh"
 }
 
 struct MPVSetupProfile {
@@ -188,6 +190,7 @@ public final class MPVPlayerView: UIView {
 
     var metalLayer = MPVPlayerMetalLayer()
     var pictureInPictureCoordinator: MPVPictureInPictureCoordinator?
+    var pictureInPictureVideoDisplaySize: CGSize = .zero
     var usesExtendedDynamicRangeOutput = false
     var url: URL?
     var headers: [String: String] = [:]

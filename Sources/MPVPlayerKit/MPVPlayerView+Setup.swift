@@ -395,6 +395,9 @@ extension MPVPlayerView {
         lastLoggedSubtitleText = ""
         hasLoggedSubtitleTextEvent = false
         resetGeometryTransitionAnimation()
+        notifyOnMain {
+            self.updatePictureInPictureVideoDisplaySize(.zero)
+        }
         performOnMPVQueueSync {
             let pendingRequestIDs = pendingExternalSubtitleLoad?.requestIDs ?? []
             if let mpv, let pending = pendingExternalSubtitleLoad {

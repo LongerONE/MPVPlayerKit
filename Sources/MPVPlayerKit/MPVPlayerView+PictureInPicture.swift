@@ -18,6 +18,19 @@ enum MPVPictureInPictureStartCancellationPolicy {
     }
 }
 
+enum MPVPictureInPictureContentSize {
+    static let fallback = CGSize(width: 16, height: 9)
+
+    static func resolve(videoDisplaySize: CGSize) -> CGSize {
+        guard videoDisplaySize.width > 0, videoDisplaySize.height > 0,
+              videoDisplaySize.width.isFinite, videoDisplaySize.height.isFinite
+        else {
+            return fallback
+        }
+        return videoDisplaySize
+    }
+}
+
 /// Keeps the inline anchor visible while the player view is hosted by the
 /// system Picture in Picture controller. The video-call ContentSource API is
 /// available on iOS 15 and is the only public API that can host a UIView.
@@ -255,6 +268,7 @@ final class MPVPictureInPictureCoordinator:
         guard isActive == false, isStarting == false else { return }
         prepareControllerIfPossible()
         guard let controller else { return }
+        updatePreferredContentSize()
         isStartCancellationRequested = false
         isStarting = true
         controller.startPictureInPicture()
@@ -281,6 +295,10 @@ final class MPVPictureInPictureCoordinator:
 
     func playerViewHierarchyDidChange() {
         prepareControllerIfPossible()
+    }
+
+    func playerVideoDisplaySizeDidChange() {
+        updatePreferredContentSize()
     }
 
     func movePlayerToPictureInPictureContainer(_ containerView: UIView) {
@@ -383,8 +401,7 @@ final class MPVPictureInPictureCoordinator:
 
         let contentViewController = MPVPictureInPictureContentViewController()
         contentViewController.coordinator = self
-        contentViewController.preferredContentSize =
-            playerView.pictureInPicturePreferredContentSize
+        contentViewController.preferredContentSize = playerView.pictureInPicturePreferredContentSize
         let source = AVPictureInPictureController.ContentSource(
             activeVideoCallSourceView: placement.sourceView,
             contentViewController: contentViewController
@@ -396,6 +413,11 @@ final class MPVPictureInPictureCoordinator:
         self.placement = placement
         self.contentViewController = contentViewController
         self.controller = controller
+    }
+
+    private func updatePreferredContentSize() {
+        guard let playerView else { return }
+        contentViewController?.preferredContentSize = playerView.pictureInPicturePreferredContentSize
     }
 
     private func tearDownController() {
@@ -446,8 +468,16 @@ public extension MPVPlayerView {
 
 extension MPVPlayerView {
     var pictureInPicturePreferredContentSize: CGSize {
-        let size = bounds.size
-        return size.width > 0 && size.height > 0 ? size : CGSize(width: 16, height: 9)
+        MPVPictureInPictureContentSize.resolve(
+            videoDisplaySize: pictureInPictureVideoDisplaySize
+        )
+    }
+
+    func updatePictureInPictureVideoDisplaySize(_ size: CGSize) {
+        let resolvedSize = MPVPictureInPictureContentSize.resolve(videoDisplaySize: size)
+        guard pictureInPictureVideoDisplaySize != resolvedSize else { return }
+        pictureInPictureVideoDisplaySize = resolvedSize
+        pictureInPictureCoordinator?.playerVideoDisplaySizeDidChange()
     }
 
     func pictureInPictureViewHierarchyDidChange() {

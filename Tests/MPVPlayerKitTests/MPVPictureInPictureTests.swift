@@ -3,6 +3,44 @@ import UIKit
 @testable import MPVPlayerKit
 
 final class MPVPictureInPictureTests: XCTestCase {
+    func testPictureInPictureContentSizeUsesVideoDisplaySizeAndFallback() {
+        XCTAssertEqual(
+            MPVPictureInPictureContentSize.resolve(
+                videoDisplaySize: CGSize(width: 1440, height: 1080)
+            ),
+            CGSize(width: 1440, height: 1080)
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureContentSize.resolve(
+                videoDisplaySize: CGSize(width: 1920, height: 800)
+            ),
+            CGSize(width: 1920, height: 800)
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureContentSize.resolve(videoDisplaySize: .zero),
+            MPVPictureInPictureContentSize.fallback
+        )
+    }
+
+    @MainActor
+    func testPictureInPicturePreferredContentSizeIgnoresPlayerBoundsAfterVideoReconfig() {
+        let playerView = MPVPlayerView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+
+        XCTAssertEqual(
+            playerView.pictureInPicturePreferredContentSize,
+            MPVPictureInPictureContentSize.fallback
+        )
+
+        playerView.updatePictureInPictureVideoDisplaySize(
+            CGSize(width: 1440, height: 1080)
+        )
+
+        XCTAssertEqual(
+            playerView.pictureInPicturePreferredContentSize,
+            CGSize(width: 1440, height: 1080)
+        )
+    }
+
     @MainActor
     func testQuickPlayerExposesPictureInPictureControl() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
