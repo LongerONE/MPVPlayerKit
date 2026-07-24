@@ -387,6 +387,7 @@ extension MPVPlayerView {
     }
 
     func destroyMPVHandle(reason: String, sendStopCommand: Bool = true) {
+        MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         setDecoderMode(.initializing)
         stopTimeTimer()
         clearMediaTracksCache()

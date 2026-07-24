@@ -454,6 +454,7 @@ public extension MPVPlayerView {
     }
 
     @objc func startPictureInPicture() {
+        MPVSystemPlaybackCoordinator.shared.activate(playerView: self)
         pictureInPictureCoordinatorInstance?.start()
     }
 

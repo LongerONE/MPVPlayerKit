@@ -46,6 +46,7 @@ extension MPVPlayerView {
             }
             self.updateClientSubtitle(at: self.currentTime)
             self.notifyTime(currentTime: self.currentTime, duration: self.duration)
+            MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
         }
     }
 

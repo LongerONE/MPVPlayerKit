@@ -30,6 +30,7 @@ extension MPVPlayerView {
         setFlag(MPVProperty.pause, false)
         isPlaying = true
         notifyState(hasReportedReadyToPlay ? .bufferFinished : .buffering)
+        MPVSystemPlaybackCoordinator.shared.activate(playerView: self)
         startTimeTimer()
     }
 
@@ -40,6 +41,7 @@ extension MPVPlayerView {
         isPlaying = false
         stopTimeTimer()
         notifyState(.paused)
+        MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
     }
 
     @objc public func stop() {
@@ -51,6 +53,7 @@ extension MPVPlayerView {
             return
         }
         stopped = true
+        MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         destroyMPVHandle(reason: "stop")
     }
 
