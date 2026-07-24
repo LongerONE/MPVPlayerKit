@@ -126,11 +126,16 @@ enum MPVContentModeSnapshot {
 
 @objc(MPVPlayerView)
 public final class MPVPlayerView: UIView {
+    /// SDR reference white, in nits, when subtitles are composited into HDR video.
+    static let subtitleHDRPeakNits = "100"
+
     static let sharedMetalVideoOutputOptions: [(String, String)] = [
         ("vo", "gpu-next"),
         ("gpu-api", "vulkan"),
         ("gpu-context", "moltenvk"),
         ("blend-subtitles", "video"),
+        ("sub-hdr-peak", subtitleHDRPeakNits),
+        ("image-subs-hdr-peak", subtitleHDRPeakNits),
         ("gpu-shader-cache", "yes"),
         ("tone-mapping", "bt.2446a"),
         ("hdr-compute-peak", "auto"),

@@ -21,6 +21,8 @@ extension MPVPlayerView {
             "embeddedfonts",
             "sub-auto",
             "blend-subtitles",
+            "sub-hdr-peak",
+            "image-subs-hdr-peak",
             "gpu-shader-cache",
             "gpu-shader-cache-dir",
         ]
@@ -122,6 +124,8 @@ extension MPVPlayerView {
             "target-colorspace-hint",
             "target-colorspace-hint-mode",
             "blend-subtitles",
+            "sub-hdr-peak",
+            "image-subs-hdr-peak",
         ]
         return propertyNames.map { name in
             "\(name)=\(getString(name) ?? "<unavailable>")"
