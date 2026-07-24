@@ -130,12 +130,6 @@ public final class MPVPlayerView: UIView {
         ("gpu-context", "moltenvk"),
         ("blend-subtitles", "video"),
         ("gpu-shader-cache", "yes"),
-        // PiP calls screenshot-raw repeatedly. The default GPU screenshot path
-        // can return a shared Metal buffer before MoltenVK's command buffer has
-        // released it, then mpv_free_node_contents trips Metal validation.
-        // Software screenshots avoid VO readback; subtitles are composited by
-        // MPVPictureInPictureFrame after the raw video frame is copied.
-        ("screenshot-sw", "yes"),
         ("tone-mapping", "bt.2446a"),
         ("hdr-compute-peak", "auto"),
         ("allow-delayed-peak-detect", "yes"),
@@ -194,7 +188,6 @@ public final class MPVPlayerView: UIView {
 
     var metalLayer = MPVPlayerMetalLayer()
     var pictureInPictureCoordinator: MPVPictureInPictureCoordinator?
-    var isRenderingInPictureInPicture = false
     var usesExtendedDynamicRangeOutput = false
     var url: URL?
     var headers: [String: String] = [:]
@@ -269,9 +262,6 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var lastLoggedSubtitleText = ""
     nonisolated(unsafe) var hasLoggedSubtitleTextEvent = false
     nonisolated(unsafe) var repeatedMPVLogMessageCounts: [String: Int] = [:]
-    nonisolated(unsafe) var pictureInPictureScreenshotErrorCount = 0
-    nonisolated(unsafe) var pictureInPictureCaptureSequence: UInt64 = 0
-    let pictureInPictureInlineCoverLayer = CALayer()
     var lastAppliedLayerBounds = CGRect.null
     var lastAppliedDrawableSize = CGSize.zero
     var pendingMetalLayerGeometry: MPVMetalLayerGeometry?
@@ -383,8 +373,17 @@ public final class MPVPlayerView: UIView {
     public override func layoutSubviews() {
         super.layoutSubviews()
         clientSubtitleController.update(at: currentTime, force: true)
-        guard isRenderingInPictureInPicture == false else { return }
         updateMetalLayerGeometryIfNeeded()
+    }
+
+    public override func didMoveToSuperview() {
+        super.didMoveToSuperview()
+        pictureInPictureViewHierarchyDidChange()
+    }
+
+    public override func didMoveToWindow() {
+        super.didMoveToWindow()
+        pictureInPictureViewHierarchyDidChange()
     }
 
 }

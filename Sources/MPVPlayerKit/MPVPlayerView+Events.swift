@@ -68,8 +68,7 @@ extension MPVPlayerView {
                 case MPV_EVENT_PLAYBACK_RESTART:
                     self.mpvDebugLog(
                         "event playback-restart stage=begin "
-                            + "profile=\(self.activeProfileDescription) "
-                            + "captureSequence=\(self.pictureInPictureCaptureSequence)"
+                            + "profile=\(self.activeProfileDescription)"
                     )
                     self.hasPlaybackRestarted = true
                     self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-begin")

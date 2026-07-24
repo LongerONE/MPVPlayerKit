@@ -122,7 +122,6 @@ extension MPVPlayerView {
             "target-colorspace-hint",
             "target-colorspace-hint-mode",
             "blend-subtitles",
-            "screenshot-sw",
         ]
         return propertyNames.map { name in
             "\(name)=\(getString(name) ?? "<unavailable>")"
