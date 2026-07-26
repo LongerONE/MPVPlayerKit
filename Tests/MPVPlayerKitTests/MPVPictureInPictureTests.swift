@@ -4,6 +4,33 @@ import Metal
 @testable import MPVPlayerKit
 
 final class MPVPictureInPictureTests: XCTestCase {
+    func testCapabilityProbeMergesRendererRecommendationsWithCandidateRequirements() {
+        let recommendation = [
+            "renderer.preference": "preserved",
+            kCVPixelBufferWidthKey as String: 1,
+            kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_32BGRA,
+        ] as [String: Any]
+        let required = MPVPictureInPictureCapabilityProbe.requiredPixelBufferAttributes(
+            for: .rgba16Float,
+            width: 640,
+            height: 360
+        )
+
+        let attributes = MPVPictureInPictureCapabilityProbe.mergedPixelBufferAttributes(
+            recommended: recommendation,
+            required: required
+        )
+
+        XCTAssertEqual(attributes["renderer.preference"] as? String, "preserved")
+        XCTAssertEqual(attributes[kCVPixelBufferWidthKey as String] as? Int, 640)
+        XCTAssertEqual(attributes[kCVPixelBufferHeightKey as String] as? Int, 360)
+        XCTAssertEqual(
+            attributes[kCVPixelBufferPixelFormatTypeKey as String] as? OSType,
+            kCVPixelFormatType_64RGBAHalf
+        )
+        XCTAssertEqual(attributes[kCVPixelBufferMetalCompatibilityKey as String] as? Bool, true)
+    }
+
     func testInlineCoverLifecycleTransitionsFromWillStartToDidStart() {
         var lifecycle = MPVPictureInPictureInlineCoverLifecycle()
 
