@@ -387,6 +387,17 @@ extension MPVPlayerView {
     }
 
     func destroyMPVHandle(reason: String, sendStopCommand: Bool = true) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated {
+                self.stopPictureInPicture()
+            }
+        } else {
+            DispatchQueue.main.sync {
+                MainActor.assumeIsolated {
+                    self.stopPictureInPicture()
+                }
+            }
+        }
         MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         setDecoderMode(.initializing)
         stopTimeTimer()
