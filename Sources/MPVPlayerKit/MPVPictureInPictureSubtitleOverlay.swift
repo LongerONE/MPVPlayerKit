@@ -224,13 +224,13 @@ final class MPVPictureInPictureSubtitleOverlay {
                 Self.color(style.textColor) ?? CGColor(gray: 1, alpha: 1),
             NSAttributedString.Key(kCTParagraphStyleAttributeName as String): paragraphStyle,
         ]
-        // MPV always outlines player-styled subtitles. Keep a minimum outline so
-        // Picture in Picture text stays readable over bright video.
-        let outlineWidth = max(layout.outlineWidth, layout.pointSize * 0.04)
+        // Outline only when the player style asks for one. A minimum outline
+        // would make Picture in Picture text look bolder than the inline player.
+        guard layout.outlineWidth > 0 else { return attributes }
         attributes[NSAttributedString.Key(kCTStrokeColorAttributeName as String)] =
             Self.color(style.outlineColor) ?? CGColor(gray: 0, alpha: 1)
         attributes[NSAttributedString.Key(kCTStrokeWidthAttributeName as String)] =
-            -(outlineWidth / max(layout.pointSize, 1) * 100)
+            -(layout.outlineWidth / max(layout.pointSize, 1) * 100)
         return attributes
     }
 

@@ -65,12 +65,27 @@ enum MPVPictureInPictureCaptureCadence {
         return abs(currentInterval - nextInterval) > rescheduleTolerance
     }
 
+    /// A sample this far above the running average is treated as a one-off.
+    static let captureDurationOutlierFactor: Double = 4
+    /// Samples below this are never treated as outliers.
+    static let captureDurationOutlierFloor: TimeInterval = 0.5
+
+    /// Rejects one-off costs, such as the seconds MPV can spend compiling its
+    /// render pipeline on the first frame, which would otherwise hold the
+    /// cadence at its slowest for several seconds.
     static func averageCaptureDuration(
         previousAverage: TimeInterval,
         sample: TimeInterval
     ) -> TimeInterval {
         guard sample.isFinite, sample > 0 else { return previousAverage }
-        guard previousAverage.isFinite, previousAverage > 0 else { return sample }
+        guard previousAverage.isFinite, previousAverage > 0 else {
+            return min(sample, captureDurationOutlierFloor)
+        }
+        let outlierThreshold = max(
+            captureDurationOutlierFloor,
+            previousAverage * captureDurationOutlierFactor
+        )
+        guard sample <= outlierThreshold else { return previousAverage }
         return previousAverage * (1 - captureDurationSmoothing)
             + sample * captureDurationSmoothing
     }

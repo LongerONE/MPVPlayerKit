@@ -232,6 +232,36 @@ final class MPVPictureInPictureTests: XCTestCase {
         )
     }
 
+    func testCaptureDurationAverageRejectsOneOffPipelineCompilation() {
+        // The first frame after a playback restart can cost seconds while MPV
+        // compiles its render pipeline. Holding that in the average would pin
+        // the cadence at its slowest.
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.averageCaptureDuration(
+                previousAverage: 0,
+                sample: 1.685
+            ),
+            MPVPictureInPictureCaptureCadence.captureDurationOutlierFloor,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.averageCaptureDuration(
+                previousAverage: 0.07,
+                sample: 1.685
+            ),
+            0.07,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.averageCaptureDuration(
+                previousAverage: 0.2,
+                sample: 0.4
+            ),
+            0.25,
+            accuracy: 0.0001
+        )
+    }
+
     func testSubtitleOverlayStyleReadsMPVPropertyValues() {
         let style = MPVPictureInPictureSubtitleStyle(propertyValues: [
             MPVProperty.subtitleFontSize: "44.000",
