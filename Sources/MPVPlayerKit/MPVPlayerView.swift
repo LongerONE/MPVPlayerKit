@@ -73,6 +73,8 @@ enum MPVProperty {
     static let subtitleMarginY = "sub-margin-y"
     static let videoOutputDisplayWidth = "video-out-params/dw"
     static let videoOutputDisplayHeight = "video-out-params/dh"
+    static let estimatedVideoFilterFPS = "estimated-vf-fps"
+    static let containerFPS = "container-fps"
 }
 
 struct MPVSetupProfile {
@@ -164,6 +166,19 @@ public final class MPVPlayerView: UIView {
     @objc public internal(set) var isPlaying = false
     @objc public internal(set) var duration: TimeInterval = 0.0
     @objc public internal(set) var currentTime: TimeInterval = 0.0
+    /// Playback speed reported to the system playback controls and to the
+    /// Picture in Picture timebase, so both advance at the rate of the video.
+    @objc public internal(set) var playbackSpeed: Double = 1.0
+
+    /// Draws the current MPV subtitle line into Picture in Picture frames.
+    ///
+    /// Raw video screenshots never contain subtitles, so this keeps the
+    /// Picture in Picture window consistent with the inline player. Disable it
+    /// when a host app composites subtitles outside of MPV.
+    @objc public var drawsSubtitlesInPictureInPicture: Bool {
+        get { pictureInPictureSubtitleOverlayEnabled }
+        set { pictureInPictureSubtitleOverlayEnabled = newValue }
+    }
 
     public var playerContentMode: UIView.ContentMode {
         get {
@@ -180,6 +195,7 @@ public final class MPVPlayerView: UIView {
             let contentModeSnapshot = MPVContentModeSnapshot(contentModeRawValue: newValue.rawValue)
             setContentModeSnapshot(contentModeSnapshot)
             applyContentMode(contentModeSnapshot)
+            pictureInPictureContentModeDidChange()
         }
     }
 
@@ -198,6 +214,8 @@ public final class MPVPlayerView: UIView {
     var pictureInPictureVideoDisplaySize: CGSize = .zero
     var hasPictureInPictureVideoOutputParameters = false
     var hasPictureInPictureFirstVideoFrameSignal = false
+    // Read on the MPV queue while capturing Picture in Picture frames.
+    nonisolated(unsafe) var pictureInPictureSubtitleOverlayEnabled = true
     var usesExtendedDynamicRangeOutput = false
     var url: URL?
     var headers: [String: String] = [:]
@@ -381,6 +399,7 @@ public final class MPVPlayerView: UIView {
         currentTime = 0.0
         duration = 0.0
         isPlaying = false
+        playbackSpeed = 1.0
         mpvDebugLog("configure url=\(redactedURLDescription(url)) headers=\(headers.count) hasUserAgent=\(userAgent?.isEmpty == false) forceSoftwareDecode=\(forceSoftwareDecode)")
     }
 

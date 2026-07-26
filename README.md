@@ -52,13 +52,40 @@ if let subtitle = subtitleTracks.first {
 }
 ```
 
-Set `MPVPlayer.delegate` to receive state, time, buffering and decoder-mode updates.
+Set `MPVPlayer.delegate` to receive state, time, buffering, decoder-mode and
+Picture in Picture updates.
 
-Picture in Picture is also available through `startPictureInPicture()`,
+## Picture in Picture
+
+Picture in Picture is available through `startPictureInPicture()`,
 `stopPictureInPicture()`, and `togglePictureInPicture()`. Set
 `allowsAutomaticPictureInPictureFromInline` when the host app wants the system
 to enter Picture in Picture as playback moves to the background. The host app
 must enable the Audio, AirPlay, and Picture in Picture background mode.
+
+The window is fed by raw MPV video screenshots, and is kept consistent with the
+inline `MPVPlayerView`:
+
+- Captures follow the video frame rate up to 30 frames per second, and back off
+  automatically when a capture costs more than its interval.
+- Downscaling to the window size uses Accelerate resampling, and frames are
+  forced opaque so nothing composites through the video.
+- MPV subtitles are drawn into the captured frame with the player's own subtitle
+  size, colors and bottom margin. Disable this with
+  `drawsSubtitlesInPictureInPicture` when subtitles are composited outside of
+  MPV. Image-based subtitle tracks (PGS, VobSub) have no text to draw, and
+  original-style ASS tracks are drawn with the player style.
+- Fit and fill content modes map to the window's video gravity.
+
+The window controls play, pause, and skip backward and forward by the interval
+the system asks for. Playback progress comes from the display layer timebase,
+which carries the MPV position and the current playback rate; a stream with an
+unknown duration is reported as live. The same position and rate are published
+to the Now Playing controls on the lock screen and in Control Center.
+
+Repeated skips accumulate: a seek publishes its target position immediately, so
+the next skip starts from it instead of from the last position MPV reported.
+Seeking while paused refreshes the window with the frame at the new position.
 
 ## Client-rendered subtitles
 
@@ -126,7 +153,7 @@ let playerViewController = MPVQuickPlayerViewController(
 present(playerViewController, animated: true)
 ```
 
-The quick interface provides play/pause, seeking, time display, Picture in Picture, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, frame interpolation, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
+The quick interface provides play/pause, seeking, time display, a Picture in Picture button that enters and leaves the window, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, frame interpolation, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
 
 Landscape lock can also be changed while the player is visible:
 

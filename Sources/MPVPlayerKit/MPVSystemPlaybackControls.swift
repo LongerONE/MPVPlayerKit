@@ -3,10 +3,19 @@ import MediaPlayer
 
 enum MPVSystemPlaybackControls {
     static let skipInterval: TimeInterval = 15
+    static let minimumSkipInterval: TimeInterval = 1
+    static let maximumSkipInterval: TimeInterval = 600
 
-    static func fixedSkipInterval(requestedInterval: TimeInterval) -> TimeInterval {
+    /// Uses the interval the system asked for, so a skip moves playback by the
+    /// amount shown on the Picture in Picture and Now Playing controls. A
+    /// missing or unusable interval falls back to ``skipInterval``.
+    static func resolvedSkipInterval(requestedInterval: TimeInterval) -> TimeInterval {
         guard requestedInterval.isFinite, requestedInterval != 0 else { return 0 }
-        return requestedInterval < 0 ? -skipInterval : skipInterval
+        let magnitude = min(
+            max(abs(requestedInterval), minimumSkipInterval),
+            maximumSkipInterval
+        )
+        return requestedInterval < 0 ? -magnitude : magnitude
     }
 
     static func seekTarget(
@@ -19,8 +28,16 @@ enum MPVSystemPlaybackControls {
         return min(target, duration)
     }
 
+    /// AVKit reads this range to draw the Picture in Picture playback progress.
+    /// An unknown duration is a live stream, which AVKit expects as an infinite
+    /// range rather than an invalid one.
+    static let liveTimeRange = CMTimeRange(
+        start: .negativeInfinity,
+        duration: .positiveInfinity
+    )
+
     static func timeRange(duration: TimeInterval) -> CMTimeRange {
-        guard duration.isFinite, duration > 0 else { return .invalid }
+        guard duration.isFinite, duration > 0 else { return liveTimeRange }
         return CMTimeRange(
             start: .zero,
             duration: CMTime(seconds: duration, preferredTimescale: 600)
@@ -48,15 +65,20 @@ final class MPVSystemPlaybackCoordinator {
     func publish(playerView: MPVPlayerView) {
         guard activePlayerView === playerView else { return }
 
+        let speed = playerView.playbackSpeed.isFinite && playerView.playbackSpeed > 0
+            ? playerView.playbackSpeed
+            : 1.0
         var info: [String: Any] = [
             Self.ownerKey: true,
             MPMediaItemPropertyTitle: displayTitle(for: playerView),
             MPNowPlayingInfoPropertyElapsedPlaybackTime: max(0, playerView.currentTime),
-            MPNowPlayingInfoPropertyPlaybackRate: playerView.isPlaying ? 1.0 : 0.0,
-            MPNowPlayingInfoPropertyDefaultPlaybackRate: 1.0,
+            MPNowPlayingInfoPropertyPlaybackRate: playerView.isPlaying ? speed : 0.0,
+            MPNowPlayingInfoPropertyDefaultPlaybackRate: speed,
         ]
         if playerView.duration.isFinite, playerView.duration > 0 {
             info[MPMediaItemPropertyPlaybackDuration] = playerView.duration
+        } else {
+            info[MPNowPlayingInfoPropertyIsLiveStream] = true
         }
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }

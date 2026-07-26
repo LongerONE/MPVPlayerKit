@@ -70,6 +70,10 @@ extension MPVQuickPlayerViewController: MPVPlayerDelegate {
         decoderMode = mode
         updateStatusLabel()
     }
+
+    public func player(_ player: MPVPlayer, didChangePictureInPictureActive isActive: Bool) {
+        updatePictureInPictureButton(isActive: isActive)
+    }
 }
 
 extension MPVQuickPlayerViewController: UIDocumentPickerDelegate {

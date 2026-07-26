@@ -1,4 +1,5 @@
 import XCTest
+import CoreMedia
 import UIKit
 import Metal
 @testable import MPVPlayerKit
@@ -42,6 +43,18 @@ final class MPVPictureInPictureTests: XCTestCase {
         )
     }
 
+    @available(iOS 17.0, *)
+    @MainActor
+    func testSampleBufferProbeUsesOpaqueAndFrameVaryingBGRAValues() {
+        let first = MPVPictureInPictureSampleBufferProbe.testPixelComponents(frameIndex: 0)
+        let next = MPVPictureInPictureSampleBufferProbe.testPixelComponents(frameIndex: 1)
+
+        XCTAssertEqual(MPVPictureInPictureSampleBufferProbe.testAlpha, .max)
+        XCTAssertEqual(first, [0, 0, 0])
+        XCTAssertNotEqual(first, next)
+        XCTAssertTrue(next.allSatisfy { $0 != 0 })
+    }
+
     func testPictureInPictureFirstCaptureRequiresVideoOutputAndFrameSignal() {
         XCTAssertFalse(MPVPictureInPictureFrameCaptureReadiness.shouldCapture(
             hasValidVideoOutputParameters: false,
@@ -61,6 +74,231 @@ final class MPVPictureInPictureTests: XCTestCase {
             isPlaying: false,
             isWaitingForStart: true
         ))
+    }
+
+    func testPictureInPictureKeepsCapturingWhilePausedInAnActiveWindow() {
+        // A paused Picture in Picture window still has to show the frame the
+        // player seeked to, so captures continue while it is active.
+        XCTAssertTrue(MPVPictureInPictureFrameCaptureReadiness.shouldCapture(
+            hasValidVideoOutputParameters: true,
+            hasPlaybackOrReconfigurationSignal: true,
+            isPlaying: false,
+            isWaitingForStart: false,
+            isPictureInPictureActive: true
+        ))
+        XCTAssertFalse(MPVPictureInPictureFrameCaptureReadiness.shouldCapture(
+            hasValidVideoOutputParameters: true,
+            hasPlaybackOrReconfigurationSignal: true,
+            isPlaying: false,
+            isWaitingForStart: false,
+            isPictureInPictureActive: false
+        ))
+    }
+
+    func testCaptureCadenceFollowsTheVideoFrameRateWithinBounds() {
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.interval(
+                videoFrameRate: 24,
+                averageCaptureDuration: 0,
+                isPlaying: true
+            ),
+            1.0 / 24,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.interval(
+                videoFrameRate: 120,
+                averageCaptureDuration: 0,
+                isPlaying: true
+            ),
+            MPVPictureInPictureCaptureCadence.minimumPlayingInterval,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.interval(
+                videoFrameRate: 0,
+                averageCaptureDuration: 0,
+                isPlaying: true
+            ),
+            1 / MPVPictureInPictureCaptureCadence.fallbackVideoFrameRate,
+            accuracy: 0.0001
+        )
+    }
+
+    func testCaptureCadenceBacksOffForExpensiveCapturesAndPausedPlayback() {
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.interval(
+                videoFrameRate: 60,
+                averageCaptureDuration: 0.06,
+                isPlaying: true
+            ),
+            0.09,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.interval(
+                videoFrameRate: 60,
+                averageCaptureDuration: 5,
+                isPlaying: true
+            ),
+            MPVPictureInPictureCaptureCadence.maximumPlayingInterval,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.interval(
+                videoFrameRate: 60,
+                averageCaptureDuration: 0.01,
+                isPlaying: false
+            ),
+            MPVPictureInPictureCaptureCadence.pausedInterval,
+            accuracy: 0.0001
+        )
+    }
+
+    func testPausedCaptureStopsOnceTheWindowShowsTheSeekedPosition() {
+        // While paused MPV keeps returning the same frame, so captures only
+        // continue until the captured position matches the player position.
+        XCTAssertTrue(MPVPictureInPictureCaptureCadence.shouldSkipPausedCapture(
+            isPlaying: false,
+            isWaitingForStart: false,
+            lastCapturedPresentationTime: 120,
+            currentTime: 120.01
+        ))
+        XCTAssertFalse(MPVPictureInPictureCaptureCadence.shouldSkipPausedCapture(
+            isPlaying: false,
+            isWaitingForStart: false,
+            lastCapturedPresentationTime: 120,
+            currentTime: 135
+        ))
+        XCTAssertFalse(MPVPictureInPictureCaptureCadence.shouldSkipPausedCapture(
+            isPlaying: false,
+            isWaitingForStart: false,
+            lastCapturedPresentationTime: nil,
+            currentTime: 120
+        ))
+        XCTAssertFalse(MPVPictureInPictureCaptureCadence.shouldSkipPausedCapture(
+            isPlaying: true,
+            isWaitingForStart: false,
+            lastCapturedPresentationTime: 120,
+            currentTime: 120
+        ))
+        XCTAssertFalse(MPVPictureInPictureCaptureCadence.shouldSkipPausedCapture(
+            isPlaying: false,
+            isWaitingForStart: true,
+            lastCapturedPresentationTime: 120,
+            currentTime: 120
+        ))
+    }
+
+    func testCaptureCadenceReschedulesOnlyForMeaningfulChanges() {
+        XCTAssertTrue(MPVPictureInPictureCaptureCadence.shouldReschedule(
+            currentInterval: nil,
+            nextInterval: 0.04
+        ))
+        XCTAssertFalse(MPVPictureInPictureCaptureCadence.shouldReschedule(
+            currentInterval: 0.04,
+            nextInterval: 0.042
+        ))
+        XCTAssertTrue(MPVPictureInPictureCaptureCadence.shouldReschedule(
+            currentInterval: 0.04,
+            nextInterval: 0.5
+        ))
+    }
+
+    func testCaptureDurationAverageIgnoresUnusableSamples() {
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.averageCaptureDuration(
+                previousAverage: 0,
+                sample: 0.02
+            ),
+            0.02,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.averageCaptureDuration(
+                previousAverage: 0.02,
+                sample: -1
+            ),
+            0.02,
+            accuracy: 0.0001
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureCaptureCadence.averageCaptureDuration(
+                previousAverage: 0.02,
+                sample: 0.06
+            ),
+            0.03,
+            accuracy: 0.0001
+        )
+    }
+
+    func testSubtitleOverlayStyleReadsMPVPropertyValues() {
+        let style = MPVPictureInPictureSubtitleStyle(propertyValues: [
+            MPVProperty.subtitleFontSize: "44.000",
+            MPVProperty.subtitleBold: "yes",
+            MPVProperty.subtitleColor: "#FFEEDDCC",
+            MPVProperty.subtitleOutlineSize: "1.500",
+            MPVProperty.subtitleMarginY: "50",
+        ])
+
+        XCTAssertEqual(style.fontSize, 44)
+        XCTAssertTrue(style.bold)
+        XCTAssertEqual(style.textColor, "#FFEEDDCC")
+        XCTAssertEqual(style.outlineSize, 1.5)
+        XCTAssertEqual(style.marginY, 50)
+        XCTAssertEqual(style.shadowOffset, 0)
+    }
+
+    func testSubtitleOverlayLayoutScalesWithFrameHeight() {
+        var style = MPVPictureInPictureSubtitleStyle()
+        style.fontSize = 36
+        style.marginY = 36
+        style.outlineSize = 2
+
+        let layout = MPVPictureInPictureSubtitleLayout(
+            style: style,
+            frameWidth: 1280,
+            frameHeight: 720
+        )
+        XCTAssertEqual(layout.pointSize, 36, accuracy: 0.001)
+        XCTAssertEqual(layout.bottomMargin, 36, accuracy: 0.001)
+        XCTAssertEqual(layout.outlineWidth, 2, accuracy: 0.001)
+
+        let smallLayout = MPVPictureInPictureSubtitleLayout(
+            style: style,
+            frameWidth: 640,
+            frameHeight: 360
+        )
+        XCTAssertEqual(smallLayout.pointSize, 18, accuracy: 0.001)
+        XCTAssertEqual(smallLayout.bottomMargin, 18, accuracy: 0.001)
+        XCTAssertEqual(smallLayout.maximumWidth, 640 * 0.92, accuracy: 0.001)
+    }
+
+    func testSubtitleOverlayParsesMPVColors() {
+        let opaqueWhite = MPVPictureInPictureSubtitleOverlay.color("#FFFFFFFF")
+        XCTAssertEqual(opaqueWhite?.alpha, 1)
+        XCTAssertEqual(MPVPictureInPictureSubtitleOverlay.color("#00000000")?.alpha, 0)
+        XCTAssertEqual(MPVPictureInPictureSubtitleOverlay.color("#FFFFFF")?.alpha, 1)
+        XCTAssertNil(MPVPictureInPictureSubtitleOverlay.color("white"))
+    }
+
+    func testSubtitleOverlayNormalizesCapturedText() {
+        XCTAssertEqual(
+            MPVPictureInPictureSubtitleOverlay.normalizedText(" line one\r\nline two \n"),
+            "line one\nline two"
+        )
+        XCTAssertEqual(MPVPictureInPictureSubtitleOverlay.normalizedText("  \n "), "")
+    }
+
+    func testPictureInPictureSampleDurationFollowsTheVideoFrameRate() {
+        XCTAssertEqual(
+            MPVPictureInPictureFrameConverter.sampleDuration(videoFrameRate: 30),
+            CMTime(value: 1, timescale: 30)
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureFrameConverter.sampleDuration(videoFrameRate: 0),
+            CMTime(value: 1, timescale: 25)
+        )
     }
 
     func testPictureInPictureFirstCaptureDoesNotRequireFiniteDuration() {

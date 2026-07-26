@@ -263,13 +263,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
             label: mpvLocalized("accessibility.picture_in_picture"),
             action: #selector(startPictureInPicture)
         )
-        pictureInPictureButton.setImage(
-            AVPictureInPictureController.pictureInPictureButtonStartImage,
-            for: .normal
-        )
         pictureInPictureButton.accessibilityIdentifier =
             "MPVQuickPlayer.pictureInPictureButton"
         pictureInPictureButton.isEnabled = player.isPictureInPictureSupported
+        updatePictureInPictureButton(isActive: player.isPictureInPictureActive)
         configureControlButton(
             settingsButton,
             symbol: "gearshape",
@@ -483,8 +480,21 @@ public final class MPVQuickPlayerViewController: UIViewController {
     }
 
     @objc private func startPictureInPicture() {
+        guard player.isPictureInPictureActive == false else {
+            player.stopPictureInPicture()
+            return
+        }
         guard preparePictureInPicturePlayback() else { return }
         player.startPictureInPicture()
+    }
+
+    func updatePictureInPictureButton(isActive: Bool) {
+        pictureInPictureButton.setImage(
+            isActive
+                ? AVPictureInPictureController.pictureInPictureButtonStopImage
+                : AVPictureInPictureController.pictureInPictureButtonStartImage,
+            for: .normal
+        )
     }
 
     @discardableResult

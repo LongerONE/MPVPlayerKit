@@ -67,17 +67,36 @@ extension MPVPlayerView {
 
         mpvDebugLog("seek time=\(max(0.0, time)) autoPlay=\(autoPlay)")
         let status = command("seek", args: [String(max(0.0, time)), "absolute+exact"])
+        if status >= 0 {
+            publishSeekTarget(max(0.0, time))
+        }
         if autoPlay {
             play()
         }
         return status >= 0
     }
 
+    /// MPV reports a new position only on its next time update, and not at all
+    /// while paused. Publishing the requested position keeps the inline
+    /// controls, the system playback controls and Picture in Picture in sync,
+    /// and lets repeated skip commands accumulate instead of collapsing into
+    /// one interval.
+    private func publishSeekTarget(_ time: TimeInterval) {
+        let target = duration.isFinite && duration > 0 ? min(time, duration) : time
+        currentTime = target
+        updateClientSubtitle(at: target)
+        notifyTime(currentTime: target, duration: duration)
+        MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
+    }
+
     @objc public func updatePlayRate(_ rate: NSNumber) {
         let value = rate.doubleValue
         guard value.isFinite, value > 0.0 else { return }
         mpvDebugLog("updatePlayRate value=\(value)")
+        playbackSpeed = value
         setDouble(MPVProperty.speed, value)
+        MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
+        pictureInPicturePlaybackStateDidChange()
     }
 
     @objc public func updateVideoQuality(_ value: NSNumber) {

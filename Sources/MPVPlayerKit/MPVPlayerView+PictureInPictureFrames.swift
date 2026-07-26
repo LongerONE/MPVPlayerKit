@@ -9,153 +9,6 @@ import libmpv
 #error("MPVPlayerKit requires MPVKit's Libmpv module.")
 #endif
 
-struct MPVPictureInPictureFrame: @unchecked Sendable {
-    let width: Int
-    let height: Int
-    let stride: Int
-    let pixels: Data
-    let presentationTime: TimeInterval
-}
-
-/// Serially used by the PiP frame queue. The pool avoids allocating a new
-/// IOSurface for every raw MPV screenshot while retaining its BGRA layout.
-final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
-    private var pixelBufferPool: CVPixelBufferPool?
-    private var pooledSize = CMVideoDimensions(width: 0, height: 0)
-
-    func makeSampleBuffer(
-        from frame: MPVPictureInPictureFrame,
-        renderSize: CMVideoDimensions
-    ) -> CMSampleBuffer? {
-        guard frame.width > 0, frame.height > 0, frame.stride >= frame.width * 4,
-              frame.pixels.count >= frame.stride * frame.height
-        else { return nil }
-        let outputSize = outputDimensions(for: frame, renderSize: renderSize)
-        guard let pixelBuffer = makePixelBuffer(width: outputSize.width, height: outputSize.height) else {
-            return nil
-        }
-        CVPixelBufferLockBaseAddress(pixelBuffer, [])
-        defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
-        guard let destination = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
-        let destinationStride = CVPixelBufferGetBytesPerRow(pixelBuffer)
-        let copiedBytes = min(outputSize.width * 4, destinationStride)
-        frame.pixels.withUnsafeBytes { source in
-            guard let sourceBase = source.baseAddress else { return }
-            guard outputSize.width != frame.width || outputSize.height != frame.height else {
-                for row in 0..<frame.height {
-                    memcpy(
-                        destination.advanced(by: row * destinationStride),
-                        sourceBase.advanced(by: row * frame.stride),
-                        copiedBytes
-                    )
-                }
-                return
-            }
-            for row in 0..<outputSize.height {
-                let sourceRow = min(frame.height - 1, row * frame.height / outputSize.height)
-                let destinationRow = destination.advanced(by: row * destinationStride)
-                let sourceRowAddress = sourceBase.advanced(by: sourceRow * frame.stride)
-                for column in 0..<outputSize.width {
-                    let sourceColumn = min(frame.width - 1, column * frame.width / outputSize.width)
-                    memcpy(
-                        destinationRow.advanced(by: column * 4),
-                        sourceRowAddress.advanced(by: sourceColumn * 4),
-                        4
-                    )
-                }
-            }
-        }
-        var formatDescription: CMVideoFormatDescription?
-        guard CMVideoFormatDescriptionCreateForImageBuffer(
-            allocator: kCFAllocatorDefault,
-            imageBuffer: pixelBuffer,
-            formatDescriptionOut: &formatDescription
-        ) == noErr, let formatDescription else { return nil }
-        var timing = CMSampleTimingInfo(
-            duration: CMTime(value: 1, timescale: 10),
-            presentationTimeStamp: CMTime(seconds: frame.presentationTime, preferredTimescale: 600),
-            decodeTimeStamp: .invalid
-        )
-        var sampleBuffer: CMSampleBuffer?
-        guard CMSampleBufferCreateReadyWithImageBuffer(
-            allocator: kCFAllocatorDefault,
-            imageBuffer: pixelBuffer,
-            formatDescription: formatDescription,
-            sampleTiming: &timing,
-            sampleBufferOut: &sampleBuffer
-        ) == noErr, let sampleBuffer else { return nil }
-        if let attachments = CMSampleBufferGetSampleAttachmentsArray(
-            sampleBuffer,
-            createIfNecessary: true
-        ), CFArrayGetCount(attachments) > 0 {
-            let dictionary = unsafeBitCast(
-                CFArrayGetValueAtIndex(attachments, 0),
-                to: CFMutableDictionary.self
-            )
-            CFDictionarySetValue(
-                dictionary,
-                Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(),
-                Unmanaged.passUnretained(kCFBooleanTrue).toOpaque()
-            )
-        }
-        return sampleBuffer
-    }
-
-    private func outputDimensions(
-        for frame: MPVPictureInPictureFrame,
-        renderSize: CMVideoDimensions
-    ) -> (width: Int, height: Int) {
-        guard renderSize.width > 0, renderSize.height > 0 else {
-            return (frame.width, frame.height)
-        }
-        let widthScale = Double(renderSize.width) / Double(frame.width)
-        let heightScale = Double(renderSize.height) / Double(frame.height)
-        let scale = min(1, widthScale, heightScale)
-        return (
-            max(1, Int((Double(frame.width) * scale).rounded(.down))),
-            max(1, Int((Double(frame.height) * scale).rounded(.down)))
-        )
-    }
-
-    private func makePixelBuffer(width: Int, height: Int) -> CVPixelBuffer? {
-        let requestedSize = CMVideoDimensions(width: Int32(width), height: Int32(height))
-        if pixelBufferPool == nil
-            || pooledSize.width != requestedSize.width
-            || pooledSize.height != requestedSize.height
-        {
-            pooledSize = requestedSize
-            pixelBufferPool = makePixelBufferPool(width: width, height: height)
-        }
-        guard let pixelBufferPool else { return nil }
-        var pixelBuffer: CVPixelBuffer?
-        guard CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, pixelBufferPool, &pixelBuffer)
-            == kCVReturnSuccess
-        else { return nil }
-        return pixelBuffer
-    }
-
-    private func makePixelBufferPool(width: Int, height: Int) -> CVPixelBufferPool? {
-        let poolAttributes: CFDictionary = [
-            kCVPixelBufferPoolMinimumBufferCountKey: 2,
-        ] as CFDictionary
-        let pixelBufferAttributes: CFDictionary = [
-            kCVPixelBufferPixelFormatTypeKey: kCVPixelFormatType_32BGRA,
-            kCVPixelBufferWidthKey: width,
-            kCVPixelBufferHeightKey: height,
-            kCVPixelBufferIOSurfacePropertiesKey: [:] as CFDictionary,
-            kCVPixelBufferMetalCompatibilityKey: true,
-        ] as CFDictionary
-        var pool: CVPixelBufferPool?
-        guard CVPixelBufferPoolCreate(
-            kCFAllocatorDefault,
-            poolAttributes,
-            pixelBufferAttributes,
-            &pool
-        ) == kCVReturnSuccess else { return nil }
-        return pool
-    }
-}
-
 private struct MPVPictureInPictureRawFrame {
     var width = 0
     var height = 0
@@ -167,6 +20,11 @@ private struct MPVPictureInPictureRawFrame {
 extension MPVPlayerView {
     /// `video` is supported by current libmpv builds. Older bundled builds
     /// accept the command without the pixel format, so retain it as a fallback.
+    ///
+    /// The `subtitles` and `window` modes are deliberately unused: they require
+    /// a video output render pass, which crashes while the Metal layer is not
+    /// presenting. Subtitles are drawn into the captured frame instead, see
+    /// ``MPVPictureInPictureSubtitleOverlay``.
     nonisolated static let pictureInPictureScreenshotArgumentCandidates = [
         ["video", "bgra"],
         ["video"],
@@ -194,7 +52,12 @@ extension MPVPlayerView {
                     height: rawFrame.height,
                     stride: rawFrame.stride,
                     pixels: rawFrame.pixels,
-                    presentationTime: max(0, self.getDouble(MPVProperty.timePosition))
+                    presentationTime: max(0, self.getDouble(MPVProperty.timePosition)),
+                    videoFrameRate: self.pictureInPictureVideoFrameRate(),
+                    subtitleText: self.pictureInPictureSubtitleText(),
+                    subtitleStyle: MPVPictureInPictureSubtitleStyle(
+                        propertyValues: self.subtitleStyleValues
+                    )
                 ))
                 return
             }
@@ -206,6 +69,26 @@ extension MPVPlayerView {
             self.mpvDebugLog("pip capture failed status=\(lastStatus)")
             completion(nil)
         }
+    }
+
+    /// Read on the MPV queue while capturing a frame.
+    private nonisolated func pictureInPictureVideoFrameRate() -> Double {
+        let estimated = getDouble(MPVProperty.estimatedVideoFilterFPS)
+        if estimated.isFinite, estimated > 0 { return estimated }
+        let container = getDouble(MPVProperty.containerFPS)
+        return container.isFinite && container > 0 ? container : 0
+    }
+
+    /// The inline player shows MPV-rendered subtitles. Capture the same text so
+    /// the Picture in Picture overlay can draw it, and only while MPV would
+    /// render it, so hidden subtitles stay hidden in both places.
+    private nonisolated func pictureInPictureSubtitleText() -> String? {
+        guard pictureInPictureSubtitleOverlayEnabled,
+              getFlag(MPVProperty.subtitleVisibility) == true,
+              let text = getString(MPVProperty.subtitleText)
+        else { return nil }
+        let normalized = MPVPictureInPictureSubtitleOverlay.normalizedText(text)
+        return normalized.isEmpty ? nil : normalized
     }
 
     private nonisolated func pictureInPictureScreenshot(
