@@ -12,9 +12,14 @@ enum MPVPictureInPictureCaptureCadence {
     static let minimumPlayingInterval: TimeInterval = 1.0 / 30
     static let maximumPlayingInterval: TimeInterval = 0.2
     static let pausedInterval: TimeInterval = 0.5
-    /// Headroom over the measured capture cost. A factor of two keeps capture
-    /// work at about half of the wall clock, leaving the rest for playback.
-    static let captureCostFactor: Double = 2.0
+    /// Headroom over the measured capture cost.
+    ///
+    /// The cost is measured as the work one capture actually performs, so this
+    /// only has to cover the scheduling latency around it. A larger factor
+    /// throttles the window well below the frame rate the captures could
+    /// sustain: at a 45ms capture cost, a factor of two holds Picture in
+    /// Picture at 11fps while the same work fits in 22fps.
+    static let captureCostFactor: Double = 1.25
     static let rescheduleTolerance: TimeInterval = 0.008
     /// Frames between capture cost reports in debug builds.
     static let statisticsInterval: UInt64 = 60

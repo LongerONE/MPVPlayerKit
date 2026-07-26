@@ -139,9 +139,17 @@ extension MPVPictureInPictureCoordinator {
     ) {
         isCapturingFrame = false
         let captureDuration = CACurrentMediaTime() - startedAt
+        // The cadence is scheduled against the work one capture performs, not
+        // the round trip. The trip also covers the wait for the MPV queue and
+        // the hop back to the main queue, which are consequences of the cadence
+        // rather than costs it has to leave room for; feeding them back padded
+        // the interval on every frame and settled the window far below the
+        // frame rate the same captures could sustain. A failed capture has no
+        // reported work, so it backs off on the trip instead.
+        let workDuration = capture.map { $0.screenshotDuration + $0.conversionDuration }
         averageCaptureDuration = MPVPictureInPictureCaptureCadence.averageCaptureDuration(
             previousAverage: averageCaptureDuration,
-            sample: captureDuration
+            sample: workDuration ?? captureDuration
         )
         guard generation == frameCaptureGeneration else { return }
         guard let capture else {
@@ -201,6 +209,7 @@ extension MPVPictureInPictureCoordinator {
                 + "output=\(capture.outputWidth)x\(capture.outputHeight) "
                 + "screenshot=\(milliseconds(capture.screenshotDuration))ms "
                 + "convert=\(milliseconds(capture.conversionDuration))ms "
+                + "work=\(milliseconds(capture.screenshotDuration + capture.conversionDuration))ms "
                 + "total=\(milliseconds(captureDuration))ms "
                 + "average=\(milliseconds(averageCaptureDuration))ms "
                 + "interval=\(milliseconds(frameTimerInterval ?? 0))ms "
