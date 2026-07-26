@@ -1,22 +1,7 @@
-import CoreMedia
 import MediaPlayer
 
 enum MPVSystemPlaybackControls {
     static let skipInterval: TimeInterval = 15
-    static let minimumSkipInterval: TimeInterval = 1
-    static let maximumSkipInterval: TimeInterval = 600
-
-    /// Uses the interval the system asked for, so a skip moves playback by the
-    /// amount shown on the Picture in Picture and Now Playing controls. A
-    /// missing or unusable interval falls back to ``skipInterval``.
-    static func resolvedSkipInterval(requestedInterval: TimeInterval) -> TimeInterval {
-        guard requestedInterval.isFinite, requestedInterval != 0 else { return 0 }
-        let magnitude = min(
-            max(abs(requestedInterval), minimumSkipInterval),
-            maximumSkipInterval
-        )
-        return requestedInterval < 0 ? -magnitude : magnitude
-    }
 
     static func seekTarget(
         currentTime: TimeInterval,
@@ -26,22 +11,6 @@ enum MPVSystemPlaybackControls {
         let target = max(0, currentTime + offset)
         guard duration.isFinite, duration > 0 else { return target }
         return min(target, duration)
-    }
-
-    /// AVKit reads this range to draw the Picture in Picture playback progress.
-    /// An unknown duration is a live stream, which AVKit expects as an infinite
-    /// range rather than an invalid one.
-    static let liveTimeRange = CMTimeRange(
-        start: .negativeInfinity,
-        duration: .positiveInfinity
-    )
-
-    static func timeRange(duration: TimeInterval) -> CMTimeRange {
-        guard duration.isFinite, duration > 0 else { return liveTimeRange }
-        return CMTimeRange(
-            start: .zero,
-            duration: CMTime(seconds: duration, preferredTimescale: 600)
-        )
     }
 }
 

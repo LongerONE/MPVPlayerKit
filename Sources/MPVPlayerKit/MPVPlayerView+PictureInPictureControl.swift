@@ -31,26 +31,17 @@ public extension MPVPlayerView {
 }
 
 extension MPVPlayerView {
+    /// The window is shaped like the video, not like the inline view, which is
+    /// usually a portrait container the video is letterboxed into.
     var pictureInPicturePreferredContentSize: CGSize {
         MPVPictureInPictureContentSize.resolve(videoDisplaySize: pictureInPictureVideoDisplaySize)
     }
 
-    func resetPictureInPictureVideoOutputReadiness() {
-        hasPictureInPictureVideoOutputParameters = false
-        hasPictureInPictureFirstVideoFrameSignal = false
+    func resetPictureInPictureVideoDisplaySize() {
+        updatePictureInPictureVideoDisplaySize(.zero)
     }
 
-    func updatePictureInPictureVideoDisplaySize(
-        _ size: CGSize,
-        signal: MPVPictureInPictureVideoOutputSignal = .none
-    ) {
-        let hasValidParameters = size.width > 0 && size.height > 0
-        hasPictureInPictureVideoOutputParameters = hasValidParameters
-        if hasValidParameters == false {
-            hasPictureInPictureFirstVideoFrameSignal = false
-        } else if signal.establishesFirstVideoFrameReadiness {
-            hasPictureInPictureFirstVideoFrameSignal = true
-        }
+    func updatePictureInPictureVideoDisplaySize(_ size: CGSize) {
         let resolvedSize = MPVPictureInPictureContentSize.resolve(videoDisplaySize: size)
         guard pictureInPictureVideoDisplaySize != resolvedSize else { return }
         pictureInPictureVideoDisplaySize = resolvedSize
@@ -59,14 +50,6 @@ extension MPVPlayerView {
 
     func pictureInPictureViewHierarchyDidChange() {
         pictureInPictureCoordinator?.playerViewHierarchyDidChange()
-    }
-
-    func pictureInPictureViewDidLayout() {
-        pictureInPictureCoordinator?.playerViewDidLayout()
-    }
-
-    func pictureInPicturePlaybackStateDidChange() {
-        pictureInPictureCoordinator?.playbackStateDidChange()
     }
 
     func stopPictureInPictureForPlayerTeardown() {
@@ -81,21 +64,5 @@ extension MPVPlayerView {
         )
         pictureInPictureCoordinator = coordinator
         return coordinator
-    }
-}
-
-enum MPVPictureInPictureVideoOutputSignal: Sendable {
-    case none
-    case fileLoaded
-    case playbackRestart
-    case videoReconfiguration
-
-    var establishesFirstVideoFrameReadiness: Bool {
-        switch self {
-        case .playbackRestart, .videoReconfiguration:
-            true
-        case .none, .fileLoaded:
-            false
-        }
     }
 }

@@ -174,27 +174,6 @@ public final class MPVPlayerView: UIView {
     /// Picture in Picture timebase, so both advance at the rate of the video.
     @objc public internal(set) var playbackSpeed: Double = 1.0
 
-    /// Draws the current MPV subtitle line into Picture in Picture frames.
-    ///
-    /// Raw video screenshots never contain subtitles, so this keeps the
-    /// Picture in Picture window consistent with the inline player. Disable it
-    /// when a host app composites subtitles outside of MPV.
-    @objc public var drawsSubtitlesInPictureInPicture: Bool {
-        get { pictureInPictureSubtitleOverlayEnabled }
-        set { pictureInPictureSubtitleOverlayEnabled = newValue }
-    }
-
-    /// How Picture in Picture frames are captured. See
-    /// ``MPVPictureInPictureCaptureMode`` before changing it: the window mode is
-    /// experimental. Applies to the next captured frame.
-    @objc public var pictureInPictureCaptureModeRawValue: Int {
-        get { pictureInPictureCaptureMode.rawValue }
-        set {
-            pictureInPictureCaptureMode =
-                MPVPictureInPictureCaptureMode(rawValue: newValue) ?? .videoWithSubtitleOverlay
-        }
-    }
-
     public var playerContentMode: UIView.ContentMode {
         get {
             contentMode
@@ -225,14 +204,8 @@ public final class MPVPlayerView: UIView {
 
     var metalLayer = MPVPlayerMetalLayer()
     var pictureInPictureCoordinator: MPVPictureInPictureCoordinator?
+    /// Shapes the Picture in Picture window, which hosts this view.
     var pictureInPictureVideoDisplaySize: CGSize = .zero
-    var hasPictureInPictureVideoOutputParameters = false
-    var hasPictureInPictureFirstVideoFrameSignal = false
-    // Read on the MPV queue while capturing Picture in Picture frames.
-    nonisolated(unsafe) var pictureInPictureSubtitleOverlayEnabled = true
-    nonisolated(unsafe) var pictureInPictureCaptureMode = MPVPictureInPictureCaptureMode
-        .videoWithSubtitleOverlay
-    nonisolated(unsafe) var lastPictureInPictureSubtitleState = ""
     var usesExtendedDynamicRangeOutput = false
     var url: URL?
     var headers: [String: String] = [:]
@@ -401,7 +374,7 @@ public final class MPVPlayerView: UIView {
         stopped = false
         setupFailed = false
         hasReportedReadyToPlay = false
-        resetPictureInPictureVideoOutputReadiness()
+        resetPictureInPictureVideoDisplaySize()
         hasPlaybackRestarted = false
         hasLoggedVideoColorParameters = false
         setupProfiles = []
@@ -424,7 +397,6 @@ public final class MPVPlayerView: UIView {
         super.layoutSubviews()
         clientSubtitleController.update(at: currentTime, force: true)
         updateMetalLayerGeometryIfNeeded()
-        pictureInPictureViewDidLayout()
     }
 
     public override func didMoveToSuperview() {

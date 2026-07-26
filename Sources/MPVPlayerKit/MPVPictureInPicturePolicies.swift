@@ -12,7 +12,17 @@ enum MPVPictureInPictureContentSize {
 }
 
 enum MPVPictureInPictureStartCancellationPolicy {
-    static func shouldStopSystemController(isStarting: Bool) -> Bool { isStarting }
+    /// The content view controller appears before the system reports the
+    /// window as active, and it also appears on a start that is already being
+    /// cancelled. Moving the player view then would strand it in a window that
+    /// is about to close.
+    static func shouldMovePlayer(
+        isStarting: Bool,
+        isActive: Bool,
+        isCancellationRequested: Bool
+    ) -> Bool {
+        isCancellationRequested == false && (isStarting || isActive)
+    }
 
     static func shouldPostInactiveState(
         hasPostedActiveState: Bool,
@@ -20,22 +30,7 @@ enum MPVPictureInPictureStartCancellationPolicy {
     ) -> Bool { hasPostedActiveState && isStartCancellationRequested == false }
 }
 
-enum MPVPictureInPictureFrameUpdatePolicy {
-    static func shouldKeepUpdating(
-        isActive: Bool,
-        isStarting: Bool,
-        isWaitingForStart: Bool
-    ) -> Bool { isActive || isStarting || isWaitingForStart }
-}
-
 enum MPVPictureInPictureTeardownPolicy {
-    static func shouldStartFrameUpdates(isTearingDown: Bool) -> Bool { isTearingDown == false }
-
-    static func shouldResumeAutomaticReadinessUpdates(
-        allowsAutomaticStartFromInline: Bool,
-        isTearingDown: Bool
-    ) -> Bool { allowsAutomaticStartFromInline && isTearingDown == false }
-
     static func shouldStartSystemController(
         isStartCancellationRequested: Bool,
         isTearingDown: Bool

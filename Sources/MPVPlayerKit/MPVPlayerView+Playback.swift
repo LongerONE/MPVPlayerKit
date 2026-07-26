@@ -96,7 +96,6 @@ extension MPVPlayerView {
         playbackSpeed = value
         setDouble(MPVProperty.speed, value)
         MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
-        pictureInPicturePlaybackStateDidChange()
     }
 
     @objc public func updateVideoQuality(_ value: NSNumber) {

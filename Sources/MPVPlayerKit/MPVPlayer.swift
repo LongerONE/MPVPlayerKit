@@ -45,19 +45,6 @@ public final class MPVPlayer: NSObject {
         get { playbackView.allowsAutomaticPictureInPictureFromInline }
         set { playbackView.allowsAutomaticPictureInPictureFromInline = newValue }
     }
-    /// Draws MPV subtitles into Picture in Picture frames, so the window shows
-    /// the same image as the inline player. Enabled by default, and unused in
-    /// the window capture mode, where MPV composites its own subtitles.
-    public var drawsSubtitlesInPictureInPicture: Bool {
-        get { playbackView.drawsSubtitlesInPictureInPicture }
-        set { playbackView.drawsSubtitlesInPictureInPicture = newValue }
-    }
-    /// How Picture in Picture frames are captured. The window mode is
-    /// experimental, see ``MPVPictureInPictureCaptureMode``.
-    public var pictureInPictureCaptureMode: MPVPictureInPictureCaptureMode {
-        get { playbackView.pictureInPictureCaptureMode }
-        set { playbackView.pictureInPictureCaptureMode = newValue }
-    }
 
     private var observers: [NSObjectProtocol] = []
     private var pendingSubtitleLoads: [String: PendingSubtitleLoad] = [:]
