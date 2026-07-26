@@ -554,8 +554,82 @@ final class MPVPictureInPictureTests: XCTestCase {
 
     func testPictureInPictureUsesCompatibleRawScreenshotArguments() {
         XCTAssertEqual(
-            MPVPlayerView.pictureInPictureScreenshotArgumentCandidates,
+            MPVPlayerView.pictureInPictureScreenshotArgumentCandidates(
+                for: .videoWithSubtitleOverlay
+            ),
             [["video", "bgra"], ["video"]]
+        )
+        XCTAssertEqual(
+            MPVPlayerView.pictureInPictureScreenshotArgumentCandidates(for: .window),
+            [["window", "bgra"], ["window"]]
+        )
+    }
+
+    @MainActor
+    func testPictureInPictureCapturesVideoFramesByDefault() {
+        let playerView = MPVPlayerView(frame: .zero)
+
+        XCTAssertEqual(playerView.pictureInPictureCaptureMode, .videoWithSubtitleOverlay)
+        XCTAssertTrue(playerView.drawsSubtitlesInPictureInPicture)
+
+        playerView.pictureInPictureCaptureModeRawValue =
+            MPVPictureInPictureCaptureMode.window.rawValue
+        XCTAssertEqual(playerView.pictureInPictureCaptureMode, .window)
+
+        playerView.pictureInPictureCaptureModeRawValue = 99
+        XCTAssertEqual(playerView.pictureInPictureCaptureMode, .videoWithSubtitleOverlay)
+    }
+
+    func testWindowCropUsesTheVideoAreaMPVReports() {
+        // A portrait window with the video letterboxed in the middle, as MPV
+        // reported on an iPhone 15 Pro: video display (0, 946) 1179x663.
+        XCTAssertEqual(
+            MPVPictureInPictureWindowCrop.resolve(
+                frameWidth: 1179,
+                frameHeight: 2556,
+                left: 0,
+                top: 946,
+                right: 0,
+                bottom: 947
+            ),
+            MPVPictureInPictureCropRect(x: 0, y: 946, width: 1179, height: 663)
+        )
+    }
+
+    func testWindowCropFallsBackToTheWholeFrameForUnusableMargins() {
+        let full = MPVPictureInPictureCropRect(x: 0, y: 0, width: 1179, height: 2556)
+        XCTAssertEqual(
+            MPVPictureInPictureWindowCrop.resolve(
+                frameWidth: 1179,
+                frameHeight: 2556,
+                left: 0,
+                top: 0,
+                right: 0,
+                bottom: 0
+            ),
+            full
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureWindowCrop.resolve(
+                frameWidth: 1179,
+                frameHeight: 2556,
+                left: 700,
+                top: 0,
+                right: 700,
+                bottom: 0
+            ),
+            full
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureWindowCrop.resolve(
+                frameWidth: 1179,
+                frameHeight: 2556,
+                left: -1,
+                top: 946,
+                right: 0,
+                bottom: 947
+            ),
+            full
         )
     }
 

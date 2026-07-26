@@ -196,6 +196,7 @@ extension MPVPictureInPictureCoordinator {
         }
         playerView?.mpvDebugLog(
             "pip capture stats frames=\(capturedFrameCount) "
+                + "mode=\(capture.captureMode == .window ? "window" : "video") "
                 + "source=\(capture.sourceWidth)x\(capture.sourceHeight) "
                 + "output=\(capture.outputWidth)x\(capture.outputHeight) "
                 + "screenshot=\(milliseconds(capture.screenshotDuration))ms "

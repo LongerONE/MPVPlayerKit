@@ -12,6 +12,7 @@ struct MPVPictureInPictureCapture: @unchecked Sendable {
     let sourceHeight: Int
     let outputWidth: Int
     let outputHeight: Int
+    let captureMode: MPVPictureInPictureCaptureMode
     let hasSubtitleOverlay: Bool
     /// Geometry of the drawn subtitle, for comparing against the inline player.
     let subtitleLayout: MPVPictureInPictureSubtitleLayout?
@@ -26,6 +27,9 @@ struct MPVPictureInPictureRawFrame {
     let stride: Int
     let pixels: UnsafeRawPointer
     let byteCount: Int
+    /// The video area to convert. Window captures include letterbox borders.
+    let crop: MPVPictureInPictureCropRect
+    let captureMode: MPVPictureInPictureCaptureMode
     let presentationTime: TimeInterval
     let videoFrameRate: Double
     let subtitleText: String?
@@ -99,9 +103,16 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
     ) -> MPVPictureInPictureCapture? {
         let startedAt = CACurrentMediaTime()
         guard frame.width > 0, frame.height > 0, frame.stride >= frame.width * 4,
-              frame.byteCount >= frame.stride * frame.height
+              frame.byteCount >= frame.stride * frame.height,
+              frame.crop.width > 0, frame.crop.height > 0,
+              frame.crop.x + frame.crop.width <= frame.width,
+              frame.crop.y + frame.crop.height <= frame.height
         else { return nil }
-        let outputSize = outputDimensions(for: frame, renderSize: renderSize)
+        let outputSize = outputDimensions(
+            cropWidth: frame.crop.width,
+            cropHeight: frame.crop.height,
+            renderSize: renderSize
+        )
         guard let pixelBuffer = makePixelBuffer(
             width: outputSize.width,
             height: outputSize.height
@@ -111,9 +122,11 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
         guard let destination = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
         let destinationStride = CVPixelBufferGetBytesPerRow(pixelBuffer)
         guard Self.copyPixels(
-            source: frame.pixels,
-            sourceWidth: frame.width,
-            sourceHeight: frame.height,
+            source: frame.pixels.advanced(
+                by: frame.crop.y * frame.stride + frame.crop.x * 4
+            ),
+            sourceWidth: frame.crop.width,
+            sourceHeight: frame.crop.height,
             sourceStride: frame.stride,
             destination: destination,
             destinationWidth: outputSize.width,
@@ -151,10 +164,11 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
             sampleBuffer: sampleBuffer,
             presentationTime: frame.presentationTime,
             videoFrameRate: frame.videoFrameRate,
-            sourceWidth: frame.width,
-            sourceHeight: frame.height,
+            sourceWidth: frame.crop.width,
+            sourceHeight: frame.crop.height,
             outputWidth: outputSize.width,
             outputHeight: outputSize.height,
+            captureMode: frame.captureMode,
             hasSubtitleOverlay: subtitleLayout != nil,
             subtitleLayout: subtitleLayout,
             screenshotDuration: screenshotDuration,
@@ -278,18 +292,19 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
     }
 
     private func outputDimensions(
-        for frame: MPVPictureInPictureRawFrame,
+        cropWidth: Int,
+        cropHeight: Int,
         renderSize: CMVideoDimensions
     ) -> (width: Int, height: Int) {
         guard renderSize.width > 0, renderSize.height > 0 else {
-            return (frame.width, frame.height)
+            return (cropWidth, cropHeight)
         }
-        let widthScale = Double(renderSize.width) / Double(frame.width)
-        let heightScale = Double(renderSize.height) / Double(frame.height)
+        let widthScale = Double(renderSize.width) / Double(cropWidth)
+        let heightScale = Double(renderSize.height) / Double(cropHeight)
         let scale = min(1, widthScale, heightScale)
         return (
-            max(1, Int((Double(frame.width) * scale).rounded(.down))),
-            max(1, Int((Double(frame.height) * scale).rounded(.down)))
+            max(1, Int((Double(cropWidth) * scale).rounded(.down))),
+            max(1, Int((Double(cropHeight) * scale).rounded(.down)))
         )
     }
 

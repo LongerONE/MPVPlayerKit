@@ -20,17 +20,18 @@ private struct MPVPictureInPictureRawFrameDescriptor {
 }
 
 extension MPVPlayerView {
-    /// `video` is supported by current libmpv builds. Older bundled builds
+    /// `bgra` is supported by current libmpv builds. Older bundled builds
     /// accept the command without the pixel format, so retain it as a fallback.
-    ///
-    /// The `subtitles` and `window` modes are deliberately unused: they require
-    /// a video output render pass, which crashes while the Metal layer is not
-    /// presenting. Subtitles are drawn into the captured frame instead, see
-    /// ``MPVPictureInPictureSubtitleOverlay``.
-    nonisolated static let pictureInPictureScreenshotArgumentCandidates = [
-        ["video", "bgra"],
-        ["video"],
-    ]
+    nonisolated static func pictureInPictureScreenshotArgumentCandidates(
+        for mode: MPVPictureInPictureCaptureMode
+    ) -> [[String]] {
+        switch mode {
+        case .videoWithSubtitleOverlay:
+            [["video", "bgra"], ["video"]]
+        case .window:
+            [["window", "bgra"], ["window"]]
+        }
+    }
 
     /// Captures one frame and converts it on the MPV queue.
     ///
@@ -44,11 +45,13 @@ extension MPVPlayerView {
     ) {
         queue.async { [weak self] in
             guard let self, let mpv = self.mpv else { completion(nil); return }
+            let mode = self.pictureInPictureCaptureMode
             var lastStatus = MPV_ERROR_INVALID_PARAMETER.rawValue
-            for arguments in Self.pictureInPictureScreenshotArgumentCandidates {
+            for arguments in Self.pictureInPictureScreenshotArgumentCandidates(for: mode) {
                 let capture = self.pictureInPictureScreenshot(
                     handle: mpv,
                     arguments: arguments,
+                    mode: mode,
                     renderSize: renderSize,
                     converter: converter
                 )
@@ -66,7 +69,7 @@ extension MPVPlayerView {
                 operation: "picture-in-picture screenshot",
                 notifyOnFailure: false
             )
-            self.mpvDebugLog("pip capture failed status=\(lastStatus)")
+            self.mpvDebugLog("pip capture failed mode=\(mode) status=\(lastStatus)")
             completion(nil)
         }
     }
@@ -81,10 +84,15 @@ extension MPVPlayerView {
 
     /// The inline player shows MPV-rendered subtitles. Capture the same text so
     /// the Picture in Picture overlay can draw it, and only while MPV would
-    /// render it, so hidden subtitles stay hidden in both places.
-    ///
-    /// Read on the MPV queue, which also owns the diagnostic state below.
-    private nonisolated func pictureInPictureSubtitleText() -> String? {
+    /// render it, so hidden subtitles stay hidden in both places. Window
+    /// captures already contain MPV's own subtitles.
+    private nonisolated func pictureInPictureSubtitleText(
+        mode: MPVPictureInPictureCaptureMode
+    ) -> String? {
+        guard mode == .videoWithSubtitleOverlay else {
+            logPictureInPictureSubtitleState("mpv-rendered")
+            return nil
+        }
         guard pictureInPictureSubtitleOverlayEnabled else {
             logPictureInPictureSubtitleState("overlay-disabled")
             return nil
@@ -115,9 +123,25 @@ extension MPVPlayerView {
         #endif
     }
 
+    /// MPV reports the video rectangle inside its window as OSD margins.
+    private nonisolated func pictureInPictureWindowCrop(
+        frameWidth: Int,
+        frameHeight: Int
+    ) -> MPVPictureInPictureCropRect {
+        MPVPictureInPictureWindowCrop.resolve(
+            frameWidth: frameWidth,
+            frameHeight: frameHeight,
+            left: Int(getInt64(MPVProperty.osdMarginLeft) ?? 0),
+            top: Int(getInt64(MPVProperty.osdMarginTop) ?? 0),
+            right: Int(getInt64(MPVProperty.osdMarginRight) ?? 0),
+            bottom: Int(getInt64(MPVProperty.osdMarginBottom) ?? 0)
+        )
+    }
+
     private nonisolated func pictureInPictureScreenshot(
         handle: OpaquePointer,
         arguments: [String],
+        mode: MPVPictureInPictureCaptureMode,
         renderSize: CMVideoDimensions,
         converter: MPVPictureInPictureFrameConverter
     ) -> (status: Int32, capture: MPVPictureInPictureCapture?) {
@@ -139,15 +163,26 @@ extension MPVPlayerView {
               descriptor.format == "bgr0" || descriptor.format == "bgra",
               let pixels = descriptor.pixels
         else { return (status, nil) }
+        let crop = mode == .window
+            ? pictureInPictureWindowCrop(
+                frameWidth: descriptor.width,
+                frameHeight: descriptor.height
+            )
+            : MPVPictureInPictureCropRect.full(
+                width: descriptor.width,
+                height: descriptor.height
+            )
         let frame = MPVPictureInPictureRawFrame(
             width: descriptor.width,
             height: descriptor.height,
             stride: descriptor.stride,
             pixels: pixels,
             byteCount: descriptor.byteCount,
+            crop: crop,
+            captureMode: mode,
             presentationTime: max(0, getDouble(MPVProperty.timePosition)),
             videoFrameRate: pictureInPictureVideoFrameRate(),
-            subtitleText: pictureInPictureSubtitleText(),
+            subtitleText: pictureInPictureSubtitleText(mode: mode),
             subtitleStyle: MPVPictureInPictureSubtitleStyle(
                 propertyValues: subtitleStyleValues
             )

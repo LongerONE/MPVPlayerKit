@@ -77,6 +77,17 @@ inline `MPVPlayerView`:
   original-style ASS tracks are drawn with the player style.
 - Fit and fill content modes map to the window's video gravity.
 
+`pictureInPictureCaptureMode` selects how frames are captured:
+
+- `.videoWithSubtitleOverlay` (default) reads back the raw video image, which
+  never needs a video output render pass, and draws the subtitle line described
+  above into it.
+- `.window` reads back what MPV renders into its window and crops it to the
+  video area, so MPV's own subtitles, fit/fill cropping and tone mapping come
+  along, and the read back frame is the size of the drawable rather than of the
+  video. It is experimental: the mode needs a video output render pass, which
+  crashed on the builds that led to the default above. Verify on device.
+
 The window controls play, pause, and skip backward and forward by the interval
 the system asks for. Playback progress comes from the display layer timebase,
 which carries the MPV position and the current playback rate; a stream with an
