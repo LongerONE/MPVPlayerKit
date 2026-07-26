@@ -56,92 +56,54 @@ final class MPVPictureInPictureTests: XCTestCase {
         }
     }
 
-    @MainActor
-    func testPictureInPictureMovesAndRestoresTheCompletePlayerView() throws {
-        let inlineView = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 219))
-        let playerView = MPVPlayerView(frame: .zero)
-        let pictureInPictureView = UIView(frame: inlineView.bounds)
-        playerView.translatesAutoresizingMaskIntoConstraints = false
-        inlineView.addSubview(playerView)
-        let leading = playerView.leadingAnchor.constraint(equalTo: inlineView.leadingAnchor)
-        let trailing = playerView.trailingAnchor.constraint(equalTo: inlineView.trailingAnchor)
-        let top = playerView.topAnchor.constraint(equalTo: inlineView.topAnchor)
-        let bottom = playerView.bottomAnchor.constraint(equalTo: inlineView.bottomAnchor)
-        NSLayoutConstraint.activate([leading, trailing, top, bottom])
-
-        let placement = try XCTUnwrap(MPVPictureInPictureViewPlacement(playerView: playerView))
-        let internalConstraints = playerView.constraints
-        XCTAssertFalse(internalConstraints.isEmpty)
-        placement.movePlayer(to: pictureInPictureView)
-        XCTAssertTrue(playerView.superview === pictureInPictureView)
-        XCTAssertFalse(leading.isActive)
-        XCTAssertTrue(internalConstraints.allSatisfy(\.isActive))
-        XCTAssertTrue(playerView.metalLayer.superlayer === playerView.layer)
-
-        placement.restorePlayer()
-        XCTAssertTrue(playerView.superview === inlineView)
-        XCTAssertTrue(leading.isActive)
-        XCTAssertTrue(playerView.metalLayer.superlayer === playerView.layer)
+    func testPictureInPictureFrameUpdatesOnlyWhileStartingOrActive() {
+        XCTAssertTrue(MPVPictureInPictureFrameUpdatePolicy.shouldKeepUpdating(
+            isActive: true,
+            isStarting: false,
+            isWaitingForStart: false
+        ))
+        XCTAssertTrue(MPVPictureInPictureFrameUpdatePolicy.shouldKeepUpdating(
+            isActive: false,
+            isStarting: true,
+            isWaitingForStart: false
+        ))
+        XCTAssertTrue(MPVPictureInPictureFrameUpdatePolicy.shouldKeepUpdating(
+            isActive: false,
+            isStarting: false,
+            isWaitingForStart: true
+        ))
+        XCTAssertFalse(MPVPictureInPictureFrameUpdatePolicy.shouldKeepUpdating(
+            isActive: false,
+            isStarting: false,
+            isWaitingForStart: false
+        ))
     }
 
-    func testPictureInPictureStartCancellationPreventsViewMigration() {
-        XCTAssertFalse(
-            MPVPictureInPictureStartCancellationPolicy.shouldMovePlayer(
-                isStarting: true,
-                isActive: false,
-                isCancellationRequested: true
-            )
-        )
-        XCTAssertTrue(
-            MPVPictureInPictureStartCancellationPolicy.shouldMovePlayer(
-                isStarting: true,
-                isActive: false,
-                isCancellationRequested: false
-            )
-        )
-        XCTAssertFalse(
-            MPVPictureInPictureStartCancellationPolicy.shouldPostInactiveState(
-                hasPostedActiveState: false,
-                isStartCancellationRequested: true
-            )
-        )
-        XCTAssertFalse(
-            MPVPictureInPictureStartCancellationPolicy.shouldPostInactiveState(
-                hasPostedActiveState: true,
-                isStartCancellationRequested: true
-            )
-        )
-        XCTAssertTrue(
-            MPVPictureInPictureStartCancellationPolicy.shouldPostInactiveState(
-                hasPostedActiveState: true,
-                isStartCancellationRequested: false
-            )
-        )
+    func testCancellingAnInProgressStartStopsTheSystemStartAndSuppressesInactiveState() {
+        XCTAssertTrue(MPVPictureInPictureStartCancellationPolicy.shouldStopSystemController(
+            isStarting: true
+        ))
+        XCTAssertFalse(MPVPictureInPictureStartCancellationPolicy.shouldStopSystemController(
+            isStarting: false
+        ))
+        XCTAssertFalse(MPVPictureInPictureStartCancellationPolicy.shouldPostInactiveState(
+            hasPostedActiveState: false,
+            isStartCancellationRequested: true
+        ))
     }
 
-    @MainActor
-    func testPictureInPictureDoesNotCloneInternalLayoutGuideConstraints() throws {
-        let inlineView = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 219))
-        let playerView = MPVPlayerView(frame: inlineView.bounds)
-        let subtitleView = UIView()
-        let customGuide = UILayoutGuide()
-        playerView.addSubview(subtitleView)
-        subtitleView.addLayoutGuide(customGuide)
-        inlineView.addSubview(playerView)
+    func testFirstStartFailureDoesNotPublishInactiveState() {
+        XCTAssertFalse(MPVPictureInPictureStartCancellationPolicy.shouldPostInactiveState(
+            hasPostedActiveState: false,
+            isStartCancellationRequested: false
+        ))
+    }
 
-        let safeAreaConstraint = playerView.leadingAnchor.constraint(
-            equalTo: subtitleView.safeAreaLayoutGuide.leadingAnchor
-        )
-        let customGuideConstraint = playerView.trailingAnchor.constraint(
-            equalTo: customGuide.trailingAnchor
-        )
-        NSLayoutConstraint.activate([safeAreaConstraint, customGuideConstraint])
-
-        let placement = try XCTUnwrap(MPVPictureInPictureViewPlacement(playerView: playerView))
-        placement.movePlayer(to: UIView(frame: inlineView.bounds))
-
-        XCTAssertTrue(safeAreaConstraint.isActive)
-        XCTAssertTrue(customGuideConstraint.isActive)
+    func testStoppingAnActivePictureInPicturePublishesInactiveState() {
+        XCTAssertTrue(MPVPictureInPictureStartCancellationPolicy.shouldPostInactiveState(
+            hasPostedActiveState: true,
+            isStartCancellationRequested: false
+        ))
     }
 
     @MainActor

@@ -1,22 +1,7 @@
 import AVKit
+import CoreMedia
+import QuartzCore
 import UIKit
-
-enum MPVPictureInPictureStartCancellationPolicy {
-    static func shouldMovePlayer(
-        isStarting: Bool,
-        isActive: Bool,
-        isCancellationRequested: Bool
-    ) -> Bool {
-        isCancellationRequested == false && (isStarting || isActive)
-    }
-
-    static func shouldPostInactiveState(
-        hasPostedActiveState: Bool,
-        isStartCancellationRequested: Bool
-    ) -> Bool {
-        hasPostedActiveState && isStartCancellationRequested == false
-    }
-}
 
 enum MPVPictureInPictureContentSize {
     static let fallback = CGSize(width: 16, height: 9)
@@ -31,297 +16,138 @@ enum MPVPictureInPictureContentSize {
     }
 }
 
-/// Keeps the inline anchor visible while the player view is hosted by the
-/// system Picture in Picture controller. The video-call ContentSource API is
-/// available on iOS 15 and is the only public API that can host a UIView.
-@MainActor
-private final class MPVPictureInPictureContentViewController:
-    AVPictureInPictureVideoCallViewController
-{
-    weak var coordinator: MPVPictureInPictureCoordinator?
-
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        view.backgroundColor = .black
-        view.clipsToBounds = true
+enum MPVPictureInPictureStartCancellationPolicy {
+    static func shouldStopSystemController(isStarting: Bool) -> Bool {
+        isStarting
     }
 
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        coordinator?.movePlayerToPictureInPictureContainer(view)
-    }
-
-    override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
-        coordinator?.restorePlayerToInlineHierarchy()
+    static func shouldPostInactiveState(
+        hasPostedActiveState: Bool,
+        isStartCancellationRequested: Bool
+    ) -> Bool {
+        hasPostedActiveState && isStartCancellationRequested == false
     }
 }
 
-@MainActor
-final class MPVPictureInPictureViewPlacement {
-    private weak var playerView: MPVPlayerView?
-    private weak var originalSuperview: UIView?
-    private let originalSubviewIndex: Int
-    private let originalFrame: CGRect
-    private let originalAutoresizingMask: UIView.AutoresizingMask
-    private let originalTranslatesAutoresizingMaskIntoConstraints: Bool
-    let sourceView = UIView()
-    private var originalConstraints: [NSLayoutConstraint] = []
-    private var sourceConstraints: [NSLayoutConstraint] = []
-    private var pictureInPictureConstraints: [NSLayoutConstraint] = []
-    private(set) var isPlayerInPictureInPictureContainer = false
-
-    init?(playerView: MPVPlayerView) {
-        guard let superview = playerView.superview,
-              let index = superview.subviews.firstIndex(of: playerView)
-        else {
-            return nil
-        }
-
-        self.playerView = playerView
-        originalSuperview = superview
-        originalSubviewIndex = index
-        originalFrame = playerView.frame
-        originalAutoresizingMask = playerView.autoresizingMask
-        originalTranslatesAutoresizingMaskIntoConstraints =
-            playerView.translatesAutoresizingMaskIntoConstraints
-
-        sourceView.backgroundColor = .clear
-        sourceView.isUserInteractionEnabled = false
-        sourceView.accessibilityElementsHidden = true
-        installSourceView(below: playerView, in: superview, at: index)
-    }
-
-    func movePlayer(to containerView: UIView) {
-        guard isPlayerInPictureInPictureContainer == false,
-              let playerView
-        else {
-            return
-        }
-
-        originalConstraints.forEach { $0.isActive = false }
-        playerView.removeFromSuperview()
-        playerView.translatesAutoresizingMaskIntoConstraints = false
-        containerView.addSubview(playerView)
-        pictureInPictureConstraints = [
-            playerView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor),
-            playerView.trailingAnchor.constraint(equalTo: containerView.trailingAnchor),
-            playerView.topAnchor.constraint(equalTo: containerView.topAnchor),
-            playerView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
-        ]
-        NSLayoutConstraint.activate(pictureInPictureConstraints)
-        isPlayerInPictureInPictureContainer = true
-    }
-
-    func restorePlayer() {
-        guard isPlayerInPictureInPictureContainer,
-              let playerView,
-              let originalSuperview
-        else {
-            return
-        }
-
-        pictureInPictureConstraints.forEach { $0.isActive = false }
-        pictureInPictureConstraints.removeAll()
-        playerView.removeFromSuperview()
-        let insertionIndex = min(originalSubviewIndex, originalSuperview.subviews.count)
-        originalSuperview.insertSubview(playerView, at: insertionIndex)
-        playerView.translatesAutoresizingMaskIntoConstraints =
-            originalTranslatesAutoresizingMaskIntoConstraints
-        playerView.autoresizingMask = originalAutoresizingMask
-        playerView.frame = originalFrame
-        originalConstraints.forEach { $0.isActive = true }
-        isPlayerInPictureInPictureContainer = false
-    }
-
-    func tearDown() {
-        restorePlayer()
-        sourceConstraints.forEach { $0.isActive = false }
-        sourceConstraints.removeAll()
-        sourceView.removeFromSuperview()
-    }
-
-    private func installSourceView(
-        below playerView: MPVPlayerView,
-        in superview: UIView,
-        at index: Int
-    ) {
-        sourceView.frame = playerView.frame
-        sourceView.autoresizingMask = playerView.autoresizingMask
-        sourceView.translatesAutoresizingMaskIntoConstraints =
-            playerView.translatesAutoresizingMaskIntoConstraints
-        superview.insertSubview(sourceView, at: min(index + 1, superview.subviews.count))
-
-        guard playerView.translatesAutoresizingMaskIntoConstraints == false else {
-            return
-        }
-
-        originalConstraints = constraintsReferencing(playerView, from: superview)
-        sourceConstraints = originalConstraints.compactMap {
-            replacement(for: $0, replacing: playerView, with: sourceView)
-        }
-        NSLayoutConstraint.activate(sourceConstraints)
-    }
-
-    private func constraintsReferencing(
-        _ view: UIView,
-        from superview: UIView
-    ) -> [NSLayoutConstraint] {
-        var constraints: [NSLayoutConstraint] = []
-        var current: UIView? = superview
-        while let container = current {
-            constraints += container.constraints.filter {
-                ($0.firstItem as AnyObject?) === view ||
-                    ($0.secondItem as AnyObject?) === view
-            }
-            current = container.superview
-        }
-        constraints += view.constraints
-        constraints = constraints.filter { constraint in
-            let firstItem = constraint.firstItem as AnyObject?
-            let secondItem = constraint.secondItem as AnyObject?
-            guard firstItem === view || secondItem === view else { return false }
-            let otherItem = firstItem === view ? constraint.secondItem : constraint.firstItem
-            guard let otherView = owningView(for: otherItem) else { return true }
-            return otherView !== view && otherView.isDescendant(of: view) == false
-        }
-        return Array(Set(constraints)).filter(\.isActive)
-    }
-
-    private func owningView(for item: Any?) -> UIView? {
-        if let view = item as? UIView {
-            return view
-        }
-        if let guide = item as? UILayoutGuide {
-            return guide.owningView
-        }
-        return nil
-    }
-
-    private func replacement(
-        for constraint: NSLayoutConstraint,
-        replacing playerView: MPVPlayerView,
-        with sourceView: UIView
-    ) -> NSLayoutConstraint? {
-        let firstItem = constraint.firstItem as AnyObject?
-        let secondItem = constraint.secondItem as AnyObject?
-        let replacement = NSLayoutConstraint(
-            item: firstItem === playerView ? sourceView : (constraint.firstItem as AnyObject),
-            attribute: constraint.firstAttribute,
-            relatedBy: constraint.relation,
-            toItem: secondItem === playerView ? sourceView : (constraint.secondItem as AnyObject?),
-            attribute: constraint.secondAttribute,
-            multiplier: constraint.multiplier,
-            constant: constraint.constant
-        )
-        replacement.priority = constraint.priority
-        replacement.identifier = constraint.identifier
-        return replacement
+enum MPVPictureInPictureFrameUpdatePolicy {
+    static func shouldKeepUpdating(
+        isActive: Bool,
+        isStarting: Bool,
+        isWaitingForStart: Bool
+    ) -> Bool {
+        isActive || isStarting || isWaitingForStart
     }
 }
 
 @MainActor
 final class MPVPictureInPictureCoordinator:
     NSObject,
-    @preconcurrency AVPictureInPictureControllerDelegate
+    @preconcurrency AVPictureInPictureControllerDelegate,
+    @preconcurrency AVPictureInPictureSampleBufferPlaybackDelegate
 {
     weak var playerView: MPVPlayerView?
-    private var placement: MPVPictureInPictureViewPlacement?
-    private var contentViewController: MPVPictureInPictureContentViewController?
-    private var controller: AVPictureInPictureController?
+    private let sampleBufferDisplayLayer = AVSampleBufferDisplayLayer()
+    private lazy var controller: AVPictureInPictureController = {
+        let source = AVPictureInPictureController.ContentSource(
+            sampleBufferDisplayLayer: sampleBufferDisplayLayer,
+            playbackDelegate: self
+        )
+        return AVPictureInPictureController(contentSource: source)
+    }()
+    private let frameProcessingQueue = DispatchQueue(
+        label: "com.mpvplayerkit.picture-in-picture.frames",
+        qos: .userInitiated
+    )
+    private let frameConverter = MPVPictureInPictureFrameConverter()
+    private var frameTimer: DispatchSourceTimer?
+    private var isCapturingFrame = false
+    private var shouldStartAfterFirstFrame = false
     private var isStarting = false
     private var isStartCancellationRequested = false
     private var hasPostedActiveState = false
+    private var consecutiveFrameCaptureFailures = 0
+    private var frameCaptureGeneration: UInt64 = 0
+    private var preferredRenderSize = CMVideoDimensions(width: 0, height: 0)
+    private var playbackTimebase: CMTimebase?
+    nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
 
     var allowsAutomaticStartFromInline: Bool {
         didSet {
-            prepareControllerIfPossible()
-            controller?.canStartPictureInPictureAutomaticallyFromInline =
+            controller.canStartPictureInPictureAutomaticallyFromInline =
                 allowsAutomaticStartFromInline
-            if allowsAutomaticStartFromInline == false, isActive == false {
-                tearDownController()
+            if allowsAutomaticStartFromInline {
+                resumeAutomaticReadinessUpdates()
+            } else if isActive == false {
+                stopFrameUpdates()
             }
         }
     }
 
-    var isActive: Bool {
-        controller?.isPictureInPictureActive == true
-    }
+    var isActive: Bool { controller.isPictureInPictureActive }
 
     init?(playerView: MPVPlayerView, allowsAutomaticStartFromInline: Bool) {
-        guard #available(iOS 15.0, *),
-              AVPictureInPictureController.isPictureInPictureSupported()
-        else {
-            return nil
-        }
+        guard AVPictureInPictureController.isPictureInPictureSupported() else { return nil }
         self.playerView = playerView
         self.allowsAutomaticStartFromInline = allowsAutomaticStartFromInline
+        sampleBufferDisplayLayer.videoGravity = .resizeAspect
         super.init()
-        prepareControllerIfPossible()
+        configurePlaybackTimebase()
+        controller.delegate = self
+        controller.canStartPictureInPictureAutomaticallyFromInline =
+            allowsAutomaticStartFromInline
+        installSourceLayer(in: playerView)
+        observePlaybackState(of: playerView)
     }
 
     deinit {
-        MainActor.assumeIsolated { placement?.tearDown() }
+        frameTimer?.setEventHandler {}
+        frameTimer?.cancel()
+        observers.forEach(NotificationCenter.default.removeObserver)
     }
 
     func start() {
-        guard isActive == false, isStarting == false else { return }
-        prepareControllerIfPossible()
-        guard let controller else { return }
-        updatePreferredContentSize()
+        guard isActive == false, isStarting == false, shouldStartAfterFirstFrame == false else { return }
+        installSourceLayerIfNeeded()
         isStartCancellationRequested = false
-        isStarting = true
-        controller.startPictureInPicture()
+        shouldStartAfterFirstFrame = true
+        startFrameUpdates(every: .milliseconds(100))
+        captureAndEnqueueFrame()
     }
 
     func stop() {
-        guard let controller else {
-            restorePlayerToInlineHierarchy()
-            return
-        }
-        if controller.isPictureInPictureActive == false, isStarting {
+        if MPVPictureInPictureStartCancellationPolicy.shouldStopSystemController(
+            isStarting: isStarting
+        ) {
             isStartCancellationRequested = true
+            shouldStartAfterFirstFrame = false
+            stopFrameUpdates()
             controller.stopPictureInPicture()
-            restorePlayerToInlineHierarchy()
             return
         }
-        isStarting = false
-        guard controller.isPictureInPictureActive else {
-            restorePlayerToInlineHierarchy()
+        guard isActive else {
+            shouldStartAfterFirstFrame = false
+            stopFrameUpdates()
+            resumeAutomaticReadinessUpdates()
             return
         }
         controller.stopPictureInPicture()
     }
 
     func playerViewHierarchyDidChange() {
-        prepareControllerIfPossible()
+        installSourceLayerIfNeeded()
     }
 
     func playerVideoDisplaySizeDidChange() {
-        updatePreferredContentSize()
-    }
-
-    func movePlayerToPictureInPictureContainer(_ containerView: UIView) {
-        guard MPVPictureInPictureStartCancellationPolicy.shouldMovePlayer(
-            isStarting: isStarting,
-            isActive: isActive,
-            isCancellationRequested: isStartCancellationRequested
-        ) else {
-            return
-        }
-        placement?.movePlayer(to: containerView)
-    }
-
-    func restorePlayerToInlineHierarchy() {
-        placement?.restorePlayer()
+        // The raw screenshot preserves this display aspect ratio. Its actual
+        // pixel dimensions are pooled by the frame converter.
+        installSourceLayerIfNeeded()
     }
 
     func pictureInPictureControllerWillStartPictureInPicture(
         _ pictureInPictureController: AVPictureInPictureController
     ) {
-        if isStartCancellationRequested {
+        guard isStartCancellationRequested == false else {
             pictureInPictureController.stopPictureInPicture()
-            restorePlayerToInlineHierarchy()
             return
         }
         isStarting = true
@@ -330,12 +156,14 @@ final class MPVPictureInPictureCoordinator:
     func pictureInPictureControllerDidStartPictureInPicture(
         _ pictureInPictureController: AVPictureInPictureController
     ) {
-        if isStartCancellationRequested {
+        guard isStartCancellationRequested == false else {
             pictureInPictureController.stopPictureInPicture()
-            restorePlayerToInlineHierarchy()
             return
         }
         isStarting = false
+        startFrameUpdates(every: .milliseconds(100))
+        synchronizePlaybackTimebase()
+        invalidatePlaybackState()
         hasPostedActiveState = true
         postStateChange(isActive: true)
     }
@@ -344,38 +172,37 @@ final class MPVPictureInPictureCoordinator:
         _ pictureInPictureController: AVPictureInPictureController,
         failedToStartPictureInPictureWithError error: any Error
     ) {
-        let shouldPostInactiveState = hasPostedActiveState
-        let wasStartCancellationRequested = isStartCancellationRequested
+        let shouldPostInactiveState = MPVPictureInPictureStartCancellationPolicy
+            .shouldPostInactiveState(
+                hasPostedActiveState: hasPostedActiveState,
+                isStartCancellationRequested: isStartCancellationRequested
+            )
         isStarting = false
         isStartCancellationRequested = false
-        restorePlayerToInlineHierarchy()
-        if MPVPictureInPictureStartCancellationPolicy.shouldPostInactiveState(
-            hasPostedActiveState: shouldPostInactiveState,
-            isStartCancellationRequested: wasStartCancellationRequested
-        ) {
-            hasPostedActiveState = false
+        shouldStartAfterFirstFrame = false
+        stopFrameUpdates()
+        resumeAutomaticReadinessUpdates()
+        hasPostedActiveState = false
+        if shouldPostInactiveState {
             postStateChange(isActive: false)
         }
-    }
-
-    func pictureInPictureControllerWillStopPictureInPicture(
-        _ pictureInPictureController: AVPictureInPictureController
-    ) {
-        restorePlayerToInlineHierarchy()
     }
 
     func pictureInPictureControllerDidStopPictureInPicture(
         _ pictureInPictureController: AVPictureInPictureController
     ) {
-        let wasStartCancellationRequested = isStartCancellationRequested
+        let shouldPostInactiveState = MPVPictureInPictureStartCancellationPolicy
+            .shouldPostInactiveState(
+                hasPostedActiveState: hasPostedActiveState,
+                isStartCancellationRequested: isStartCancellationRequested
+            )
         isStarting = false
         isStartCancellationRequested = false
-        restorePlayerToInlineHierarchy()
-        if MPVPictureInPictureStartCancellationPolicy.shouldPostInactiveState(
-            hasPostedActiveState: hasPostedActiveState,
-            isStartCancellationRequested: wasStartCancellationRequested
-        ) {
-            hasPostedActiveState = false
+        shouldStartAfterFirstFrame = false
+        stopFrameUpdates()
+        resumeAutomaticReadinessUpdates()
+        hasPostedActiveState = false
+        if shouldPostInactiveState {
             postStateChange(isActive: false)
         }
     }
@@ -385,48 +212,207 @@ final class MPVPictureInPictureCoordinator:
         restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler:
             @escaping (Bool) -> Void
     ) {
-        restorePlayerToInlineHierarchy()
         completionHandler(true)
     }
 
-    private func prepareControllerIfPossible() {
-        guard controller == nil,
-              let playerView,
-              playerView.superview != nil,
-              playerView.window != nil,
-              let placement = MPVPictureInPictureViewPlacement(playerView: playerView)
-        else {
+    func pictureInPictureController(
+        _ pictureInPictureController: AVPictureInPictureController,
+        setPlaying playing: Bool
+    ) {
+        if playing { playerView?.play() } else { playerView?.pause() }
+        synchronizePlaybackTimebase()
+        invalidatePlaybackState()
+    }
+
+    func pictureInPictureControllerTimeRangeForPlayback(
+        _ pictureInPictureController: AVPictureInPictureController
+    ) -> CMTimeRange {
+        MPVSystemPlaybackControls.timeRange(duration: playerView?.duration ?? 0)
+    }
+
+    func pictureInPictureControllerIsPlaybackPaused(
+        _ pictureInPictureController: AVPictureInPictureController
+    ) -> Bool {
+        playerView?.isPlaying != true
+    }
+
+    func pictureInPictureController(
+        _ pictureInPictureController: AVPictureInPictureController,
+        didTransitionToRenderSize newRenderSize: CMVideoDimensions
+    ) {
+        preferredRenderSize = newRenderSize
+    }
+
+    func pictureInPictureController(
+        _ pictureInPictureController: AVPictureInPictureController,
+        skipByInterval skipInterval: CMTime,
+        completion: @escaping () -> Void
+    ) {
+        defer { completion() }
+        guard let playerView else { return }
+        let interval = MPVSystemPlaybackControls.fixedSkipInterval(
+            requestedInterval: skipInterval.seconds
+        )
+        let target = MPVSystemPlaybackControls.seekTarget(
+            currentTime: playerView.currentTime,
+            duration: playerView.duration,
+            offset: interval
+        )
+        guard playerView.seek(["time": target, "autoPlay": false] as NSDictionary) else {
             return
         }
-
-        let contentViewController = MPVPictureInPictureContentViewController()
-        contentViewController.coordinator = self
-        contentViewController.preferredContentSize = playerView.pictureInPicturePreferredContentSize
-        let source = AVPictureInPictureController.ContentSource(
-            activeVideoCallSourceView: placement.sourceView,
-            contentViewController: contentViewController
-        )
-        let controller = AVPictureInPictureController(contentSource: source)
-        controller.delegate = self
-        controller.canStartPictureInPictureAutomaticallyFromInline =
-            allowsAutomaticStartFromInline
-        self.placement = placement
-        self.contentViewController = contentViewController
-        self.controller = controller
+        synchronizePlaybackTimebase(to: target)
+        captureAndEnqueueFrame()
+        invalidatePlaybackState()
     }
 
-    private func updatePreferredContentSize() {
+    func pictureInPictureControllerShouldProhibitBackgroundAudioPlayback(
+        _ pictureInPictureController: AVPictureInPictureController
+    ) -> Bool { false }
+
+    private func installSourceLayer(in playerView: MPVPlayerView) {
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        sampleBufferDisplayLayer.frame = playerView.bounds
+        sampleBufferDisplayLayer.backgroundColor = UIColor.black.cgColor
+        if sampleBufferDisplayLayer.superlayer !== playerView.layer {
+            playerView.layer.insertSublayer(sampleBufferDisplayLayer, below: playerView.metalLayer)
+        }
+        CATransaction.commit()
+    }
+
+    private func installSourceLayerIfNeeded() {
         guard let playerView else { return }
-        contentViewController?.preferredContentSize = playerView.pictureInPicturePreferredContentSize
+        installSourceLayer(in: playerView)
     }
 
-    private func tearDownController() {
-        guard isActive == false, isStarting == false else { return }
-        controller?.delegate = nil
-        controller = nil
-        contentViewController = nil
-        placement?.tearDown()
-        placement = nil
+    private func observePlaybackState(of playerView: MPVPlayerView) {
+        let center = NotificationCenter.default
+        [MPVPlayerKitNotification.didChangeState, MPVPlayerKitNotification.didUpdateTime]
+            .forEach { name in
+                observers.append(center.addObserver(
+                    forName: name,
+                    object: playerView,
+                    queue: .main
+                ) { [weak self] _ in
+                    MainActor.assumeIsolated {
+                        self?.synchronizePlaybackTimebase()
+                        self?.invalidatePlaybackState()
+                    }
+                })
+            }
+    }
+
+    private func configurePlaybackTimebase() {
+        var timebase: CMTimebase?
+        guard CMTimebaseCreateWithSourceClock(
+            allocator: kCFAllocatorDefault,
+            sourceClock: CMClockGetHostTimeClock(),
+            timebaseOut: &timebase
+        ) == noErr, let timebase else { return }
+        playbackTimebase = timebase
+        sampleBufferDisplayLayer.controlTimebase = timebase
+        synchronizePlaybackTimebase()
+    }
+
+    private func synchronizePlaybackTimebase(to time: TimeInterval? = nil) {
+        guard let playbackTimebase, let playerView else { return }
+        CMTimebaseSetTime(
+            playbackTimebase,
+            time: CMTime(seconds: max(0, time ?? playerView.currentTime), preferredTimescale: 600)
+        )
+        CMTimebaseSetRate(playbackTimebase, rate: playerView.isPlaying ? 1 : 0)
+    }
+
+    private func invalidatePlaybackState() {
+        controller.invalidatePlaybackState()
+    }
+
+    private func startFrameUpdates(every interval: DispatchTimeInterval) {
+        stopFrameUpdates()
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now(), repeating: interval, leeway: .milliseconds(25))
+        timer.setEventHandler { [weak self] in
+            MainActor.assumeIsolated { self?.captureAndEnqueueFrame() }
+        }
+        frameTimer = timer
+        timer.resume()
+    }
+
+    private func stopFrameUpdates() {
+        frameTimer?.setEventHandler {}
+        frameTimer?.cancel()
+        frameTimer = nil
+        frameCaptureGeneration &+= 1
+    }
+
+    private func resumeAutomaticReadinessUpdates() {
+        guard allowsAutomaticStartFromInline else { return }
+        startFrameUpdates(every: .milliseconds(500))
+    }
+
+    private func captureAndEnqueueFrame() {
+        guard isCapturingFrame == false, let playerView else { return }
+        guard playerView.isPlaying || shouldStartAfterFirstFrame else { return }
+        let generation = frameCaptureGeneration
+        let frameProcessingQueue = frameProcessingQueue
+        let frameConverter = frameConverter
+        let preferredRenderSize = preferredRenderSize
+        isCapturingFrame = true
+        playerView.capturePictureInPictureFrame { [weak self] frame in
+            frameProcessingQueue.async {
+                let sampleBuffer = frame.flatMap {
+                    frameConverter.makeSampleBuffer(from: $0, renderSize: preferredRenderSize)
+                }
+                DispatchQueue.main.async {
+                    guard let self else { return }
+                    self.isCapturingFrame = false
+                    guard generation == self.frameCaptureGeneration else { return }
+                    guard let frame, let sampleBuffer else {
+                        self.handleFrameCaptureFailure()
+                        return
+                    }
+                    self.consecutiveFrameCaptureFailures = 0
+                    self.synchronizePlaybackTimebase(to: frame.presentationTime)
+                    self.enqueue(sampleBuffer)
+                    let wasWaitingForStart = self.shouldStartAfterFirstFrame
+                    if wasWaitingForStart {
+                        self.shouldStartAfterFirstFrame = false
+                        guard self.isStartCancellationRequested == false else {
+                            self.stopFrameUpdates()
+                            self.resumeAutomaticReadinessUpdates()
+                            return
+                        }
+                        self.isStarting = true
+                        self.controller.startPictureInPicture()
+                    }
+                    if MPVPictureInPictureFrameUpdatePolicy.shouldKeepUpdating(
+                        isActive: self.isActive,
+                        isStarting: self.isStarting,
+                        isWaitingForStart: self.shouldStartAfterFirstFrame
+                    ) == false {
+                        self.stopFrameUpdates()
+                    }
+                }
+            }
+        }
+    }
+
+    private func enqueue(_ sampleBuffer: CMSampleBuffer) {
+        if #available(iOS 17.0, *) {
+            let renderer = sampleBufferDisplayLayer.sampleBufferRenderer
+            if renderer.status == .failed { renderer.flush() }
+            renderer.enqueue(sampleBuffer)
+        } else {
+            if sampleBufferDisplayLayer.status == .failed { sampleBufferDisplayLayer.flush() }
+            sampleBufferDisplayLayer.enqueue(sampleBuffer)
+        }
+    }
+
+    private func handleFrameCaptureFailure() {
+        consecutiveFrameCaptureFailures += 1
+        guard consecutiveFrameCaptureFailures == 3 else { return }
+        startFrameUpdates(every: .milliseconds(500))
     }
 
     private func postStateChange(isActive: Bool) {
@@ -469,9 +455,7 @@ public extension MPVPlayerView {
 
 extension MPVPlayerView {
     var pictureInPicturePreferredContentSize: CGSize {
-        MPVPictureInPictureContentSize.resolve(
-            videoDisplaySize: pictureInPictureVideoDisplaySize
-        )
+        MPVPictureInPictureContentSize.resolve(videoDisplaySize: pictureInPictureVideoDisplaySize)
     }
 
     func updatePictureInPictureVideoDisplaySize(_ size: CGSize) {

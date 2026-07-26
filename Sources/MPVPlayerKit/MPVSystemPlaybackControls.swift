@@ -1,7 +1,13 @@
+import CoreMedia
 import MediaPlayer
 
 enum MPVSystemPlaybackControls {
     static let skipInterval: TimeInterval = 15
+
+    static func fixedSkipInterval(requestedInterval: TimeInterval) -> TimeInterval {
+        guard requestedInterval.isFinite, requestedInterval != 0 else { return 0 }
+        return requestedInterval < 0 ? -skipInterval : skipInterval
+    }
 
     static func seekTarget(
         currentTime: TimeInterval,
@@ -11,6 +17,14 @@ enum MPVSystemPlaybackControls {
         let target = max(0, currentTime + offset)
         guard duration.isFinite, duration > 0 else { return target }
         return min(target, duration)
+    }
+
+    static func timeRange(duration: TimeInterval) -> CMTimeRange {
+        guard duration.isFinite, duration > 0 else { return .invalid }
+        return CMTimeRange(
+            start: .zero,
+            duration: CMTime(seconds: duration, preferredTimescale: 600)
+        )
     }
 }
 
