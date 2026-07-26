@@ -181,12 +181,6 @@ final class MPVPictureInPictureCoordinator:
         installSourceLayerIfNeeded()
     }
 
-    /// Keeps the Picture in Picture window on the fit/fill mode of the inline
-    /// player instead of always letterboxing.
-    func playerContentModeDidChange() {
-        updateVideoGravity()
-    }
-
     /// Playback rate, pause state or duration changed outside of AVKit.
     func playbackStateDidChange() {
         synchronizePlaybackTimebase()
@@ -388,13 +382,13 @@ final class MPVPictureInPictureCoordinator:
         installSourceLayer(in: playerView)
     }
 
+    /// Captured frames carry the display aspect ratio of the video, so the
+    /// window is shaped like the video and this never letterboxes. It stays
+    /// `resizeAspect` so a frame whose aspect ratio changed mid-playback is
+    /// letterboxed for a moment instead of being cropped.
     private func updateVideoGravity() {
-        let contentMode = playerView?.currentContentModeSnapshot() ?? .fit
-        let videoGravity: AVLayerVideoGravity = contentMode == .fill
-            ? .resizeAspectFill
-            : .resizeAspect
-        guard sampleBufferDisplayLayer.videoGravity != videoGravity else { return }
-        sampleBufferDisplayLayer.videoGravity = videoGravity
+        guard sampleBufferDisplayLayer.videoGravity != .resizeAspect else { return }
+        sampleBufferDisplayLayer.videoGravity = .resizeAspect
     }
 
     private func observePlaybackState(of playerView: MPVPlayerView) {

@@ -584,53 +584,122 @@ final class MPVPictureInPictureTests: XCTestCase {
         // A portrait window with the video letterboxed in the middle, as MPV
         // reported on an iPhone 15 Pro: video display (0, 946) 1179x663.
         XCTAssertEqual(
-            MPVPictureInPictureWindowCrop.resolve(
+            MPVPictureInPictureVideoRect.resolve(
                 frameWidth: 1179,
                 frameHeight: 2556,
                 left: 0,
                 top: 946,
                 right: 0,
-                bottom: 947
+                bottom: 947,
+                displayWidth: 3840,
+                displayHeight: 2160
             ),
             MPVPictureInPictureCropRect(x: 0, y: 946, width: 1179, height: 663)
         )
     }
 
-    func testWindowCropFallsBackToTheWholeFrameForUnusableMargins() {
-        let full = MPVPictureInPictureCropRect(x: 0, y: 0, width: 1179, height: 2556)
+    func testWindowCropUsesTheDisplayAspectWhenMarginsAreUnavailable() {
+        // Unreadable margins would otherwise leave the black bars in the frame
+        // and give the window the shape of the drawable.
+        let crop = MPVPictureInPictureVideoRect.resolve(
+            frameWidth: 1179,
+            frameHeight: 2556,
+            left: 0,
+            top: 0,
+            right: 0,
+            bottom: 0,
+            displayWidth: 3840,
+            displayHeight: 2160
+        )
+
+        XCTAssertEqual(crop.width, 1179)
+        XCTAssertEqual(crop.height, 663)
+        XCTAssertEqual(crop.x, 0)
+        XCTAssertEqual(crop.y, 946)
+    }
+
+    func testWindowCropKeepsTheWholeFrameWithoutADisplayAspect() {
         XCTAssertEqual(
-            MPVPictureInPictureWindowCrop.resolve(
+            MPVPictureInPictureVideoRect.resolve(
                 frameWidth: 1179,
                 frameHeight: 2556,
                 left: 0,
                 top: 0,
                 right: 0,
-                bottom: 0
+                bottom: 0,
+                displayWidth: 0,
+                displayHeight: 0
             ),
-            full
+            MPVPictureInPictureCropRect(x: 0, y: 0, width: 1179, height: 2556)
         )
         XCTAssertEqual(
-            MPVPictureInPictureWindowCrop.resolve(
+            MPVPictureInPictureVideoRect.resolve(
                 frameWidth: 1179,
                 frameHeight: 2556,
                 left: 700,
                 top: 0,
                 right: 700,
-                bottom: 0
+                bottom: 0,
+                displayWidth: 0,
+                displayHeight: 0
             ),
-            full
+            MPVPictureInPictureCropRect(x: 0, y: 0, width: 1179, height: 2556)
         )
+    }
+
+    func testOutputSizeKeepsTheDisplayAspectOfAnamorphicVideo() {
+        // Stored 1920x1080 shown at 2538x1080: the frame has to carry the
+        // display aspect, or the Picture in Picture window is the wrong shape.
+        let size = MPVPictureInPictureOutputSize.resolve(
+            cropWidth: 1920,
+            cropHeight: 1080,
+            displayWidth: 2538,
+            displayHeight: 1080,
+            renderSize: CMVideoDimensions(width: 1280, height: 720)
+        )
+
         XCTAssertEqual(
-            MPVPictureInPictureWindowCrop.resolve(
-                frameWidth: 1179,
-                frameHeight: 2556,
-                left: -1,
-                top: 946,
-                right: 0,
-                bottom: 947
-            ),
-            full
+            Double(size.width) / Double(size.height),
+            2538.0 / 1080.0,
+            accuracy: 0.01
         )
+        XCTAssertLessThanOrEqual(size.width, 1280)
+        XCTAssertLessThanOrEqual(size.height, 720)
+    }
+
+    func testOutputSizeFitsSquarePixelVideoInTheRenderBudget() {
+        let size = MPVPictureInPictureOutputSize.resolve(
+            cropWidth: 3840,
+            cropHeight: 2160,
+            displayWidth: 3840,
+            displayHeight: 2160,
+            renderSize: CMVideoDimensions(width: 1280, height: 720)
+        )
+
+        XCTAssertEqual(size.width, 1280)
+        XCTAssertEqual(size.height, 720)
+    }
+
+    func testOutputSizeFallsBackToTheCropAspectAndNeverUpscales() {
+        let unknownDisplay = MPVPictureInPictureOutputSize.resolve(
+            cropWidth: 1179,
+            cropHeight: 663,
+            displayWidth: 0,
+            displayHeight: 0,
+            renderSize: CMVideoDimensions(width: 1280, height: 720)
+        )
+        XCTAssertEqual(unknownDisplay.width, 1179)
+        XCTAssertEqual(unknownDisplay.height, 663)
+
+        let smallSource = MPVPictureInPictureOutputSize.resolve(
+            cropWidth: 640,
+            cropHeight: 360,
+            displayWidth: 640,
+            displayHeight: 360,
+            renderSize: CMVideoDimensions(width: 1280, height: 720)
+        )
+        XCTAssertEqual(smallSource.width, 640)
+        XCTAssertEqual(smallSource.height, 360)
     }
 
     func testRendererInvariantOptionMapUsesLastValueForDuplicateKeys() {

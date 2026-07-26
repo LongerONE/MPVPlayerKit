@@ -29,6 +29,9 @@ struct MPVPictureInPictureRawFrame {
     let byteCount: Int
     /// The video area to convert. Window captures include letterbox borders.
     let crop: MPVPictureInPictureCropRect
+    /// The size the video is meant to be displayed at, aspect ratio included.
+    let displayWidth: Int
+    let displayHeight: Int
     let captureMode: MPVPictureInPictureCaptureMode
     let presentationTime: TimeInterval
     let videoFrameRate: Double
@@ -108,9 +111,11 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
               frame.crop.x + frame.crop.width <= frame.width,
               frame.crop.y + frame.crop.height <= frame.height
         else { return nil }
-        let outputSize = outputDimensions(
+        let outputSize = MPVPictureInPictureOutputSize.resolve(
             cropWidth: frame.crop.width,
             cropHeight: frame.crop.height,
+            displayWidth: frame.displayWidth,
+            displayHeight: frame.displayHeight,
             renderSize: renderSize
         )
         guard let pixelBuffer = makePixelBuffer(
@@ -288,23 +293,6 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
             &buffer,
             0x1,
             vImage_Flags(kvImageDoNotTile)
-        )
-    }
-
-    private func outputDimensions(
-        cropWidth: Int,
-        cropHeight: Int,
-        renderSize: CMVideoDimensions
-    ) -> (width: Int, height: Int) {
-        guard renderSize.width > 0, renderSize.height > 0 else {
-            return (cropWidth, cropHeight)
-        }
-        let widthScale = Double(renderSize.width) / Double(cropWidth)
-        let heightScale = Double(renderSize.height) / Double(cropHeight)
-        let scale = min(1, widthScale, heightScale)
-        return (
-            max(1, Int((Double(cropWidth) * scale).rounded(.down))),
-            max(1, Int((Double(cropHeight) * scale).rounded(.down)))
         )
     }
 

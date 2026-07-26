@@ -210,7 +210,6 @@ public final class MPVPlayerView: UIView {
             let contentModeSnapshot = MPVContentModeSnapshot(contentModeRawValue: newValue.rawValue)
             setContentModeSnapshot(contentModeSnapshot)
             applyContentMode(contentModeSnapshot)
-            pictureInPictureContentModeDidChange()
         }
     }
 

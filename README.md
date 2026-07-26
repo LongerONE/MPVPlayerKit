@@ -66,6 +66,9 @@ must enable the Audio, AirPlay, and Picture in Picture background mode.
 The window is fed by raw MPV video screenshots, and is kept consistent with the
 inline `MPVPlayerView`:
 
+- The window is shaped like the video: frames carry the display aspect ratio MPV
+  reports, so anamorphic video is not stretched and the shape of the drawable or
+  of the fit/fill mode never leaks into the window.
 - Captures follow the video frame rate up to 30 frames per second, and back off
   automatically when a capture costs more than its interval.
 - Downscaling to the window size uses Accelerate resampling, and frames are
@@ -75,7 +78,8 @@ inline `MPVPlayerView`:
   `drawsSubtitlesInPictureInPicture` when subtitles are composited outside of
   MPV. Image-based subtitle tracks (PGS, VobSub) have no text to draw, and
   original-style ASS tracks are drawn with the player style.
-- Fit and fill content modes map to the window's video gravity.
+- The inline fit/fill mode does not change the window: it always shows the whole
+  video frame at the aspect ratio of the video.
 
 `pictureInPictureCaptureMode` selects how frames are captured:
 

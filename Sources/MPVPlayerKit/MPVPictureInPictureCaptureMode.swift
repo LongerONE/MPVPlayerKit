@@ -21,38 +21,3 @@ import Foundation
     /// device before relying on it.
     case window = 1
 }
-
-/// The video area inside a window screenshot.
-struct MPVPictureInPictureCropRect: Equatable, Sendable {
-    let x: Int
-    let y: Int
-    let width: Int
-    let height: Int
-
-    static func full(width: Int, height: Int) -> MPVPictureInPictureCropRect {
-        MPVPictureInPictureCropRect(x: 0, y: 0, width: width, height: height)
-    }
-}
-
-/// A window screenshot covers the whole drawable, so the video sits inside the
-/// letterbox borders MPV reports through `osd-dimensions`. Cropping to them
-/// keeps the Picture in Picture aspect ratio and drops the black bars.
-enum MPVPictureInPictureWindowCrop {
-    static func resolve(
-        frameWidth: Int,
-        frameHeight: Int,
-        left: Int,
-        top: Int,
-        right: Int,
-        bottom: Int
-    ) -> MPVPictureInPictureCropRect {
-        let full = MPVPictureInPictureCropRect.full(width: frameWidth, height: frameHeight)
-        guard frameWidth > 0, frameHeight > 0,
-              left >= 0, top >= 0, right >= 0, bottom >= 0
-        else { return full }
-        let width = frameWidth - left - right
-        let height = frameHeight - top - bottom
-        guard width > 0, height > 0 else { return full }
-        return MPVPictureInPictureCropRect(x: left, y: top, width: width, height: height)
-    }
-}

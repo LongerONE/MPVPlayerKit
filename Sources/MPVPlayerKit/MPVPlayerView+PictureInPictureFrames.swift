@@ -123,18 +123,31 @@ extension MPVPlayerView {
         #endif
     }
 
+    /// The display size MPV reports carries the aspect ratio the video is meant
+    /// to be shown at, which differs from its stored size when the video is
+    /// anamorphic.
+    private nonisolated func pictureInPictureVideoDisplayDimensions() -> (width: Int, height: Int) {
+        (
+            Int(getInt64(MPVProperty.videoOutputDisplayWidth) ?? 0),
+            Int(getInt64(MPVProperty.videoOutputDisplayHeight) ?? 0)
+        )
+    }
+
     /// MPV reports the video rectangle inside its window as OSD margins.
     private nonisolated func pictureInPictureWindowCrop(
         frameWidth: Int,
-        frameHeight: Int
+        frameHeight: Int,
+        displaySize: (width: Int, height: Int)
     ) -> MPVPictureInPictureCropRect {
-        MPVPictureInPictureWindowCrop.resolve(
+        MPVPictureInPictureVideoRect.resolve(
             frameWidth: frameWidth,
             frameHeight: frameHeight,
             left: Int(getInt64(MPVProperty.osdMarginLeft) ?? 0),
             top: Int(getInt64(MPVProperty.osdMarginTop) ?? 0),
             right: Int(getInt64(MPVProperty.osdMarginRight) ?? 0),
-            bottom: Int(getInt64(MPVProperty.osdMarginBottom) ?? 0)
+            bottom: Int(getInt64(MPVProperty.osdMarginBottom) ?? 0),
+            displayWidth: displaySize.width,
+            displayHeight: displaySize.height
         )
     }
 
@@ -163,10 +176,12 @@ extension MPVPlayerView {
               descriptor.format == "bgr0" || descriptor.format == "bgra",
               let pixels = descriptor.pixels
         else { return (status, nil) }
+        let displaySize = pictureInPictureVideoDisplayDimensions()
         let crop = mode == .window
             ? pictureInPictureWindowCrop(
                 frameWidth: descriptor.width,
-                frameHeight: descriptor.height
+                frameHeight: descriptor.height,
+                displaySize: displaySize
             )
             : MPVPictureInPictureCropRect.full(
                 width: descriptor.width,
@@ -179,6 +194,8 @@ extension MPVPlayerView {
             pixels: pixels,
             byteCount: descriptor.byteCount,
             crop: crop,
+            displayWidth: displaySize.width,
+            displayHeight: displaySize.height,
             captureMode: mode,
             presentationTime: max(0, getDouble(MPVProperty.timePosition)),
             videoFrameRate: pictureInPictureVideoFrameRate(),

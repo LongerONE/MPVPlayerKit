@@ -65,10 +65,6 @@ extension MPVPlayerView {
         pictureInPictureCoordinator?.playerViewDidLayout()
     }
 
-    func pictureInPictureContentModeDidChange() {
-        pictureInPictureCoordinator?.playerContentModeDidChange()
-    }
-
     func pictureInPicturePlaybackStateDidChange() {
         pictureInPictureCoordinator?.playbackStateDidChange()
     }
