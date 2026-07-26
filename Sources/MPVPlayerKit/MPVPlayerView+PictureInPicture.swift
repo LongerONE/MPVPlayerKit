@@ -107,6 +107,9 @@ final class MPVPictureInPictureCoordinator:
 
     func start() {
         guard isActive == false, isStarting == false, shouldStartAfterFirstFrame == false else { return }
+        playerView?.mpvDebugLog(
+            "pip start requested possible=\(controller.isPictureInPicturePossible)"
+        )
         installSourceLayerIfNeeded()
         isStartCancellationRequested = false
         shouldStartAfterFirstFrame = true
@@ -172,6 +175,9 @@ final class MPVPictureInPictureCoordinator:
         _ pictureInPictureController: AVPictureInPictureController,
         failedToStartPictureInPictureWithError error: any Error
     ) {
+        playerView?.mpvDebugLog(
+            "pip start failed error=\(error.localizedDescription)"
+        )
         let shouldPostInactiveState = MPVPictureInPictureStartCancellationPolicy
             .shouldPostInactiveState(
                 hasPostedActiveState: hasPostedActiveState,

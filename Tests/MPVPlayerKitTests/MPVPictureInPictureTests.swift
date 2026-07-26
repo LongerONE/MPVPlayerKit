@@ -79,6 +79,13 @@ final class MPVPictureInPictureTests: XCTestCase {
         ))
     }
 
+    func testPictureInPictureUsesCompatibleRawScreenshotArguments() {
+        XCTAssertEqual(
+            MPVPlayerView.pictureInPictureScreenshotArgumentCandidates,
+            [["video", "bgra"], ["video"]]
+        )
+    }
+
     func testCancellingAnInProgressStartStopsTheSystemStartAndSuppressesInactiveState() {
         XCTAssertTrue(MPVPictureInPictureStartCancellationPolicy.shouldStopSystemController(
             isStarting: true
