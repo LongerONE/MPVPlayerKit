@@ -1,6 +1,7 @@
 import AVKit
 import CoreMedia
 import QuartzCore
+import UIKit
 
 extension MPVPictureInPictureCoordinator {
     /// Reschedules the capture timer for the current playback state.
@@ -109,7 +110,8 @@ extension MPVPictureInPictureCoordinator {
         hasLoggedFrameCaptureDeferral = false
         let generation = frameCaptureGeneration
         let renderSize = MPVPictureInPictureRenderBudget.resolve(
-            reportedRenderSize: preferredRenderSize
+            reportedRenderSize: preferredRenderSize,
+            screenScale: UIScreen.main.nativeScale
         )
         let startedAt = CACurrentMediaTime()
         isCapturingFrame = true

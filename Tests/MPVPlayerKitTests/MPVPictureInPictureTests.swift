@@ -301,10 +301,42 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertEqual(budget.height, MPVPictureInPictureRenderBudget.maximumHeight)
 
         let reported = MPVPictureInPictureRenderBudget.resolve(
-            reportedRenderSize: CMVideoDimensions(width: 480, height: 270)
+            reportedRenderSize: CMVideoDimensions(width: 370, height: 208),
+            screenScale: 3
         )
-        XCTAssertEqual(reported.width, 480)
-        XCTAssertEqual(reported.height, 270)
+        XCTAssertEqual(reported.width, 1110)
+        XCTAssertEqual(reported.height, 624)
+    }
+
+    func testRenderBudgetKeepsWindowSizesAtNativePixelsWithinTheCeiling() {
+        // AVKit reports points. A 3x screen needs three times the pixels, up to
+        // the budget, or the window is softer than the inline player.
+        let capped = MPVPictureInPictureRenderBudget.resolve(
+            reportedRenderSize: CMVideoDimensions(width: 640, height: 360),
+            screenScale: 3
+        )
+        XCTAssertEqual(capped.width, MPVPictureInPictureRenderBudget.maximumWidth)
+        XCTAssertEqual(capped.height, MPVPictureInPictureRenderBudget.maximumHeight)
+    }
+
+    func testRenderBudgetIgnoresWindowSizeJitterDuringTheOpeningAnimation() {
+        let settled = CMVideoDimensions(width: 393, height: 221)
+        XCTAssertFalse(MPVPictureInPictureRenderBudget.isSignificantChange(
+            from: settled,
+            to: CMVideoDimensions(width: 392, height: 220)
+        ))
+        XCTAssertTrue(MPVPictureInPictureRenderBudget.isSignificantChange(
+            from: settled,
+            to: CMVideoDimensions(width: 200, height: 112)
+        ))
+        XCTAssertTrue(MPVPictureInPictureRenderBudget.isSignificantChange(
+            from: CMVideoDimensions(width: 0, height: 0),
+            to: settled
+        ))
+        XCTAssertFalse(MPVPictureInPictureRenderBudget.isSignificantChange(
+            from: settled,
+            to: CMVideoDimensions(width: 0, height: 0)
+        ))
     }
 
     func testPictureInPictureSampleDurationFollowsTheVideoFrameRate() {

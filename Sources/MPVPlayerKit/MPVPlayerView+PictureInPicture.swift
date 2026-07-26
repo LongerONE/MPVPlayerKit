@@ -329,6 +329,10 @@ final class MPVPictureInPictureCoordinator:
         _ pictureInPictureController: AVPictureInPictureController,
         didTransitionToRenderSize newRenderSize: CMVideoDimensions
     ) {
+        guard MPVPictureInPictureRenderBudget.isSignificantChange(
+            from: preferredRenderSize,
+            to: newRenderSize
+        ) else { return }
         preferredRenderSize = newRenderSize
         playerView?.mpvDebugLog(
             "pip render size \(newRenderSize.width)x\(newRenderSize.height)"

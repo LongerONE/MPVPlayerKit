@@ -39,16 +39,46 @@ struct MPVPictureInPictureRawFrame {
 enum MPVPictureInPictureRenderBudget {
     static let maximumWidth: Int32 = 1280
     static let maximumHeight: Int32 = 720
+    /// Relative change in the reported window size worth a new frame.
+    static let significantChangeRatio = 0.1
 
     static var `default`: CMVideoDimensions {
         CMVideoDimensions(width: maximumWidth, height: maximumHeight)
     }
 
-    static func resolve(reportedRenderSize: CMVideoDimensions) -> CMVideoDimensions {
+    /// AVKit reports the size of its window layer, which iOS measures in
+    /// points: a 370-point wide window covers 1110 pixels on a 3x screen.
+    /// Converting frames at that point size would make the Picture in Picture
+    /// window three times softer than the inline player, so scale up to native
+    /// pixels and keep the budget as the ceiling.
+    static func resolve(
+        reportedRenderSize: CMVideoDimensions,
+        screenScale: CGFloat = 1
+    ) -> CMVideoDimensions {
         guard reportedRenderSize.width > 0, reportedRenderSize.height > 0 else {
             return `default`
         }
-        return reportedRenderSize
+        let scale = max(1, Double(screenScale))
+        return CMVideoDimensions(
+            width: Int32(min(Double(maximumWidth), Double(reportedRenderSize.width) * scale)
+                .rounded()),
+            height: Int32(min(Double(maximumHeight), Double(reportedRenderSize.height) * scale)
+                .rounded())
+        )
+    }
+
+    /// The window animates into place, reporting a stream of sizes that differ
+    /// by a pixel. Each one would otherwise cost a full screenshot.
+    static func isSignificantChange(
+        from current: CMVideoDimensions,
+        to next: CMVideoDimensions
+    ) -> Bool {
+        guard next.width > 0, next.height > 0 else { return false }
+        guard current.width > 0, current.height > 0 else { return true }
+        let widthRatio = Double(next.width) / Double(current.width)
+        let heightRatio = Double(next.height) / Double(current.height)
+        return abs(widthRatio - 1) > significantChangeRatio
+            || abs(heightRatio - 1) > significantChangeRatio
     }
 }
 
