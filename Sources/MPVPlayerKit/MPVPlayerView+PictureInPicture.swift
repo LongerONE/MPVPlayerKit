@@ -39,6 +39,26 @@ enum MPVPictureInPictureFrameUpdatePolicy {
     }
 }
 
+enum MPVPictureInPictureTeardownPolicy {
+    static func shouldStartFrameUpdates(isTearingDown: Bool) -> Bool {
+        isTearingDown == false
+    }
+
+    static func shouldResumeAutomaticReadinessUpdates(
+        allowsAutomaticStartFromInline: Bool,
+        isTearingDown: Bool
+    ) -> Bool {
+        allowsAutomaticStartFromInline && isTearingDown == false
+    }
+
+    static func shouldStartSystemController(
+        isStartCancellationRequested: Bool,
+        isTearingDown: Bool
+    ) -> Bool {
+        isStartCancellationRequested == false && isTearingDown == false
+    }
+}
+
 @MainActor
 final class MPVPictureInPictureCoordinator:
     NSObject,
@@ -64,11 +84,14 @@ final class MPVPictureInPictureCoordinator:
     private var shouldStartAfterFirstFrame = false
     private var isStarting = false
     private var isStartCancellationRequested = false
+    private var isTearingDown = false
     private var hasPostedActiveState = false
     private var consecutiveFrameCaptureFailures = 0
     private var frameCaptureGeneration: UInt64 = 0
     private var preferredRenderSize = CMVideoDimensions(width: 0, height: 0)
     private var playbackTimebase: CMTimebase?
+    private var inlineCoverLifecycle = MPVPictureInPictureInlineCoverLifecycle()
+    private let inlineCover = MPVPictureInPictureInlineCover()
     nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
 
     var allowsAutomaticStartFromInline: Bool {
@@ -100,12 +123,26 @@ final class MPVPictureInPictureCoordinator:
     }
 
     deinit {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { [inlineCover] in
+                inlineCover.hide()
+            }
+        } else {
+            // Player teardown is normally main-actor isolated. Retain this
+            // fallback for an unexpected final release off the main thread.
+            Task { @MainActor [inlineCover] in
+                inlineCover.hide()
+            }
+        }
         frameTimer?.setEventHandler {}
         frameTimer?.cancel()
         observers.forEach(NotificationCenter.default.removeObserver)
     }
 
     func start() {
+        // A coordinator can survive a normal player stop. A later explicit
+        // PiP start is a new lifecycle and may resume its frame timer.
+        isTearingDown = false
         guard isActive == false, isStarting == false, shouldStartAfterFirstFrame == false else { return }
         playerView?.mpvDebugLog(
             "pip start requested possible=\(controller.isPictureInPicturePossible)"
@@ -124,10 +161,12 @@ final class MPVPictureInPictureCoordinator:
             isStartCancellationRequested = true
             shouldStartAfterFirstFrame = false
             stopFrameUpdates()
+            hideInlineCover()
             controller.stopPictureInPicture()
             return
         }
         guard isActive else {
+            hideInlineCover()
             shouldStartAfterFirstFrame = false
             stopFrameUpdates()
             resumeAutomaticReadinessUpdates()
@@ -136,8 +175,25 @@ final class MPVPictureInPictureCoordinator:
         controller.stopPictureInPicture()
     }
 
+    func stopForPlayerTeardown() {
+        isTearingDown = true
+        isStartCancellationRequested = true
+        shouldStartAfterFirstFrame = false
+        stopFrameUpdates()
+        hideInlineCover()
+        guard isActive || isStarting else { return }
+        controller.stopPictureInPicture()
+    }
+
     func playerViewHierarchyDidChange() {
         installSourceLayerIfNeeded()
+        guard let playerView else { return }
+        inlineCover.bringToFrontIfVisible(over: playerView)
+    }
+
+    func playerViewDidLayout() {
+        guard let playerView else { return }
+        inlineCover.bringToFrontIfVisible(over: playerView)
     }
 
     func playerVideoDisplaySizeDidChange() {
@@ -149,25 +205,40 @@ final class MPVPictureInPictureCoordinator:
     func pictureInPictureControllerWillStartPictureInPicture(
         _ pictureInPictureController: AVPictureInPictureController
     ) {
-        guard isStartCancellationRequested == false else {
+        guard MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartCancellationRequested: isStartCancellationRequested,
+            isTearingDown: isTearingDown
+        ) else {
+            isStarting = false
+            hideInlineCover()
             pictureInPictureController.stopPictureInPicture()
             return
         }
         isStarting = true
+        inlineCoverLifecycle.requestStart()
     }
 
     func pictureInPictureControllerDidStartPictureInPicture(
         _ pictureInPictureController: AVPictureInPictureController
     ) {
-        guard isStartCancellationRequested == false else {
+        guard MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartCancellationRequested: isStartCancellationRequested,
+            isTearingDown: isTearingDown
+        ) else {
+            isStarting = false
+            hideInlineCover()
             pictureInPictureController.stopPictureInPicture()
             return
         }
+        guard inlineCoverLifecycle.didStart() else { return }
         isStarting = false
         startFrameUpdates(every: .milliseconds(100))
         synchronizePlaybackTimebase()
         invalidatePlaybackState()
         hasPostedActiveState = true
+        if let playerView {
+            inlineCover.show(over: playerView)
+        }
         postStateChange(isActive: true)
     }
 
@@ -189,6 +260,7 @@ final class MPVPictureInPictureCoordinator:
         stopFrameUpdates()
         resumeAutomaticReadinessUpdates()
         hasPostedActiveState = false
+        hideInlineCover()
         if shouldPostInactiveState {
             postStateChange(isActive: false)
         }
@@ -208,6 +280,7 @@ final class MPVPictureInPictureCoordinator:
         stopFrameUpdates()
         resumeAutomaticReadinessUpdates()
         hasPostedActiveState = false
+        hideInlineCover()
         if shouldPostInactiveState {
             postStateChange(isActive: false)
         }
@@ -335,6 +408,9 @@ final class MPVPictureInPictureCoordinator:
     }
 
     private func startFrameUpdates(every interval: DispatchTimeInterval) {
+        guard MPVPictureInPictureTeardownPolicy.shouldStartFrameUpdates(
+            isTearingDown: isTearingDown
+        ) else { return }
         stopFrameUpdates()
         let timer = DispatchSource.makeTimerSource(queue: .main)
         timer.schedule(deadline: .now(), repeating: interval, leeway: .milliseconds(25))
@@ -353,7 +429,10 @@ final class MPVPictureInPictureCoordinator:
     }
 
     private func resumeAutomaticReadinessUpdates() {
-        guard allowsAutomaticStartFromInline else { return }
+        guard MPVPictureInPictureTeardownPolicy.shouldResumeAutomaticReadinessUpdates(
+            allowsAutomaticStartFromInline: allowsAutomaticStartFromInline,
+            isTearingDown: isTearingDown
+        ) else { return }
         startFrameUpdates(every: .milliseconds(500))
     }
 
@@ -384,7 +463,10 @@ final class MPVPictureInPictureCoordinator:
                     let wasWaitingForStart = self.shouldStartAfterFirstFrame
                     if wasWaitingForStart {
                         self.shouldStartAfterFirstFrame = false
-                        guard self.isStartCancellationRequested == false else {
+                        guard MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+                            isStartCancellationRequested: self.isStartCancellationRequested,
+                            isTearingDown: self.isTearingDown
+                        ) else {
                             self.stopFrameUpdates()
                             self.resumeAutomaticReadinessUpdates()
                             return
@@ -419,6 +501,11 @@ final class MPVPictureInPictureCoordinator:
         consecutiveFrameCaptureFailures += 1
         guard consecutiveFrameCaptureFailures == 3 else { return }
         startFrameUpdates(every: .milliseconds(500))
+    }
+
+    private func hideInlineCover() {
+        _ = inlineCoverLifecycle.end()
+        inlineCover.hide()
     }
 
     private func postStateChange(isActive: Bool) {
@@ -473,6 +560,14 @@ extension MPVPlayerView {
 
     func pictureInPictureViewHierarchyDidChange() {
         pictureInPictureCoordinator?.playerViewHierarchyDidChange()
+    }
+
+    func pictureInPictureViewDidLayout() {
+        pictureInPictureCoordinator?.playerViewDidLayout()
+    }
+
+    func stopPictureInPictureForPlayerTeardown() {
+        pictureInPictureCoordinator?.stopForPlayerTeardown()
     }
 
     private var pictureInPictureCoordinatorInstance: MPVPictureInPictureCoordinator? {

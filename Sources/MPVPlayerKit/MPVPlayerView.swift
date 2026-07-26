@@ -385,6 +385,7 @@ public final class MPVPlayerView: UIView {
         super.layoutSubviews()
         clientSubtitleController.update(at: currentTime, force: true)
         updateMetalLayerGeometryIfNeeded()
+        pictureInPictureViewDidLayout()
     }
 
     public override func didMoveToSuperview() {

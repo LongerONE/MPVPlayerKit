@@ -46,7 +46,7 @@ extension MPVPlayerView {
 
     @objc public func stop() {
         clientSubtitleController.clear()
-        stopPictureInPicture()
+        stopPictureInPictureForPlayerTeardown()
         setDecoderMode(.initializing)
         pictureInPictureRendererRuntimeState.reset()
         guard stopped == false else {

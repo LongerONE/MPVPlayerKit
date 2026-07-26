@@ -4,6 +4,59 @@ import Metal
 @testable import MPVPlayerKit
 
 final class MPVPictureInPictureTests: XCTestCase {
+    func testInlineCoverLifecycleTransitionsFromWillStartToDidStart() {
+        var lifecycle = MPVPictureInPictureInlineCoverLifecycle()
+
+        XCTAssertEqual(lifecycle.state, .hidden)
+        lifecycle.requestStart()
+        XCTAssertEqual(lifecycle.state, .starting)
+        XCTAssertTrue(lifecycle.didStart())
+        XCTAssertEqual(lifecycle.state, .visible)
+    }
+
+    func testInlineCoverLifecycleIgnoresUnexpectedOrDuplicateDidStart() {
+        var lifecycle = MPVPictureInPictureInlineCoverLifecycle()
+
+        XCTAssertFalse(lifecycle.didStart())
+        XCTAssertEqual(lifecycle.state, .hidden)
+
+        lifecycle.requestStart()
+        XCTAssertTrue(lifecycle.didStart())
+        XCTAssertFalse(lifecycle.didStart())
+        XCTAssertEqual(lifecycle.state, .visible)
+    }
+
+    func testInlineCoverLifecycleClearsForFailureStopAndTeardown() {
+        var lifecycle = MPVPictureInPictureInlineCoverLifecycle()
+
+        lifecycle.requestStart()
+        XCTAssertFalse(lifecycle.end())
+        XCTAssertEqual(lifecycle.state, .hidden)
+
+        lifecycle.requestStart()
+        _ = lifecycle.didStart()
+        XCTAssertTrue(lifecycle.end())
+        XCTAssertEqual(lifecycle.state, .hidden)
+        XCTAssertFalse(lifecycle.end())
+    }
+
+    @MainActor
+    func testInlineCoverAttachesToAndDetachesFromPlayerView() {
+        let playerView = UIView(frame: CGRect(x: 0, y: 0, width: 320, height: 180))
+        let cover = MPVPictureInPictureInlineCover()
+
+        cover.show(over: playerView)
+        let attachedCover = playerView.subviews.first {
+            $0.accessibilityIdentifier == "MPVPlayerView.pictureInPictureInlineCover"
+        }
+        XCTAssertNotNil(attachedCover)
+        XCTAssertTrue(attachedCover?.superview === playerView)
+
+        cover.hide()
+        XCTAssertNil(attachedCover?.superview)
+        XCTAssertFalse(playerView.subviews.contains { $0 === attachedCover })
+    }
+
     func testPictureInPictureContentSizeUsesVideoDisplaySizeAndFallback() {
         XCTAssertEqual(
             MPVPictureInPictureContentSize.resolve(
@@ -77,6 +130,38 @@ final class MPVPictureInPictureTests: XCTestCase {
             isActive: false,
             isStarting: false,
             isWaitingForStart: false
+        ))
+    }
+
+    func testPlayerTeardownNeverRestartsPictureInPictureFrameUpdates() {
+        XCTAssertFalse(MPVPictureInPictureTeardownPolicy.shouldStartFrameUpdates(
+            isTearingDown: true
+        ))
+        XCTAssertFalse(
+            MPVPictureInPictureTeardownPolicy.shouldResumeAutomaticReadinessUpdates(
+                allowsAutomaticStartFromInline: true,
+                isTearingDown: true
+            )
+        )
+        XCTAssertFalse(MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartCancellationRequested: false,
+            isTearingDown: true
+        ))
+    }
+
+    func testPictureInPictureFrameUpdatesCanResumeForANewLifecycle() {
+        XCTAssertTrue(MPVPictureInPictureTeardownPolicy.shouldStartFrameUpdates(
+            isTearingDown: false
+        ))
+        XCTAssertTrue(
+            MPVPictureInPictureTeardownPolicy.shouldResumeAutomaticReadinessUpdates(
+                allowsAutomaticStartFromInline: true,
+                isTearingDown: false
+            )
+        )
+        XCTAssertTrue(MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartCancellationRequested: false,
+            isTearingDown: false
         ))
     }
 

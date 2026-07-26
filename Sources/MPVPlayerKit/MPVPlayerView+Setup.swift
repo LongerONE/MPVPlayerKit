@@ -400,12 +400,12 @@ extension MPVPlayerView {
     func destroyMPVHandle(reason: String, sendStopCommand: Bool = true) {
         if Thread.isMainThread {
             MainActor.assumeIsolated {
-                self.stopPictureInPicture()
+                self.stopPictureInPictureForPlayerTeardown()
             }
         } else {
             DispatchQueue.main.sync {
                 MainActor.assumeIsolated {
-                    self.stopPictureInPicture()
+                    self.stopPictureInPictureForPlayerTeardown()
                 }
             }
         }
