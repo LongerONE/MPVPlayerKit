@@ -3,62 +3,6 @@ import CoreMedia
 import QuartzCore
 import UIKit
 
-enum MPVPictureInPictureContentSize {
-    static let fallback = CGSize(width: 16, height: 9)
-
-    static func resolve(videoDisplaySize: CGSize) -> CGSize {
-        guard videoDisplaySize.width > 0, videoDisplaySize.height > 0,
-              videoDisplaySize.width.isFinite, videoDisplaySize.height.isFinite
-        else {
-            return fallback
-        }
-        return videoDisplaySize
-    }
-}
-
-enum MPVPictureInPictureStartCancellationPolicy {
-    static func shouldStopSystemController(isStarting: Bool) -> Bool {
-        isStarting
-    }
-
-    static func shouldPostInactiveState(
-        hasPostedActiveState: Bool,
-        isStartCancellationRequested: Bool
-    ) -> Bool {
-        hasPostedActiveState && isStartCancellationRequested == false
-    }
-}
-
-enum MPVPictureInPictureFrameUpdatePolicy {
-    static func shouldKeepUpdating(
-        isActive: Bool,
-        isStarting: Bool,
-        isWaitingForStart: Bool
-    ) -> Bool {
-        isActive || isStarting || isWaitingForStart
-    }
-}
-
-enum MPVPictureInPictureTeardownPolicy {
-    static func shouldStartFrameUpdates(isTearingDown: Bool) -> Bool {
-        isTearingDown == false
-    }
-
-    static func shouldResumeAutomaticReadinessUpdates(
-        allowsAutomaticStartFromInline: Bool,
-        isTearingDown: Bool
-    ) -> Bool {
-        allowsAutomaticStartFromInline && isTearingDown == false
-    }
-
-    static func shouldStartSystemController(
-        isStartCancellationRequested: Bool,
-        isTearingDown: Bool
-    ) -> Bool {
-        isStartCancellationRequested == false && isTearingDown == false
-    }
-}
-
 @MainActor
 final class MPVPictureInPictureCoordinator:
     NSObject,
@@ -92,6 +36,8 @@ final class MPVPictureInPictureCoordinator:
     private var playbackTimebase: CMTimebase?
     private var inlineCoverLifecycle = MPVPictureInPictureInlineCoverLifecycle()
     private let inlineCover = MPVPictureInPictureInlineCover()
+    private let runtimeDiagnostics = MPVPictureInPictureRuntimeDiagnostics()
+    private var hasLoggedFrameCaptureDeferral = false
     nonisolated(unsafe) private var observers: [NSObjectProtocol] = []
 
     var allowsAutomaticStartFromInline: Bool {
@@ -119,6 +65,10 @@ final class MPVPictureInPictureCoordinator:
         controller.canStartPictureInPictureAutomaticallyFromInline =
             allowsAutomaticStartFromInline
         installSourceLayer(in: playerView)
+        runtimeDiagnostics.logInitialCapabilityIfNeeded(
+            playerView: playerView,
+            displayLayer: sampleBufferDisplayLayer
+        )
         observePlaybackState(of: playerView)
     }
 
@@ -148,8 +98,16 @@ final class MPVPictureInPictureCoordinator:
             "pip start requested possible=\(controller.isPictureInPicturePossible)"
         )
         installSourceLayerIfNeeded()
+        if let playerView {
+            runtimeDiagnostics.logRendererState(
+                stage: "start-requested",
+                playerView: playerView,
+                displayLayer: sampleBufferDisplayLayer
+            )
+        }
         isStartCancellationRequested = false
         shouldStartAfterFirstFrame = true
+        hasLoggedFrameCaptureDeferral = false
         startFrameUpdates(every: .milliseconds(100))
         captureAndEnqueueFrame()
     }
@@ -240,6 +198,18 @@ final class MPVPictureInPictureCoordinator:
             inlineCover.show(over: playerView)
         }
         postStateChange(isActive: true)
+        if let playerView {
+            runtimeDiagnostics.logRendererState(
+                stage: "active",
+                playerView: playerView,
+                displayLayer: sampleBufferDisplayLayer
+            )
+            runtimeDiagnostics.logPerformanceMetrics(
+                stage: "active",
+                playerView: playerView,
+                displayLayer: sampleBufferDisplayLayer
+            )
+        }
     }
 
     func pictureInPictureController(
@@ -438,7 +408,23 @@ final class MPVPictureInPictureCoordinator:
 
     private func captureAndEnqueueFrame() {
         guard isCapturingFrame == false, let playerView else { return }
-        guard playerView.isPlaying || shouldStartAfterFirstFrame else { return }
+        guard MPVPictureInPictureFrameCaptureReadiness.shouldCapture(
+            hasValidVideoOutputParameters: playerView.hasPictureInPictureVideoOutputParameters,
+            hasPlaybackOrReconfigurationSignal: playerView.hasPictureInPictureFirstVideoFrameSignal,
+            isPlaying: playerView.isPlaying,
+            isWaitingForStart: shouldStartAfterFirstFrame
+        ) else {
+            if hasLoggedFrameCaptureDeferral == false {
+                hasLoggedFrameCaptureDeferral = true
+                playerView.mpvDebugLog(
+                    "pip capture deferred reason=video-not-ready "
+                        + "outputParams=\(playerView.hasPictureInPictureVideoOutputParameters) "
+                        + "firstFrameSignal=\(playerView.hasPictureInPictureFirstVideoFrameSignal)"
+                )
+            }
+            return
+        }
+        hasLoggedFrameCaptureDeferral = false
         let generation = frameCaptureGeneration
         let frameProcessingQueue = frameProcessingQueue
         let frameConverter = frameConverter
@@ -551,7 +537,22 @@ extension MPVPlayerView {
         MPVPictureInPictureContentSize.resolve(videoDisplaySize: pictureInPictureVideoDisplaySize)
     }
 
-    func updatePictureInPictureVideoDisplaySize(_ size: CGSize) {
+    func resetPictureInPictureVideoOutputReadiness() {
+        hasPictureInPictureVideoOutputParameters = false
+        hasPictureInPictureFirstVideoFrameSignal = false
+    }
+
+    func updatePictureInPictureVideoDisplaySize(
+        _ size: CGSize,
+        signal: MPVPictureInPictureVideoOutputSignal = .none
+    ) {
+        let hasValidParameters = size.width > 0 && size.height > 0
+        hasPictureInPictureVideoOutputParameters = hasValidParameters
+        if hasValidParameters == false {
+            hasPictureInPictureFirstVideoFrameSignal = false
+        } else if signal.establishesFirstVideoFrameReadiness {
+            hasPictureInPictureFirstVideoFrameSignal = true
+        }
         let resolvedSize = MPVPictureInPictureContentSize.resolve(videoDisplaySize: size)
         guard pictureInPictureVideoDisplaySize != resolvedSize else { return }
         pictureInPictureVideoDisplaySize = resolvedSize
@@ -578,5 +579,21 @@ extension MPVPlayerView {
         )
         pictureInPictureCoordinator = coordinator
         return coordinator
+    }
+}
+
+enum MPVPictureInPictureVideoOutputSignal: Sendable {
+    case none
+    case fileLoaded
+    case playbackRestart
+    case videoReconfiguration
+
+    var establishesFirstVideoFrameReadiness: Bool {
+        switch self {
+        case .playbackRestart, .videoReconfiguration:
+            true
+        case .none, .fileLoaded:
+            false
+        }
     }
 }

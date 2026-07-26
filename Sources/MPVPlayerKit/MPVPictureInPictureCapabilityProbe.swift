@@ -22,13 +22,32 @@ enum MPVPictureInPicturePixelBufferFormat: String, CaseIterable, Sendable {
         }
     }
 
-    var metalTextureFormat: MTLPixelFormat {
+    var metalTexturePlanes: [MPVPictureInPictureMetalTexturePlane] {
         switch self {
-        case .bgra8: .bgra8Unorm
-        case .yuv42010VideoRange: .r16Unorm
-        case .rgba16Float: .rgba16Float
+        case .bgra8:
+            [.init(index: 0, label: "BGRA", pixelFormat: .bgra8Unorm)]
+        case .yuv42010VideoRange:
+            [
+                .init(index: 0, label: "Y", pixelFormat: .r16Unorm),
+                .init(index: 1, label: "UV", pixelFormat: .rg16Unorm),
+            ]
+        case .rgba16Float:
+            [.init(index: 0, label: "RGBA", pixelFormat: .rgba16Float)]
         }
     }
+}
+
+struct MPVPictureInPictureMetalTexturePlane: Equatable, Sendable {
+    let index: Int
+    let label: String
+    let pixelFormat: MTLPixelFormat
+}
+
+struct MPVPictureInPictureMetalTexturePlaneCapability: Equatable, Sendable {
+    let index: Int
+    let label: String
+    let pixelFormat: MTLPixelFormat
+    let textureCreated: Bool
 }
 
 struct MPVPictureInPicturePixelBufferCapability: Equatable, Sendable {
@@ -38,6 +57,7 @@ struct MPVPictureInPicturePixelBufferCapability: Equatable, Sendable {
     let pixelBufferCreated: Bool
     let isIOSurfaceBacked: Bool
     let isMetalTextureCreatable: Bool
+    let metalTexturePlaneCapabilities: [MPVPictureInPictureMetalTexturePlaneCapability]
 }
 
 struct MPVPictureInPictureRendererPerformanceMetrics: Equatable, Sendable {
@@ -52,6 +72,7 @@ struct MPVPictureInPictureRendererCapability: Equatable, Sendable {
     let rendererStatus: String?
     let requiresFlushToResumeDecoding: Bool?
     let hasRecommendedPixelBufferAttributes: Bool
+    let recommendedPixelBufferAttributesDescription: String
     let supportsPerformanceMetrics: Bool
     let pixelBufferCapabilities: [MPVPictureInPicturePixelBufferCapability]
 
@@ -59,15 +80,20 @@ struct MPVPictureInPictureRendererCapability: Equatable, Sendable {
         let status = rendererStatus ?? "unavailable"
         let requiresFlush = requiresFlushToResumeDecoding.map(String.init) ?? "unavailable"
         let formats = pixelBufferCapabilities.map { capability in
-            "\(capability.format.rawValue):resolved=\(capability.resolvedAttributes) "
+            let planes = capability.metalTexturePlaneCapabilities.map { plane in
+                "\(plane.label):plane=\(plane.index) format=\(plane.pixelFormat) "
+                    + "metal=\(plane.textureCreated)"
+            }.joined(separator: "; ")
+            return "\(capability.format.rawValue):resolved=\(capability.resolvedAttributes) "
                 + "pool=\(capability.poolCreated) buffer=\(capability.pixelBufferCreated) "
                 + "iosurface=\(capability.isIOSurfaceBacked) "
-                + "metal=\(capability.isMetalTextureCreatable)"
+                + "metal=\(capability.isMetalTextureCreatable) [\(planes)]"
         }.joined(separator: ", ")
         return "pip capability renderer=\(isSampleBufferRendererAvailable) "
             + "status=\(status) "
             + "requiresFlush=\(requiresFlush) "
             + "recommendedAttributes=\(hasRecommendedPixelBufferAttributes) "
+            + "recommended=\(recommendedPixelBufferAttributesDescription) "
             + "performanceMetrics=\(supportsPerformanceMetrics) [\(formats)]"
     }
 }
@@ -81,23 +107,20 @@ struct MPVPictureInPictureRendererCapability: Equatable, Sendable {
 /// - SeeAlso: https://developer.apple.com/documentation/avfoundation/avsamplebuffervideorenderer/recommendedpixelbufferattributes
 @MainActor
 final class MPVPictureInPictureCapabilityProbe {
-    private static let probeWidth = 64
-    private static let probeHeight = 64
-
     /// Merges system recommendations with the fixed requirements of one
     /// candidate. Candidate requirements intentionally win: this function is
     /// used to determine whether that exact format can be allocated.
-    static func mergedPixelBufferAttributes(
+    nonisolated static func mergedPixelBufferAttributes(
         recommended: [String: Any],
         required: [String: Any]
     ) -> [String: Any] {
         recommended.merging(required, uniquingKeysWith: { _, requiredValue in requiredValue })
     }
 
-    static func requiredPixelBufferAttributes(
+    nonisolated static func requiredPixelBufferAttributes(
         for format: MPVPictureInPicturePixelBufferFormat,
-        width: Int = probeWidth,
-        height: Int = probeHeight
+        width: Int = 64,
+        height: Int = 64
     ) -> [String: Any] {
         [
             kCVPixelBufferPixelFormatTypeKey as String: format.coreVideoPixelFormat,
@@ -115,6 +138,7 @@ final class MPVPictureInPictureCapabilityProbe {
                 rendererStatus: nil,
                 requiresFlushToResumeDecoding: nil,
                 hasRecommendedPixelBufferAttributes: false,
+                recommendedPixelBufferAttributesDescription: "unavailable",
                 supportsPerformanceMetrics: false,
                 pixelBufferCapabilities: []
             )
@@ -137,6 +161,7 @@ final class MPVPictureInPictureCapabilityProbe {
             rendererStatus: String(describing: renderer.status),
             requiresFlushToResumeDecoding: renderer.requiresFlushToResumeDecoding,
             hasRecommendedPixelBufferAttributes: recommendedAttributes.isEmpty == false,
+            recommendedPixelBufferAttributesDescription: Self.describe(recommendedAttributes),
             supportsPerformanceMetrics: {
                 if #available(iOS 17.4, *) { return true }
                 return false
@@ -202,7 +227,8 @@ final class MPVPictureInPictureCapabilityProbe {
                 poolCreated: false,
                 pixelBufferCreated: false,
                 isIOSurfaceBacked: false,
-                isMetalTextureCreatable: false
+                isMetalTextureCreatable: false,
+                metalTexturePlaneCapabilities: []
             )
         }
         var pixelBuffer: CVPixelBuffer?
@@ -215,16 +241,19 @@ final class MPVPictureInPictureCapabilityProbe {
                 poolCreated: true,
                 pixelBufferCreated: false,
                 isIOSurfaceBacked: false,
-                isMetalTextureCreatable: false
+                isMetalTextureCreatable: false,
+                metalTexturePlaneCapabilities: []
             )
         }
+        let planes = createMetalTextures(from: pixelBuffer, format: format)
         return MPVPictureInPicturePixelBufferCapability(
             format: format,
             resolvedAttributes: resolvedAttributes.didResolve,
             poolCreated: true,
             pixelBufferCreated: true,
             isIOSurfaceBacked: CVPixelBufferGetIOSurface(pixelBuffer) != nil,
-            isMetalTextureCreatable: canCreateMetalTexture(from: pixelBuffer, format: format)
+            isMetalTextureCreatable: planes.allSatisfy(\.textureCreated),
+            metalTexturePlaneCapabilities: planes
         )
     }
 
@@ -256,11 +285,22 @@ final class MPVPictureInPictureCapabilityProbe {
         return (true, attributes)
     }
 
-    private func canCreateMetalTexture(
+    private static func describe(_ attributes: [String: Any]) -> String {
+        guard attributes.isEmpty == false else { return "none" }
+        return attributes.keys.sorted().map { key in
+            "\(key)=\(String(describing: attributes[key]!))"
+        }.joined(separator: ";")
+    }
+
+    private func createMetalTextures(
         from pixelBuffer: CVPixelBuffer,
         format: MPVPictureInPicturePixelBufferFormat
-    ) -> Bool {
-        guard let device = MTLCreateSystemDefaultDevice() else { return false }
+    ) -> [MPVPictureInPictureMetalTexturePlaneCapability] {
+        guard let device = MTLCreateSystemDefaultDevice() else {
+            return format.metalTexturePlanes.map {
+                .init(index: $0.index, label: $0.label, pixelFormat: $0.pixelFormat, textureCreated: false)
+            }
+        }
         var textureCache: CVMetalTextureCache?
         guard CVMetalTextureCacheCreate(
             kCFAllocatorDefault,
@@ -269,22 +309,34 @@ final class MPVPictureInPictureCapabilityProbe {
             nil,
             &textureCache
         ) == kCVReturnSuccess, let textureCache
-        else { return false }
-        var texture: CVMetalTexture?
-        let width = CVPixelBufferGetWidthOfPlane(pixelBuffer, 0)
-        let height = CVPixelBufferGetHeightOfPlane(pixelBuffer, 0)
-        let textureWidth = width > 0 ? width : CVPixelBufferGetWidth(pixelBuffer)
-        let textureHeight = height > 0 ? height : CVPixelBufferGetHeight(pixelBuffer)
-        return CVMetalTextureCacheCreateTextureFromImage(
-            kCFAllocatorDefault,
-            textureCache,
-            pixelBuffer,
-            nil,
-            format.metalTextureFormat,
-            textureWidth,
-            textureHeight,
-            0,
-            &texture
-        ) == kCVReturnSuccess
+        else {
+            return format.metalTexturePlanes.map {
+                .init(index: $0.index, label: $0.label, pixelFormat: $0.pixelFormat, textureCreated: false)
+            }
+        }
+        return format.metalTexturePlanes.map { plane in
+            let width = CVPixelBufferGetWidthOfPlane(pixelBuffer, plane.index)
+            let height = CVPixelBufferGetHeightOfPlane(pixelBuffer, plane.index)
+            let textureWidth = width > 0 ? width : CVPixelBufferGetWidth(pixelBuffer)
+            let textureHeight = height > 0 ? height : CVPixelBufferGetHeight(pixelBuffer)
+            var texture: CVMetalTexture?
+            let result = CVMetalTextureCacheCreateTextureFromImage(
+                kCFAllocatorDefault,
+                textureCache,
+                pixelBuffer,
+                nil,
+                plane.pixelFormat,
+                textureWidth,
+                textureHeight,
+                plane.index,
+                &texture
+            )
+            return .init(
+                index: plane.index,
+                label: plane.label,
+                pixelFormat: plane.pixelFormat,
+                textureCreated: result == kCVReturnSuccess
+            )
+        }
     }
 }

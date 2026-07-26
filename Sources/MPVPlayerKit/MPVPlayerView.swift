@@ -196,6 +196,8 @@ public final class MPVPlayerView: UIView {
     var metalLayer = MPVPlayerMetalLayer()
     var pictureInPictureCoordinator: MPVPictureInPictureCoordinator?
     var pictureInPictureVideoDisplaySize: CGSize = .zero
+    var hasPictureInPictureVideoOutputParameters = false
+    var hasPictureInPictureFirstVideoFrameSignal = false
     var usesExtendedDynamicRangeOutput = false
     var url: URL?
     var headers: [String: String] = [:]
@@ -364,6 +366,7 @@ public final class MPVPlayerView: UIView {
         stopped = false
         setupFailed = false
         hasReportedReadyToPlay = false
+        resetPictureInPictureVideoOutputReadiness()
         hasPlaybackRestarted = false
         hasLoggedVideoColorParameters = false
         setupProfiles = []

@@ -31,6 +31,49 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertEqual(attributes[kCVPixelBufferMetalCompatibilityKey as String] as? Bool, true)
     }
 
+    func testCapabilityProbeUsesBothX420MetalPlanes() {
+        XCTAssertEqual(
+            MPVPictureInPicturePixelBufferFormat.yuv42010VideoRange.metalTexturePlanes.map(\.label),
+            ["Y", "UV"]
+        )
+        XCTAssertEqual(
+            MPVPictureInPicturePixelBufferFormat.yuv42010VideoRange.metalTexturePlanes.map(\.pixelFormat),
+            [.r16Unorm, .rg16Unorm]
+        )
+    }
+
+    func testPictureInPictureFirstCaptureRequiresVideoOutputAndFrameSignal() {
+        XCTAssertFalse(MPVPictureInPictureFrameCaptureReadiness.shouldCapture(
+            hasValidVideoOutputParameters: false,
+            hasPlaybackOrReconfigurationSignal: true,
+            isPlaying: true,
+            isWaitingForStart: true
+        ))
+        XCTAssertFalse(MPVPictureInPictureFrameCaptureReadiness.shouldCapture(
+            hasValidVideoOutputParameters: true,
+            hasPlaybackOrReconfigurationSignal: false,
+            isPlaying: true,
+            isWaitingForStart: true
+        ))
+        XCTAssertTrue(MPVPictureInPictureFrameCaptureReadiness.shouldCapture(
+            hasValidVideoOutputParameters: true,
+            hasPlaybackOrReconfigurationSignal: true,
+            isPlaying: false,
+            isWaitingForStart: true
+        ))
+    }
+
+    func testPictureInPictureFirstCaptureDoesNotRequireFiniteDuration() {
+        // Live streams commonly report an unknown duration. Readiness is
+        // based solely on MPV video-output parameters and frame signals.
+        XCTAssertTrue(MPVPictureInPictureFrameCaptureReadiness.shouldCapture(
+            hasValidVideoOutputParameters: true,
+            hasPlaybackOrReconfigurationSignal: true,
+            isPlaying: true,
+            isWaitingForStart: false
+        ))
+    }
+
     func testInlineCoverLifecycleTransitionsFromWillStartToDidStart() {
         var lifecycle = MPVPictureInPictureInlineCoverLifecycle()
 
