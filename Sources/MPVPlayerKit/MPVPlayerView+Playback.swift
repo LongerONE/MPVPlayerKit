@@ -48,6 +48,7 @@ extension MPVPlayerView {
         clientSubtitleController.clear()
         stopPictureInPicture()
         setDecoderMode(.initializing)
+        pictureInPictureRendererRuntimeState.reset()
         guard stopped == false else {
             mpvDebugLog("stop ignored already stopped")
             return

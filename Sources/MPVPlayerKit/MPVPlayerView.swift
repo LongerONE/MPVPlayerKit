@@ -282,6 +282,8 @@ public final class MPVPlayerView: UIView {
     var geometryTransitionAnimationID = 0
     nonisolated(unsafe) var setupProfiles: [MPVSetupProfile] = []
     nonisolated(unsafe) var activeSetupProfileIndex = 0
+    nonisolated let pictureInPictureRendererRuntimeState =
+        MPVPictureInPictureRendererRuntimeState()
 
     @objc public override init(frame: CGRect) {
         super.init(frame: frame)
@@ -366,6 +368,7 @@ public final class MPVPlayerView: UIView {
         hasLoggedVideoColorParameters = false
         setupProfiles = []
         activeSetupProfileIndex = 0
+        pictureInPictureRendererRuntimeState.reset()
         lastAppliedLayerBounds = CGRect.null
         lastAppliedDrawableSize = .zero
         pendingMetalLayerGeometry = nil

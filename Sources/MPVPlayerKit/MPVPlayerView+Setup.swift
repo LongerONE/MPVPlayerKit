@@ -37,8 +37,15 @@ extension MPVPlayerView {
             return
         }
 
-        setupProfiles = makeSetupProfiles()
+        let profiles = makeSetupProfiles()
+        setupProfiles = profiles
         activeSetupProfileIndex = 0
+        pictureInPictureRendererRuntimeState.store(
+            profiles: profiles.map(
+                MPVPictureInPictureRendererInvariantSnapshot.SetupProfile.init
+            ),
+            activeProfileIndex: 0
+        )
         mpvDebugLog("setupMPV begin url=\(redactedURLDescription(url)) bounds=\(bounds) headers=\(headers.count) profiles=\(setupProfiles.map(\.name).joined(separator: ","))")
 
         while activeSetupProfileIndex < setupProfiles.count {
@@ -47,6 +54,9 @@ extension MPVPlayerView {
                 return
             }
             activeSetupProfileIndex += 1
+            pictureInPictureRendererRuntimeState.setActiveProfileIndex(
+                activeSetupProfileIndex
+            )
         }
 
         mpvDebugLog("setupMPV exhausted all profiles")
@@ -383,6 +393,7 @@ extension MPVPlayerView {
     func failSetup() {
         setupFailed = true
         destroyMPVHandle(reason: "setup-failed")
+        pictureInPictureRendererRuntimeState.reset()
         notifyState(.error)
     }
 
