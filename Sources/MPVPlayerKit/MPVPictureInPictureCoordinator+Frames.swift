@@ -108,52 +108,50 @@ extension MPVPictureInPictureCoordinator {
         }
         hasLoggedFrameCaptureDeferral = false
         let generation = frameCaptureGeneration
-        let frameProcessingQueue = frameProcessingQueue
-        let frameConverter = frameConverter
-        let preferredRenderSize = preferredRenderSize
+        let renderSize = MPVPictureInPictureRenderBudget.resolve(
+            reportedRenderSize: preferredRenderSize
+        )
         let startedAt = CACurrentMediaTime()
         isCapturingFrame = true
-        playerView.capturePictureInPictureFrame { [weak self] frame in
-            frameProcessingQueue.async {
-                let sampleBuffer = frame.flatMap {
-                    frameConverter.makeSampleBuffer(from: $0, renderSize: preferredRenderSize)
-                }
-                DispatchQueue.main.async {
-                    MainActor.assumeIsolated {
-                        guard let self else { return }
-                        self.finishFrameCapture(
-                            frame: frame,
-                            sampleBuffer: sampleBuffer,
-                            generation: generation,
-                            startedAt: startedAt
-                        )
-                    }
+        playerView.capturePictureInPictureFrame(
+            renderSize: renderSize,
+            converter: frameConverter
+        ) { [weak self] capture in
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.finishFrameCapture(
+                        capture: capture,
+                        generation: generation,
+                        startedAt: startedAt
+                    )
                 }
             }
         }
     }
 
     private func finishFrameCapture(
-        frame: MPVPictureInPictureFrame?,
-        sampleBuffer: CMSampleBuffer?,
+        capture: MPVPictureInPictureCapture?,
         generation: UInt64,
         startedAt: CFTimeInterval
     ) {
         isCapturingFrame = false
+        let captureDuration = CACurrentMediaTime() - startedAt
         averageCaptureDuration = MPVPictureInPictureCaptureCadence.averageCaptureDuration(
             previousAverage: averageCaptureDuration,
-            sample: CACurrentMediaTime() - startedAt
+            sample: captureDuration
         )
         guard generation == frameCaptureGeneration else { return }
-        guard let frame, let sampleBuffer else {
+        guard let capture else {
             handleFrameCaptureFailure()
             return
         }
         consecutiveFrameCaptureFailures = 0
-        videoFrameRate = frame.videoFrameRate
-        lastCapturedPresentationTime = frame.presentationTime
-        synchronizePlaybackTimebase(to: frame.presentationTime)
-        enqueue(sampleBuffer)
+        videoFrameRate = capture.videoFrameRate
+        lastCapturedPresentationTime = capture.presentationTime
+        synchronizePlaybackTimebase(to: capture.presentationTime)
+        enqueue(capture.sampleBuffer)
+        logCaptureStatisticsIfNeeded(capture, captureDuration: captureDuration)
         let wasWaitingForStart = shouldStartAfterFirstFrame
         if wasWaitingForStart {
             shouldStartAfterFirstFrame = false
@@ -177,6 +175,34 @@ extension MPVPictureInPictureCoordinator {
             return
         }
         applyCaptureCadence()
+    }
+
+    /// Reports what a capture actually costs, so the cadence can be judged
+    /// against real screenshot and scaling times on device.
+    private func logCaptureStatisticsIfNeeded(
+        _ capture: MPVPictureInPictureCapture,
+        captureDuration: TimeInterval
+    ) {
+        capturedFrameCount &+= 1
+        let isFirstFrameOfLifecycle = capturedFrameCount == 1 || shouldStartAfterFirstFrame
+        guard isFirstFrameOfLifecycle
+            || capturedFrameCount % MPVPictureInPictureCaptureCadence.statisticsInterval == 0
+        else { return }
+        let milliseconds = { (value: TimeInterval) in
+            String(format: "%.1f", value * 1000)
+        }
+        playerView?.mpvDebugLog(
+            "pip capture stats frames=\(capturedFrameCount) "
+                + "source=\(capture.sourceWidth)x\(capture.sourceHeight) "
+                + "output=\(capture.outputWidth)x\(capture.outputHeight) "
+                + "screenshot=\(milliseconds(capture.screenshotDuration))ms "
+                + "convert=\(milliseconds(capture.conversionDuration))ms "
+                + "total=\(milliseconds(captureDuration))ms "
+                + "average=\(milliseconds(averageCaptureDuration))ms "
+                + "interval=\(milliseconds(frameTimerInterval ?? 0))ms "
+                + "sourceFPS=\(String(format: "%.2f", capture.videoFrameRate)) "
+                + "subtitles=\(capture.hasSubtitleOverlay)"
+        )
     }
 
     private func enqueue(_ sampleBuffer: CMSampleBuffer) {

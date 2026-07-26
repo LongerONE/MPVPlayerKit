@@ -132,7 +132,7 @@ final class MPVPictureInPictureTests: XCTestCase {
                 averageCaptureDuration: 0.06,
                 isPlaying: true
             ),
-            0.09,
+            0.06 * MPVPictureInPictureCaptureCadence.captureCostFactor,
             accuracy: 0.0001
         )
         XCTAssertEqual(
@@ -288,6 +288,23 @@ final class MPVPictureInPictureTests: XCTestCase {
             "line one\nline two"
         )
         XCTAssertEqual(MPVPictureInPictureSubtitleOverlay.normalizedText("  \n "), "")
+    }
+
+    func testRenderBudgetBoundsCapturesBeforeAVKitReportsAWindowSize() {
+        // A 4K screenshot converted at full resolution costs about ten times
+        // the work the window can show, and delays the first frame AVKit waits
+        // for before starting Picture in Picture.
+        let budget = MPVPictureInPictureRenderBudget.resolve(
+            reportedRenderSize: CMVideoDimensions(width: 0, height: 0)
+        )
+        XCTAssertEqual(budget.width, MPVPictureInPictureRenderBudget.maximumWidth)
+        XCTAssertEqual(budget.height, MPVPictureInPictureRenderBudget.maximumHeight)
+
+        let reported = MPVPictureInPictureRenderBudget.resolve(
+            reportedRenderSize: CMVideoDimensions(width: 480, height: 270)
+        )
+        XCTAssertEqual(reported.width, 480)
+        XCTAssertEqual(reported.height, 270)
     }
 
     func testPictureInPictureSampleDurationFollowsTheVideoFrameRate() {

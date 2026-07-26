@@ -41,7 +41,9 @@ final class MPVPictureInPictureCoordinator:
     var consecutiveFrameCaptureFailures = 0
     var frameCaptureGeneration: UInt64 = 0
     var displayedFrameRefreshToken: UInt64 = 0
-    var preferredRenderSize = CMVideoDimensions(width: 0, height: 0)
+    var capturedFrameCount: UInt64 = 0
+    /// Bounded until AVKit reports the size of its window.
+    var preferredRenderSize = MPVPictureInPictureRenderBudget.default
     var videoFrameRate: Double = 0
     var averageCaptureDuration: TimeInterval = 0
     var lastCapturedPresentationTime: TimeInterval?
@@ -119,6 +121,7 @@ final class MPVPictureInPictureCoordinator:
         shouldStartAfterFirstFrame = true
         hasLoggedFrameCaptureDeferral = false
         lastCapturedPresentationTime = nil
+        capturedFrameCount = 0
         startFrameUpdates(every: MPVPictureInPictureCaptureCadence.minimumPlayingInterval)
         captureAndEnqueueFrame()
     }
@@ -327,6 +330,9 @@ final class MPVPictureInPictureCoordinator:
         didTransitionToRenderSize newRenderSize: CMVideoDimensions
     ) {
         preferredRenderSize = newRenderSize
+        playerView?.mpvDebugLog(
+            "pip render size \(newRenderSize.width)x\(newRenderSize.height)"
+        )
         captureAndEnqueueFrame(force: true)
     }
 

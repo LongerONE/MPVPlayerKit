@@ -3,52 +3,71 @@ import AVFoundation
 import CoreMedia
 import CoreVideo
 
-/// One raw MPV screenshot plus the playback context needed to present it in the
-/// Picture in Picture window.
-struct MPVPictureInPictureFrame: @unchecked Sendable {
+/// One converted Picture in Picture frame, ready to enqueue.
+struct MPVPictureInPictureCapture: @unchecked Sendable {
+    let sampleBuffer: CMSampleBuffer
+    let presentationTime: TimeInterval
+    let videoFrameRate: Double
+    let sourceWidth: Int
+    let sourceHeight: Int
+    let outputWidth: Int
+    let outputHeight: Int
+    let hasSubtitleOverlay: Bool
+    let screenshotDuration: TimeInterval
+    let conversionDuration: TimeInterval
+}
+
+/// Raw `screenshot-raw` output, valid only while MPV owns the command result.
+struct MPVPictureInPictureRawFrame {
     let width: Int
     let height: Int
     let stride: Int
-    let pixels: Data
+    let pixels: UnsafeRawPointer
+    let byteCount: Int
     let presentationTime: TimeInterval
     let videoFrameRate: Double
     let subtitleText: String?
     let subtitleStyle: MPVPictureInPictureSubtitleStyle
+}
 
-    init(
-        width: Int,
-        height: Int,
-        stride: Int,
-        pixels: Data,
-        presentationTime: TimeInterval,
-        videoFrameRate: Double = 0,
-        subtitleText: String? = nil,
-        subtitleStyle: MPVPictureInPictureSubtitleStyle = MPVPictureInPictureSubtitleStyle()
-    ) {
-        self.width = width
-        self.height = height
-        self.stride = stride
-        self.pixels = pixels
-        self.presentationTime = presentationTime
-        self.videoFrameRate = videoFrameRate
-        self.subtitleText = subtitleText
-        self.subtitleStyle = subtitleStyle
+/// Bounds the pixels a Picture in Picture frame is converted at.
+///
+/// AVKit reports the window size only once Picture in Picture is running. Until
+/// then a 4K screenshot would be converted, composited and enqueued at its full
+/// resolution, which costs about ten times the work the window can show and
+/// delays the first frame the system waits for.
+enum MPVPictureInPictureRenderBudget {
+    static let maximumWidth: Int32 = 1280
+    static let maximumHeight: Int32 = 720
+
+    static var `default`: CMVideoDimensions {
+        CMVideoDimensions(width: maximumWidth, height: maximumHeight)
+    }
+
+    static func resolve(reportedRenderSize: CMVideoDimensions) -> CMVideoDimensions {
+        guard reportedRenderSize.width > 0, reportedRenderSize.height > 0 else {
+            return `default`
+        }
+        return reportedRenderSize
     }
 }
 
-/// Serially used by the PiP frame queue. The pool avoids allocating a new
-/// IOSurface for every raw MPV screenshot while retaining its BGRA layout.
+/// Serially used from the MPV queue, where the raw screenshot lives. The pool
+/// avoids allocating a new IOSurface for every screenshot while retaining its
+/// BGRA layout.
 final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
     private var pixelBufferPool: CVPixelBufferPool?
     private var pooledSize = CMVideoDimensions(width: 0, height: 0)
     private let subtitleOverlay = MPVPictureInPictureSubtitleOverlay()
 
-    func makeSampleBuffer(
-        from frame: MPVPictureInPictureFrame,
-        renderSize: CMVideoDimensions
-    ) -> CMSampleBuffer? {
+    func makeCapture(
+        from frame: MPVPictureInPictureRawFrame,
+        renderSize: CMVideoDimensions,
+        screenshotDuration: TimeInterval
+    ) -> MPVPictureInPictureCapture? {
+        let startedAt = CACurrentMediaTime()
         guard frame.width > 0, frame.height > 0, frame.stride >= frame.width * 4,
-              frame.pixels.count >= frame.stride * frame.height
+              frame.byteCount >= frame.stride * frame.height
         else { return nil }
         let outputSize = outputDimensions(for: frame, renderSize: renderSize)
         guard let pixelBuffer = makePixelBuffer(
@@ -59,20 +78,16 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
         defer { CVPixelBufferUnlockBaseAddress(pixelBuffer, []) }
         guard let destination = CVPixelBufferGetBaseAddress(pixelBuffer) else { return nil }
         let destinationStride = CVPixelBufferGetBytesPerRow(pixelBuffer)
-        let scaled = frame.pixels.withUnsafeBytes { source in
-            guard let sourceBase = source.baseAddress else { return false }
-            return Self.copyPixels(
-                source: sourceBase,
-                sourceWidth: frame.width,
-                sourceHeight: frame.height,
-                sourceStride: frame.stride,
-                destination: destination,
-                destinationWidth: outputSize.width,
-                destinationHeight: outputSize.height,
-                destinationStride: destinationStride
-            )
-        }
-        guard scaled else { return nil }
+        guard Self.copyPixels(
+            source: frame.pixels,
+            sourceWidth: frame.width,
+            sourceHeight: frame.height,
+            sourceStride: frame.stride,
+            destination: destination,
+            destinationWidth: outputSize.width,
+            destinationHeight: outputSize.height,
+            destinationStride: destinationStride
+        ) else { return nil }
         // `bgr0` screenshots leave the alpha byte at zero. The Picture in
         // Picture window composites the sample buffer, so it must be opaque.
         Self.makeOpaque(
@@ -81,14 +96,40 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
             height: outputSize.height,
             stride: destinationStride
         )
+        var hasSubtitleOverlay = false
         if let subtitleText = frame.subtitleText {
             subtitleOverlay.draw(
                 text: subtitleText,
                 style: frame.subtitleStyle,
                 in: pixelBuffer
             )
+            hasSubtitleOverlay = true
         }
 
+        guard let sampleBuffer = Self.makeSampleBuffer(
+            pixelBuffer: pixelBuffer,
+            presentationTime: frame.presentationTime,
+            videoFrameRate: frame.videoFrameRate
+        ) else { return nil }
+        return MPVPictureInPictureCapture(
+            sampleBuffer: sampleBuffer,
+            presentationTime: frame.presentationTime,
+            videoFrameRate: frame.videoFrameRate,
+            sourceWidth: frame.width,
+            sourceHeight: frame.height,
+            outputWidth: outputSize.width,
+            outputHeight: outputSize.height,
+            hasSubtitleOverlay: hasSubtitleOverlay,
+            screenshotDuration: screenshotDuration,
+            conversionDuration: CACurrentMediaTime() - startedAt
+        )
+    }
+
+    private static func makeSampleBuffer(
+        pixelBuffer: CVPixelBuffer,
+        presentationTime: TimeInterval,
+        videoFrameRate: Double
+    ) -> CMSampleBuffer? {
         var formatDescription: CMVideoFormatDescription?
         guard CMVideoFormatDescriptionCreateForImageBuffer(
             allocator: kCFAllocatorDefault,
@@ -96,9 +137,9 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
             formatDescriptionOut: &formatDescription
         ) == noErr, let formatDescription else { return nil }
         var timing = CMSampleTimingInfo(
-            duration: Self.sampleDuration(videoFrameRate: frame.videoFrameRate),
+            duration: sampleDuration(videoFrameRate: videoFrameRate),
             presentationTimeStamp: CMTime(
-                seconds: frame.presentationTime,
+                seconds: presentationTime,
                 preferredTimescale: 600
             ),
             decodeTimeStamp: .invalid
@@ -200,7 +241,7 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
     }
 
     private func outputDimensions(
-        for frame: MPVPictureInPictureFrame,
+        for frame: MPVPictureInPictureRawFrame,
         renderSize: CMVideoDimensions
     ) -> (width: Int, height: Int) {
         guard renderSize.width > 0, renderSize.height > 0 else {
