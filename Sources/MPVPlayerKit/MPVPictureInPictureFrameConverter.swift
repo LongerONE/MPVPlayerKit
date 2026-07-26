@@ -13,6 +13,8 @@ struct MPVPictureInPictureCapture: @unchecked Sendable {
     let outputWidth: Int
     let outputHeight: Int
     let hasSubtitleOverlay: Bool
+    /// Geometry of the drawn subtitle, for comparing against the inline player.
+    let subtitleLayout: MPVPictureInPictureSubtitleLayout?
     let screenshotDuration: TimeInterval
     let conversionDuration: TimeInterval
 }
@@ -126,14 +128,18 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
             height: outputSize.height,
             stride: destinationStride
         )
-        var hasSubtitleOverlay = false
+        var subtitleLayout: MPVPictureInPictureSubtitleLayout?
         if let subtitleText = frame.subtitleText {
             subtitleOverlay.draw(
                 text: subtitleText,
                 style: frame.subtitleStyle,
                 in: pixelBuffer
             )
-            hasSubtitleOverlay = true
+            subtitleLayout = MPVPictureInPictureSubtitleLayout(
+                style: frame.subtitleStyle,
+                frameWidth: outputSize.width,
+                frameHeight: outputSize.height
+            )
         }
 
         guard let sampleBuffer = Self.makeSampleBuffer(
@@ -149,7 +155,8 @@ final class MPVPictureInPictureFrameConverter: @unchecked Sendable {
             sourceHeight: frame.height,
             outputWidth: outputSize.width,
             outputHeight: outputSize.height,
-            hasSubtitleOverlay: hasSubtitleOverlay,
+            hasSubtitleOverlay: subtitleLayout != nil,
+            subtitleLayout: subtitleLayout,
             screenshotDuration: screenshotDuration,
             conversionDuration: CACurrentMediaTime() - startedAt
         )

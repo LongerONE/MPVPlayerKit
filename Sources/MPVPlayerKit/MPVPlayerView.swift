@@ -216,6 +216,7 @@ public final class MPVPlayerView: UIView {
     var hasPictureInPictureFirstVideoFrameSignal = false
     // Read on the MPV queue while capturing Picture in Picture frames.
     nonisolated(unsafe) var pictureInPictureSubtitleOverlayEnabled = true
+    nonisolated(unsafe) var lastPictureInPictureSubtitleState = ""
     var usesExtendedDynamicRangeOutput = false
     var url: URL?
     var headers: [String: String] = [:]

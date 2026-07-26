@@ -154,6 +154,7 @@ extension MPVPictureInPictureCoordinator {
         synchronizePlaybackTimebase(to: capture.presentationTime)
         enqueue(capture.sampleBuffer)
         logCaptureStatisticsIfNeeded(capture, captureDuration: captureDuration)
+        logSubtitleOverlayIfChanged(capture)
         let wasWaitingForStart = shouldStartAfterFirstFrame
         if wasWaitingForStart {
             shouldStartAfterFirstFrame = false
@@ -205,6 +206,26 @@ extension MPVPictureInPictureCoordinator {
                 + "sourceFPS=\(String(format: "%.2f", capture.videoFrameRate)) "
                 + "subtitles=\(capture.hasSubtitleOverlay)"
         )
+    }
+
+    /// Reports the geometry a subtitle was drawn with, so it can be compared
+    /// against what MPV renders into the inline player.
+    private func logSubtitleOverlayIfChanged(_ capture: MPVPictureInPictureCapture) {
+        #if DEBUG
+        let state: String
+        if let layout = capture.subtitleLayout {
+            state = "drawn frame=\(capture.outputWidth)x\(capture.outputHeight) "
+                + "pointSize=\(String(format: "%.1f", layout.pointSize)) "
+                + "bottomMargin=\(String(format: "%.1f", layout.bottomMargin)) "
+                + "outline=\(String(format: "%.2f", layout.outlineWidth)) "
+                + "maxWidth=\(String(format: "%.0f", layout.maximumWidth))"
+        } else {
+            state = "none"
+        }
+        guard state != lastLoggedSubtitleOverlayState else { return }
+        lastLoggedSubtitleOverlayState = state
+        playerView?.mpvDebugLog("pip subtitle overlay \(state)")
+        #endif
     }
 
     private func enqueue(_ sampleBuffer: CMSampleBuffer) {

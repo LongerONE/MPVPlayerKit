@@ -48,6 +48,7 @@ final class MPVPictureInPictureCoordinator:
     var averageCaptureDuration: TimeInterval = 0
     var lastCapturedPresentationTime: TimeInterval?
     var hasLoggedFrameCaptureDeferral = false
+    var lastLoggedSubtitleOverlayState = ""
     private var playbackTimebase: CMTimebase?
     private var lastPlaybackStateSnapshot: PlaybackStateSnapshot?
     private var inlineCoverLifecycle = MPVPictureInPictureInlineCoverLifecycle()

@@ -82,13 +82,37 @@ extension MPVPlayerView {
     /// The inline player shows MPV-rendered subtitles. Capture the same text so
     /// the Picture in Picture overlay can draw it, and only while MPV would
     /// render it, so hidden subtitles stay hidden in both places.
+    ///
+    /// Read on the MPV queue, which also owns the diagnostic state below.
     private nonisolated func pictureInPictureSubtitleText() -> String? {
-        guard pictureInPictureSubtitleOverlayEnabled,
-              getFlag(MPVProperty.subtitleVisibility) == true,
-              let text = getString(MPVProperty.subtitleText)
-        else { return nil }
-        let normalized = MPVPictureInPictureSubtitleOverlay.normalizedText(text)
-        return normalized.isEmpty ? nil : normalized
+        guard pictureInPictureSubtitleOverlayEnabled else {
+            logPictureInPictureSubtitleState("overlay-disabled")
+            return nil
+        }
+        guard getFlag(MPVProperty.subtitleVisibility) == true else {
+            logPictureInPictureSubtitleState(
+                "hidden sid=\(getInt64(MPVProperty.subtitleID).map(String.init) ?? "none")"
+            )
+            return nil
+        }
+        let normalized = getString(MPVProperty.subtitleText)
+            .map(MPVPictureInPictureSubtitleOverlay.normalizedText) ?? ""
+        guard normalized.isEmpty == false else {
+            logPictureInPictureSubtitleState(
+                "no-text sid=\(getInt64(MPVProperty.subtitleID).map(String.init) ?? "none")"
+            )
+            return nil
+        }
+        logPictureInPictureSubtitleState("text chars=\(normalized.count)")
+        return normalized
+    }
+
+    private nonisolated func logPictureInPictureSubtitleState(_ state: String) {
+        #if DEBUG
+        guard lastPictureInPictureSubtitleState != state else { return }
+        lastPictureInPictureSubtitleState = state
+        mpvDebugLog("pip subtitle capture \(state)")
+        #endif
     }
 
     private nonisolated func pictureInPictureScreenshot(
