@@ -34,7 +34,10 @@ extension MPVQuickPlayerViewController: MPVPlayerDelegate {
     public func player(_ player: MPVPlayer, didChangeState state: MPVPlaybackState) {
         playbackState = state
         let isPlaying = state == .buffering || state == .readyToPlay || state == .bufferFinished
-        playButton.setImage(UIImage(systemName: isPlaying ? "pause.fill" : "play.fill"), for: .normal)
+        playButton.setImage(
+            MPVQuickPlayerSymbol.image(isPlaying ? .pause : .play, pointSize: 20),
+            for: .normal
+        )
         if Self.shouldShowLoading(for: state) {
             loadingIndicator.startAnimating()
         } else {

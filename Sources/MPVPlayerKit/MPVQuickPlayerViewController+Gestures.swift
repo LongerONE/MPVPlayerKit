@@ -64,7 +64,7 @@ extension MPVQuickPlayerViewController {
             panTargetTime = min(max(panStartTime + delta, 0), player.duration)
             let progress = Float(panTargetTime / max(player.duration, 1))
             showGestureHUD(
-                icon: translation.x >= 0 ? "goforward" : "gobackward",
+                icon: translation.x >= 0 ? .seekForward : .seekBackward,
                 text: Self.timeDescription(currentTime: panTargetTime, duration: player.duration),
                 progress: progress
             )
@@ -75,7 +75,11 @@ extension MPVQuickPlayerViewController {
                 viewHeight: contentView.bounds.height
             )
             UIScreen.main.brightness = value
-            showGestureHUD(icon: "sun.max.fill", text: "\(Int((value * 100).rounded()))%", progress: Float(value))
+            showGestureHUD(
+                icon: .brightness,
+                text: "\(Int((value * 100).rounded()))%",
+                progress: Float(value)
+            )
         case .volume:
             let value = Float(Self.verticalValue(
                 startValue: CGFloat(panStartVolume),
@@ -84,15 +88,15 @@ extension MPVQuickPlayerViewController {
             ))
             systemVolumeSlider?.setValue(value, animated: false)
             systemVolumeSlider?.sendActions(for: .valueChanged)
-            let icon = value == 0 ? "speaker.slash.fill" : "speaker.wave.2.fill"
+            let icon: MPVQuickPlayerSymbol = value == 0 ? .volumeMuted : .volume
             showGestureHUD(icon: icon, text: "\(Int((value * 100).rounded()))%", progress: value)
         case .none:
             break
         }
     }
 
-    func showGestureHUD(icon: String, text: String, progress: Float) {
-        gestureHUDIcon.image = UIImage(systemName: icon)
+    func showGestureHUD(icon: MPVQuickPlayerSymbol, text: String, progress: Float) {
+        gestureHUDIcon.image = MPVQuickPlayerSymbol.image(icon, pointSize: 24)
         gestureHUDLabel.text = text
         gestureHUDProgress.setProgress(min(max(progress, 0), 1), animated: false)
         if gestureHUD.alpha < 1 {

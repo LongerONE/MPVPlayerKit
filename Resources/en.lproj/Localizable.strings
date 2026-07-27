@@ -1,6 +1,8 @@
 "accessibility.close_player" = "Close player";
 "accessibility.loading_video" = "Loading video";
 "accessibility.play_pause" = "Play or pause";
+"accessibility.skip_backward_15_seconds" = "Skip backward 15 seconds";
+"accessibility.skip_forward_15_seconds" = "Skip forward 15 seconds";
 "accessibility.video_track" = "Video track";
 "accessibility.audio_track" = "Audio track";
 "accessibility.subtitles" = "Subtitles";

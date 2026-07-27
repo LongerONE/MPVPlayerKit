@@ -1,6 +1,8 @@
 "accessibility.close_player" = "关闭播放器";
 "accessibility.loading_video" = "正在加载视频";
 "accessibility.play_pause" = "播放或暂停";
+"accessibility.skip_backward_15_seconds" = "后退 15 秒";
+"accessibility.skip_forward_15_seconds" = "前进 15 秒";
 "accessibility.video_track" = "视频轨道";
 "accessibility.audio_track" = "音频轨道";
 "accessibility.subtitles" = "字幕";

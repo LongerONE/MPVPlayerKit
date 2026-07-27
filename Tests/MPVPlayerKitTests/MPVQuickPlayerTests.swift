@@ -70,4 +70,42 @@ final class MPVQuickPlayerTests: XCTestCase {
         XCTAssertTrue(controller.topBar.isUserInteractionEnabled)
         XCTAssertTrue(controller.controlsView.isUserInteractionEnabled)
     }
+
+    @MainActor
+    func testQuickPlayerExposesFifteenSecondTransportControls() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
+        let controller = MPVQuickPlayerViewController(url: url, autoplay: false)
+        controller.loadViewIfNeeded()
+
+        XCTAssertEqual(
+            controller.transportStack.arrangedSubviews,
+            [controller.backwardButton, controller.playButton, controller.forwardButton]
+        )
+        XCTAssertEqual(
+            controller.backwardButton.accessibilityIdentifier,
+            "MPVQuickPlayer.backward15Button"
+        )
+        XCTAssertEqual(
+            controller.playButton.accessibilityIdentifier,
+            "MPVQuickPlayer.playButton"
+        )
+        XCTAssertEqual(
+            controller.forwardButton.accessibilityIdentifier,
+            "MPVQuickPlayer.forward15Button"
+        )
+        XCTAssertNotNil(controller.backwardButton.image(for: .normal))
+        XCTAssertNotNil(controller.playButton.image(for: .normal))
+        XCTAssertNotNil(controller.forwardButton.image(for: .normal))
+        XCTAssertEqual(controller.backwardButton.accessibilityLabel, mpvLocalized("accessibility.skip_backward_15_seconds"))
+        XCTAssertEqual(controller.forwardButton.accessibilityLabel, mpvLocalized("accessibility.skip_forward_15_seconds"))
+
+        let backwardAction = NSStringFromSelector(#selector(MPVQuickPlayerViewController.skipBackward15Seconds))
+        let forwardAction = NSStringFromSelector(#selector(MPVQuickPlayerViewController.skipForward15Seconds))
+        XCTAssertTrue(
+            controller.backwardButton.actions(forTarget: controller, forControlEvent: .touchUpInside)?.contains(backwardAction) == true
+        )
+        XCTAssertTrue(
+            controller.forwardButton.actions(forTarget: controller, forControlEvent: .touchUpInside)?.contains(forwardAction) == true
+        )
+    }
 }

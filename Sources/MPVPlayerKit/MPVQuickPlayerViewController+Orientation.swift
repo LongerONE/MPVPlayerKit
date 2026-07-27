@@ -122,7 +122,7 @@ extension MPVQuickPlayerViewController {
         )
         closeButtonLeadingConstraint?.constant = 12 + insets.left
         statusLabelTrailingConstraint?.constant = -(12 + insets.right)
-        playButtonLeadingConstraint?.constant = 12 + insets.left
+        transportStackLeadingConstraint?.constant = 12 + insets.left
         progressSliderTrailingConstraint?.constant = -(12 + insets.right)
     }
 

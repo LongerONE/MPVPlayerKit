@@ -329,19 +329,14 @@ final class MPVPlayerModelTests: XCTestCase {
     }
 
     func testQuickPlayerUsesAvailableSFSymbolControls() {
-        [
-            "xmark",
-            "play.fill",
-            "pause.fill",
-            "film",
-            "waveform",
-            "captions.bubble",
-            "gearshape",
-            "rectangle.landscape.rotate",
-            "sun.max.fill",
-            "speaker.wave.2.fill",
-        ].forEach { symbol in
-            XCTAssertNotNil(UIImage(systemName: symbol), symbol)
+        MPVQuickPlayerSymbol.allCases.forEach { symbol in
+            let image = UIImage(systemName: symbol.rawValue)
+            XCTAssertNotNil(image, symbol.rawValue)
+            XCTAssertEqual(
+                MPVQuickPlayerSymbol.image(symbol)?.renderingMode,
+                .alwaysTemplate,
+                symbol.rawValue
+            )
         }
     }
 

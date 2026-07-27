@@ -1,5 +1,4 @@
 import AVFoundation
-import AVKit
 import MediaPlayer
 import UIKit
 import UniformTypeIdentifiers
@@ -37,7 +36,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
     let orientationButton = UIButton(type: .system)
     let statusLabel = UILabel()
     let controlsView = UIView()
+    let backwardButton = UIButton(type: .system)
     let playButton = UIButton(type: .system)
+    let forwardButton = UIButton(type: .system)
+    let transportStack = UIStackView()
     let progressSlider = UISlider()
     let timeLabel = UILabel()
     let trackButtonStack = UIStackView()
@@ -68,7 +70,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var arePlaybackControlsHidden = false
     var closeButtonLeadingConstraint: NSLayoutConstraint!
     var statusLabelTrailingConstraint: NSLayoutConstraint!
-    var playButtonLeadingConstraint: NSLayoutConstraint!
+    var transportStackLeadingConstraint: NSLayoutConstraint!
     var progressSliderTrailingConstraint: NSLayoutConstraint!
 
     enum PanDirection {
@@ -183,13 +185,16 @@ public final class MPVQuickPlayerViewController: UIViewController {
         contentView.addSubview(topBar)
 
         closeButton.tintColor = .white
-        closeButton.setImage(UIImage(systemName: "xmark"), for: .normal)
+        closeButton.setImage(MPVQuickPlayerSymbol.image(.close, pointSize: 16), for: .normal)
         closeButton.accessibilityLabel = mpvLocalized("accessibility.close_player")
         closeButton.addTarget(self, action: #selector(closePlayer), for: .touchUpInside)
         topBar.addSubview(closeButton)
 
         orientationButton.tintColor = .white
-        orientationButton.setImage(UIImage(systemName: "rectangle.landscape.rotate"), for: .normal)
+        orientationButton.setImage(
+            MPVQuickPlayerSymbol.image(.forceLandscape, pointSize: 18),
+            for: .normal
+        )
         orientationButton.accessibilityLabel = mpvLocalized("accessibility.force_landscape")
         orientationButton.accessibilityIdentifier = "MPVQuickPlayer.orientationButton"
         orientationButton.addTarget(self, action: #selector(toggleForcedLandscape), for: .touchUpInside)
@@ -211,11 +216,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         controlsView.backgroundColor = UIColor.black.withAlphaComponent(0.72)
         contentView.addSubview(controlsView)
 
-        playButton.tintColor = .white
-        playButton.accessibilityLabel = mpvLocalized("accessibility.play_pause")
-        playButton.setImage(UIImage(systemName: "play.fill"), for: .normal)
-        playButton.addTarget(self, action: #selector(togglePlayback), for: .touchUpInside)
-        controlsView.addSubview(playButton)
+        configureTransportControls()
 
         progressSlider.minimumValue = 0
         progressSlider.minimumTrackTintColor = .systemBlue
@@ -236,30 +237,30 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
         trackButtonStack.axis = .horizontal
         trackButtonStack.alignment = .center
-        trackButtonStack.spacing = 14
+        trackButtonStack.spacing = 8
         controlsView.addSubview(trackButtonStack)
 
         configureControlButton(
             videoButton,
-            symbol: "film",
+            symbol: .videoTrack,
             label: mpvLocalized("accessibility.video_track"),
             action: #selector(chooseVideoTrack)
         )
         configureControlButton(
             audioButton,
-            symbol: "waveform",
+            symbol: .audioTrack,
             label: mpvLocalized("accessibility.audio_track"),
             action: #selector(chooseAudioTrack)
         )
         configureControlButton(
             subtitleButton,
-            symbol: "captions.bubble",
+            symbol: .subtitles,
             label: mpvLocalized("accessibility.subtitles"),
             action: #selector(chooseSubtitleTrack)
         )
         configureControlButton(
             pictureInPictureButton,
-            symbol: "pip.enter",
+            symbol: .pictureInPictureEnter,
             label: mpvLocalized("accessibility.picture_in_picture"),
             action: #selector(startPictureInPicture)
         )
@@ -269,7 +270,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         updatePictureInPictureButton(isActive: player.isPictureInPictureActive)
         configureControlButton(
             settingsButton,
-            symbol: "gearshape",
+            symbol: .settings,
             label: mpvLocalized("accessibility.playback_settings"),
             action: #selector(showSettings)
         )
@@ -299,24 +300,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
         updateStatusLabel()
     }
 
-    func configureControlButton(
-        _ button: UIButton,
-        symbol: String,
-        label: String,
-        action: Selector
-    ) {
-        button.setImage(UIImage(systemName: symbol), for: .normal)
-        button.tintColor = .white
-        button.accessibilityLabel = label
-        trackButtonStack.addArrangedSubview(button)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        NSLayoutConstraint.activate([
-            button.widthAnchor.constraint(equalToConstant: 32),
-            button.heightAnchor.constraint(equalToConstant: 32),
-        ])
-        button.addTarget(self, action: action, for: .touchUpInside)
-    }
-
     func configureLayout() {
         let constrainedViews = [
             player.playbackView,
@@ -326,7 +309,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
             statusLabel,
             loadingIndicator,
             controlsView,
-            playButton,
+            transportStack,
             progressSlider,
             timeLabel,
             trackButtonStack,
@@ -349,7 +332,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
             equalTo: topBar.trailingAnchor,
             constant: -12
         )
-        playButtonLeadingConstraint = playButton.leadingAnchor.constraint(
+        transportStackLeadingConstraint = transportStack.leadingAnchor.constraint(
             equalTo: controlsView.leadingAnchor,
             constant: 12
         )
@@ -389,22 +372,29 @@ public final class MPVQuickPlayerViewController: UIViewController {
             controlsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
             controlsView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
 
-            playButtonLeadingConstraint,
-            playButton.topAnchor.constraint(equalTo: controlsView.topAnchor, constant: 10),
-            playButton.widthAnchor.constraint(equalToConstant: 36),
-            playButton.heightAnchor.constraint(equalToConstant: 36),
+            transportStackLeadingConstraint,
+            transportStack.topAnchor.constraint(equalTo: controlsView.topAnchor, constant: 10),
 
-            progressSlider.leadingAnchor.constraint(equalTo: playButton.trailingAnchor, constant: 8),
+            progressSlider.leadingAnchor.constraint(equalTo: transportStack.trailingAnchor, constant: 8),
             progressSliderTrailingConstraint,
-            progressSlider.centerYAnchor.constraint(equalTo: playButton.centerYAnchor),
+            progressSlider.centerYAnchor.constraint(equalTo: transportStack.centerYAnchor),
 
-            timeLabel.leadingAnchor.constraint(equalTo: progressSlider.leadingAnchor),
+            timeLabel.leadingAnchor.constraint(equalTo: transportStack.leadingAnchor),
             timeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 6),
-            timeLabel.bottomAnchor.constraint(equalTo: controlsSafeArea.bottomAnchor, constant: -10),
-            timeLabel.trailingAnchor.constraint(lessThanOrEqualTo: trackButtonStack.leadingAnchor, constant: -12),
+            timeLabel.trailingAnchor.constraint(equalTo: progressSlider.trailingAnchor),
 
-            trackButtonStack.trailingAnchor.constraint(equalTo: progressSlider.trailingAnchor),
-            trackButtonStack.centerYAnchor.constraint(equalTo: timeLabel.centerYAnchor),
+            trackButtonStack.topAnchor.constraint(equalTo: timeLabel.bottomAnchor, constant: 6),
+            trackButtonStack.centerXAnchor.constraint(equalTo: controlsView.centerXAnchor),
+            trackButtonStack.leadingAnchor.constraint(
+                greaterThanOrEqualTo: timeLabel.leadingAnchor
+            ),
+            trackButtonStack.trailingAnchor.constraint(
+                lessThanOrEqualTo: timeLabel.trailingAnchor
+            ),
+            trackButtonStack.bottomAnchor.constraint(
+                equalTo: controlsSafeArea.bottomAnchor,
+                constant: -10
+            ),
 
             systemVolumeView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             systemVolumeView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
@@ -471,14 +461,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
         }
     }
 
-    @objc private func togglePlayback() {
-        if player.isPlaying {
-            player.pause()
-        } else {
-            player.play()
-        }
-    }
-
     @objc private func startPictureInPicture() {
         guard player.isPictureInPictureActive == false else {
             player.stopPictureInPicture()
@@ -490,9 +472,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
     func updatePictureInPictureButton(isActive: Bool) {
         pictureInPictureButton.setImage(
-            isActive
-                ? AVPictureInPictureController.pictureInPictureButtonStopImage
-                : AVPictureInPictureController.pictureInPictureButtonStartImage,
+            MPVQuickPlayerSymbol.image(
+                isActive ? .pictureInPictureExit : .pictureInPictureEnter,
+                pointSize: 17
+            ),
             for: .normal
         )
     }
