@@ -19,9 +19,12 @@ enum MPVPictureInPictureStartCancellationPolicy {
     static func shouldMovePlayer(
         isStarting: Bool,
         isActive: Bool,
-        isCancellationRequested: Bool
+        isCancellationRequested: Bool,
+        isStopping: Bool
     ) -> Bool {
-        isCancellationRequested == false && (isStarting || isActive)
+        isCancellationRequested == false
+            && isStopping == false
+            && (isStarting || isActive)
     }
 
     static func shouldPostInactiveState(

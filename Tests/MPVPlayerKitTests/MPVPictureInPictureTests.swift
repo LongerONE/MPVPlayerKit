@@ -137,22 +137,35 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertTrue(MPVPictureInPictureStartCancellationPolicy.shouldMovePlayer(
             isStarting: true,
             isActive: false,
-            isCancellationRequested: false
+            isCancellationRequested: false,
+            isStopping: false
         ))
         XCTAssertTrue(MPVPictureInPictureStartCancellationPolicy.shouldMovePlayer(
             isStarting: false,
             isActive: true,
-            isCancellationRequested: false
+            isCancellationRequested: false,
+            isStopping: false
         ))
         XCTAssertFalse(MPVPictureInPictureStartCancellationPolicy.shouldMovePlayer(
             isStarting: true,
             isActive: false,
-            isCancellationRequested: true
+            isCancellationRequested: true,
+            isStopping: false
+        ))
+        // AVKit still reports the controller as active while it lays out the
+        // disappearing window. That pass must not move the restored player
+        // back into the shrinking PiP container.
+        XCTAssertFalse(MPVPictureInPictureStartCancellationPolicy.shouldMovePlayer(
+            isStarting: false,
+            isActive: true,
+            isCancellationRequested: false,
+            isStopping: true
         ))
         XCTAssertFalse(MPVPictureInPictureStartCancellationPolicy.shouldMovePlayer(
             isStarting: false,
             isActive: false,
-            isCancellationRequested: false
+            isCancellationRequested: false,
+            isStopping: false
         ))
         XCTAssertFalse(MPVPictureInPictureStartCancellationPolicy.shouldPostInactiveState(
             hasPostedActiveState: false,

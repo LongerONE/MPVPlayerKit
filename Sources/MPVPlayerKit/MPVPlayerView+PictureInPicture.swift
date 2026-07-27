@@ -18,6 +18,7 @@ private final class MPVPictureInPictureContentViewController:
     AVPictureInPictureVideoCallViewController
 {
     weak var coordinator: MPVPictureInPictureCoordinator?
+    private var allowsPlayerHosting = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -27,13 +28,27 @@ private final class MPVPictureInPictureContentViewController:
 
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
-        guard view.bounds.width > 0, view.bounds.height > 0 else { return }
+        guard allowsPlayerHosting,
+              view.bounds.width > 0,
+              view.bounds.height > 0
+        else {
+            return
+        }
         coordinator?.movePlayerToPictureInPictureContainer(view)
     }
 
+    override func viewWillAppear(_ animated: Bool) {
+        allowsPlayerHosting = true
+        super.viewWillAppear(animated)
+    }
+
     override func viewWillDisappear(_ animated: Bool) {
-        super.viewWillDisappear(animated)
+        // Disabling hosting before UIKit starts the disappearance layout keeps
+        // that layout pass from moving the player back into the shrinking PiP
+        // window after the coordinator restored it inline.
+        allowsPlayerHosting = false
         coordinator?.restorePlayerToInlineHierarchy()
+        super.viewWillDisappear(animated)
     }
 }
 
@@ -47,6 +62,7 @@ final class MPVPictureInPictureCoordinator:
     private var contentViewController: MPVPictureInPictureContentViewController?
     private var controller: AVPictureInPictureController?
     private var isStarting = false
+    private var isStopping = false
     private var isStartCancellationRequested = false
     private var isTearingDown = false
     private var hasPostedActiveState = false
@@ -83,6 +99,7 @@ final class MPVPictureInPictureCoordinator:
         // a new lifecycle rather than a continuation of the torn down one.
         isTearingDown = false
         guard isActive == false, isStarting == false else { return }
+        isStopping = false
         prepareControllerIfPossible()
         guard let controller else { return }
         playerView?.mpvDebugLog(
@@ -99,6 +116,7 @@ final class MPVPictureInPictureCoordinator:
             return
         }
         if controller.isPictureInPictureActive == false, isStarting {
+            isStopping = true
             isStartCancellationRequested = true
             controller.stopPictureInPicture()
             restorePlayerToInlineHierarchy()
@@ -109,6 +127,7 @@ final class MPVPictureInPictureCoordinator:
             restorePlayerToInlineHierarchy()
             return
         }
+        isStopping = true
         controller.stopPictureInPicture()
     }
 
@@ -143,7 +162,8 @@ final class MPVPictureInPictureCoordinator:
         guard MPVPictureInPictureStartCancellationPolicy.shouldMovePlayer(
             isStarting: isStarting,
             isActive: isActive,
-            isCancellationRequested: isStartCancellationRequested || isTearingDown
+            isCancellationRequested: isStartCancellationRequested || isTearingDown,
+            isStopping: isStopping
         ) else {
             return
         }
@@ -159,6 +179,7 @@ final class MPVPictureInPictureCoordinator:
     func pictureInPictureControllerWillStartPictureInPicture(
         _ pictureInPictureController: AVPictureInPictureController
     ) {
+        isStopping = false
         guard MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
             isStartCancellationRequested: isStartCancellationRequested,
             isTearingDown: isTearingDown
@@ -199,6 +220,7 @@ final class MPVPictureInPictureCoordinator:
     func pictureInPictureControllerWillStopPictureInPicture(
         _ pictureInPictureController: AVPictureInPictureController
     ) {
+        isStopping = true
         restorePlayerToInlineHierarchy()
     }
 
@@ -213,6 +235,7 @@ final class MPVPictureInPictureCoordinator:
         restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completionHandler:
             @escaping (Bool) -> Void
     ) {
+        isStopping = true
         restorePlayerToInlineHierarchy()
         completionHandler(true)
     }
@@ -224,8 +247,9 @@ final class MPVPictureInPictureCoordinator:
                 isStartCancellationRequested: isStartCancellationRequested
             )
         isStarting = false
-        isStartCancellationRequested = false
         restorePlayerToInlineHierarchy()
+        isStartCancellationRequested = false
+        isStopping = false
         guard shouldPostInactiveState else { return }
         hasPostedActiveState = false
         postStateChange(isActive: false)
