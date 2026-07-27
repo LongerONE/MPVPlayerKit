@@ -282,6 +282,10 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var repeatedMPVLogMessageCounts: [String: Int] = [:]
     var lastAppliedLayerBounds = CGRect.null
     var lastAppliedDrawableSize = CGSize.zero
+    /// A Picture in Picture hierarchy callback can arrive before UIKit has
+    /// assigned the view a size in its destination hierarchy. Keep the
+    /// resynchronization pending instead of applying a zero-sized drawable.
+    var pendingPictureInPictureGeometryResynchronizationReason: String?
     var pendingMetalLayerGeometry: MPVMetalLayerGeometry?
     var isMetalGeometryTransitionInProgress = false
     var geometryTransitionOverlayView: UIView?
@@ -382,6 +386,7 @@ public final class MPVPlayerView: UIView {
         pictureInPictureRendererRuntimeState.reset()
         lastAppliedLayerBounds = CGRect.null
         lastAppliedDrawableSize = .zero
+        pendingPictureInPictureGeometryResynchronizationReason = nil
         pendingMetalLayerGeometry = nil
         isMetalGeometryTransitionInProgress = false
         geometryTransitionPreparedTargetSize = .zero
@@ -396,6 +401,10 @@ public final class MPVPlayerView: UIView {
     public override func layoutSubviews() {
         super.layoutSubviews()
         clientSubtitleController.update(at: currentTime, force: true)
+        if let reason = pendingPictureInPictureGeometryResynchronizationReason {
+            resynchronizeMetalLayerGeometry(reason: reason)
+            return
+        }
         updateMetalLayerGeometryIfNeeded()
     }
 

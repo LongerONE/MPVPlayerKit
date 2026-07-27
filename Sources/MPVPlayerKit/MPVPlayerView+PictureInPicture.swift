@@ -25,8 +25,9 @@ private final class MPVPictureInPictureContentViewController:
         view.clipsToBounds = true
     }
 
-    override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        guard view.bounds.width > 0, view.bounds.height > 0 else { return }
         coordinator?.movePlayerToPictureInPictureContainer(view)
     }
 

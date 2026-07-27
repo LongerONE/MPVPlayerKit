@@ -239,6 +239,34 @@ final class MPVPictureInPictureTests: XCTestCase {
     }
 
     @MainActor
+    func testGeometryResyncWaitsForTheRestoredInlineLayout() {
+        let scale = UIScreen.main.nativeScale
+        let playerView = MPVPlayerView(frame: .zero)
+        let pictureInPictureDrawable = CGSize(width: 320 * scale, height: 180 * scale)
+        playerView.metalLayer.drawableSize = pictureInPictureDrawable
+
+        // PiP delegate callbacks can restore the view before the inline
+        // hierarchy has assigned its final size. Applying this zero size would
+        // leave the small PiP drawable pinned at the top of the player.
+        playerView.resynchronizeMetalLayerGeometry(reason: "pip-exit")
+
+        XCTAssertEqual(playerView.metalLayer.drawableSize, pictureInPictureDrawable)
+        XCTAssertEqual(
+            playerView.pendingPictureInPictureGeometryResynchronizationReason,
+            "pip-exit"
+        )
+
+        playerView.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        playerView.layoutIfNeeded()
+
+        XCTAssertEqual(
+            playerView.metalLayer.drawableSize,
+            CGSize(width: 390 * scale, height: 844 * scale)
+        )
+        XCTAssertNil(playerView.pendingPictureInPictureGeometryResynchronizationReason)
+    }
+
+    @MainActor
     func testPlacementReportsWhetherItMovedThePlayerView() throws {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let playerView = MPVPlayerView(frame: CGRect(x: 0, y: 0, width: 390, height: 220))

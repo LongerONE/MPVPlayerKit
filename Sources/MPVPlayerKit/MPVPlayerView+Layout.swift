@@ -80,6 +80,15 @@ extension MPVPlayerView {
             return
         }
         layoutIfNeeded()
+        guard bounds.width > 0, bounds.height > 0 else {
+            pendingPictureInPictureGeometryResynchronizationReason = reason
+            mpvDebugLog("metal geometry resync deferred reason=\(reason) bounds=\(bounds)")
+            setNeedsLayout()
+            superview?.setNeedsLayout()
+            window?.setNeedsLayout()
+            return
+        }
+        pendingPictureInPictureGeometryResynchronizationReason = nil
         mpvDebugLog("metal geometry resync reason=\(reason) bounds=\(bounds)")
         lastAppliedLayerBounds = .null
         lastAppliedDrawableSize = .zero
