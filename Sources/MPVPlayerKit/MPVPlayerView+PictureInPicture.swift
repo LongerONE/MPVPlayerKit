@@ -174,6 +174,7 @@ final class MPVPictureInPictureCoordinator:
     func restorePlayerToInlineHierarchy() {
         guard placement?.restorePlayer() == true else { return }
         playerView?.resynchronizeMetalLayerGeometry(reason: "pip-exit")
+        playerView?.schedulePictureInPictureGeometryResynchronization(reason: "pip-exit")
     }
 
     func pictureInPictureControllerWillStartPictureInPicture(

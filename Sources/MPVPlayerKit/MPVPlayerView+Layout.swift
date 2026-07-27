@@ -83,9 +83,7 @@ extension MPVPlayerView {
         guard bounds.width > 0, bounds.height > 0 else {
             pendingPictureInPictureGeometryResynchronizationReason = reason
             mpvDebugLog("metal geometry resync deferred reason=\(reason) bounds=\(bounds)")
-            setNeedsLayout()
-            superview?.setNeedsLayout()
-            window?.setNeedsLayout()
+            schedulePictureInPictureGeometryResynchronization(reason: reason)
             return
         }
         pendingPictureInPictureGeometryResynchronizationReason = nil
@@ -100,6 +98,68 @@ extension MPVPlayerView {
             // the snapshot cross fade would only show a stale frame over it.
             animated: false
         )
+    }
+
+    /// PiP delegate callbacks can arrive while AVKit is still restoring the
+    /// inline hierarchy. Rotation fixes the symptom because it performs a new
+    /// layout pass; do the equivalent here for a short, bounded period instead
+    /// of leaving the PiP-sized drawable visible until the user rotates.
+    func schedulePictureInPictureGeometryResynchronization(reason: String) {
+        pictureInPictureGeometryResynchronizationTask?.cancel()
+        pictureInPictureGeometryResynchronizationGeneration &+= 1
+        let generation = pictureInPictureGeometryResynchronizationGeneration
+
+        pictureInPictureGeometryResynchronizationTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            var lastResynchronizedBounds: CGRect?
+
+            // AVKit completes the return animation asynchronously. Eight
+            // passes cover that transition without a persistent polling loop.
+            for attempt in 0..<8 {
+                guard Task.isCancelled == false,
+                      generation == self.pictureInPictureGeometryResynchronizationGeneration
+                else {
+                    return
+                }
+
+                // Avoid a nested resynchronization from layoutSubviews; this
+                // task owns the forced update for this pass.
+                self.pendingPictureInPictureGeometryResynchronizationReason = nil
+                self.layoutPictureInPictureHierarchy()
+
+                let currentBounds = self.bounds
+                guard currentBounds.width > 0, currentBounds.height > 0 else {
+                    self.pendingPictureInPictureGeometryResynchronizationReason = reason
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                    continue
+                }
+
+                if attempt == 0 || currentBounds != lastResynchronizedBounds {
+                    self.resynchronizeMetalLayerGeometry(reason: reason)
+                    lastResynchronizedBounds = currentBounds
+                }
+
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+
+            guard generation == self.pictureInPictureGeometryResynchronizationGeneration else {
+                return
+            }
+            self.pictureInPictureGeometryResynchronizationTask = nil
+        }
+    }
+
+    private func layoutPictureInPictureHierarchy() {
+        setNeedsLayout()
+        var ancestor = superview
+        while let currentAncestor = ancestor {
+            currentAncestor.setNeedsLayout()
+            ancestor = currentAncestor.superview
+        }
+        window?.setNeedsLayout()
+        window?.layoutIfNeeded()
+        superview?.layoutIfNeeded()
+        layoutIfNeeded()
     }
 
     func updateMetalLayerGeometry(

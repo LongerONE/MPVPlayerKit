@@ -286,6 +286,11 @@ public final class MPVPlayerView: UIView {
     /// assigned the view a size in its destination hierarchy. Keep the
     /// resynchronization pending instead of applying a zero-sized drawable.
     var pendingPictureInPictureGeometryResynchronizationReason: String?
+    /// PiP returns the player before the inline hierarchy has always finished
+    /// its transition. Keep one bounded retry task so the first stable inline
+    /// layout is applied without requiring a device rotation.
+    var pictureInPictureGeometryResynchronizationTask: Task<Void, Never>?
+    var pictureInPictureGeometryResynchronizationGeneration = 0
     var pendingMetalLayerGeometry: MPVMetalLayerGeometry?
     var isMetalGeometryTransitionInProgress = false
     var geometryTransitionOverlayView: UIView?
@@ -386,6 +391,9 @@ public final class MPVPlayerView: UIView {
         pictureInPictureRendererRuntimeState.reset()
         lastAppliedLayerBounds = CGRect.null
         lastAppliedDrawableSize = .zero
+        pictureInPictureGeometryResynchronizationTask?.cancel()
+        pictureInPictureGeometryResynchronizationTask = nil
+        pictureInPictureGeometryResynchronizationGeneration &+= 1
         pendingPictureInPictureGeometryResynchronizationReason = nil
         pendingMetalLayerGeometry = nil
         isMetalGeometryTransitionInProgress = false

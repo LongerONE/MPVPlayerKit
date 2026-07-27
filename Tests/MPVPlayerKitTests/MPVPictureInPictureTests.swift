@@ -289,6 +289,28 @@ final class MPVPictureInPictureTests: XCTestCase {
     }
 
     @MainActor
+    func testGeometryResyncRetriesWhenInlineLayoutArrivesAfterPictureInPictureExit() async {
+        let scale = UIScreen.main.nativeScale
+        let playerView = MPVPlayerView(frame: .zero)
+        let pictureInPictureDrawable = CGSize(width: 320 * scale, height: 180 * scale)
+        playerView.metalLayer.drawableSize = pictureInPictureDrawable
+
+        playerView.resynchronizeMetalLayerGeometry(reason: "pip-exit")
+        XCTAssertNotNil(playerView.pictureInPictureGeometryResynchronizationTask)
+
+        // This mirrors the delayed inline size that rotation previously forced
+        // UIKit to apply manually after returning from PiP.
+        playerView.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        try? await Task.sleep(nanoseconds: 150_000_000)
+
+        XCTAssertEqual(
+            playerView.metalLayer.drawableSize,
+            CGSize(width: 390 * scale, height: 844 * scale)
+        )
+        playerView.pictureInPictureGeometryResynchronizationTask?.cancel()
+    }
+
+    @MainActor
     func testPlacementReportsWhetherItMovedThePlayerView() throws {
         let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         let playerView = MPVPlayerView(frame: CGRect(x: 0, y: 0, width: 390, height: 220))
