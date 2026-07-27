@@ -146,11 +146,13 @@ final class MPVPictureInPictureCoordinator:
         ) else {
             return
         }
-        placement?.movePlayer(to: containerView)
+        guard placement?.movePlayer(to: containerView) == true else { return }
+        playerView?.resynchronizeMetalLayerGeometry(reason: "pip-enter")
     }
 
     func restorePlayerToInlineHierarchy() {
-        placement?.restorePlayer()
+        guard placement?.restorePlayer() == true else { return }
+        playerView?.resynchronizeMetalLayerGeometry(reason: "pip-exit")
     }
 
     func pictureInPictureControllerWillStartPictureInPicture(

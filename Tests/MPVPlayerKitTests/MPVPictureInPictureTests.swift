@@ -205,6 +205,58 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertTrue(playerView.isDescendant(of: container))
     }
 
+    /// Returning from the window left the layer presenting the drawable it
+    /// last produced at the Picture in Picture size, which put the video in a
+    /// strip at the top of the restored view. The size matches the one applied
+    /// before the window opened, so the ordinary change test skips it and MPV
+    /// is never told to render at the inline size again.
+    @MainActor
+    func testGeometryResyncRecoversADrawableLeftAtThePictureInPictureSize() {
+        let scale = UIScreen.main.nativeScale
+        let playerView = MPVPlayerView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        playerView.updateMetalLayerGeometry(
+            for: playerView.bounds,
+            scale: scale,
+            transitionReason: "test",
+            animated: false
+        )
+        let inlineDrawable = CGSize(width: 390 * scale, height: 844 * scale)
+        XCTAssertEqual(playerView.metalLayer.drawableSize, inlineDrawable)
+
+        // What the window leaves behind: the layer is sized for the small
+        // Picture in Picture drawable while the view is back at full size.
+        playerView.metalLayer.drawableSize = CGSize(width: 320 * scale, height: 180 * scale)
+
+        // A plain layout pass cannot see it, because the change test compares
+        // against the last geometry applied rather than against the layer.
+        playerView.updateMetalLayerGeometryIfNeeded()
+        XCTAssertNotEqual(playerView.metalLayer.drawableSize, inlineDrawable)
+
+        playerView.resynchronizeMetalLayerGeometry(reason: "pip-exit")
+
+        XCTAssertEqual(playerView.metalLayer.drawableSize, inlineDrawable)
+        XCTAssertEqual(playerView.metalLayer.frame, playerView.bounds)
+    }
+
+    @MainActor
+    func testPlacementReportsWhetherItMovedThePlayerView() throws {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let playerView = MPVPlayerView(frame: CGRect(x: 0, y: 0, width: 390, height: 220))
+        container.addSubview(playerView)
+        let pictureInPictureContainer = UIView(
+            frame: CGRect(x: 0, y: 0, width: 320, height: 180)
+        )
+        let placement = try XCTUnwrap(MPVPictureInPictureViewPlacement(playerView: playerView))
+
+        // Only a move that happened may re-size the renderer; the delegate
+        // calls both directions more than once per lifecycle.
+        XCTAssertFalse(placement.restorePlayer())
+        XCTAssertTrue(placement.movePlayer(to: pictureInPictureContainer))
+        XCTAssertFalse(placement.movePlayer(to: pictureInPictureContainer))
+        XCTAssertTrue(placement.restorePlayer())
+        XCTAssertFalse(placement.restorePlayer())
+    }
+
     /// Moving the view must not disturb the renderer: the Metal layer and the
     /// MPV output options travel with it, and Picture in Picture would lose
     /// Dolby Vision if they were rebuilt on the way.

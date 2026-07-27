@@ -45,11 +45,14 @@ final class MPVPictureInPictureViewPlacement {
         installSourceView(below: playerView, in: superview, at: index)
     }
 
-    func movePlayer(to containerView: UIView) {
+    /// Returns whether the player view actually moved, so the caller can
+    /// re-synchronize the renderer with its new size.
+    @discardableResult
+    func movePlayer(to containerView: UIView) -> Bool {
         guard isPlayerInPictureInPictureContainer == false,
               let playerView
         else {
-            return
+            return false
         }
 
         originalConstraints.forEach { $0.isActive = false }
@@ -63,15 +66,18 @@ final class MPVPictureInPictureViewPlacement {
             playerView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
         ]
         NSLayoutConstraint.activate(pictureInPictureConstraints)
+        containerView.layoutIfNeeded()
         isPlayerInPictureInPictureContainer = true
+        return true
     }
 
-    func restorePlayer() {
+    @discardableResult
+    func restorePlayer() -> Bool {
         guard isPlayerInPictureInPictureContainer,
               let playerView,
               let originalSuperview
         else {
-            return
+            return false
         }
 
         pictureInPictureConstraints.forEach { $0.isActive = false }
@@ -82,13 +88,23 @@ final class MPVPictureInPictureViewPlacement {
         playerView.translatesAutoresizingMaskIntoConstraints =
             originalTranslatesAutoresizingMaskIntoConstraints
         playerView.autoresizingMask = originalAutoresizingMask
-        playerView.frame = originalFrame
         originalConstraints.forEach { $0.isActive = true }
+        // The recorded frame is only authoritative while the layout is driven
+        // by autoresizing. Under constraints it is a snapshot from before the
+        // window was shown, and the host may have laid out differently since,
+        // so the reactivated constraints decide the size instead.
+        if originalTranslatesAutoresizingMaskIntoConstraints {
+            playerView.frame = originalFrame
+        }
+        // Settle the inline layout now, so the caller sizes the renderer
+        // against the frame the view actually returns to.
+        originalSuperview.layoutIfNeeded()
         isPlayerInPictureInPictureContainer = false
+        return true
     }
 
     func tearDown() {
-        restorePlayer()
+        _ = restorePlayer()
         sourceConstraints.forEach { $0.isActive = false }
         sourceConstraints.removeAll()
         sourceView.removeFromSuperview()

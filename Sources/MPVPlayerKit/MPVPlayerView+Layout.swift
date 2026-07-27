@@ -63,6 +63,36 @@ extension MPVPlayerView {
         )
     }
 
+    /// Re-sizes the renderer to the view after it changed window hierarchy.
+    ///
+    /// Picture in Picture moves this view between the inline hierarchy and the
+    /// Picture in Picture window. A plain layout pass is not enough to recover
+    /// from that: the layer keeps presenting the drawable it last produced at
+    /// the other size, and MPV is only told about a new size when the geometry
+    /// is applied, so a size that happens to match the one applied last would
+    /// be skipped and leave the window rendering at the previous size. The
+    /// change test is therefore cleared rather than consulted.
+    func resynchronizeMetalLayerGeometry(reason: String) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.resynchronizeMetalLayerGeometry(reason: reason)
+            }
+            return
+        }
+        layoutIfNeeded()
+        mpvDebugLog("metal geometry resync reason=\(reason) bounds=\(bounds)")
+        lastAppliedLayerBounds = .null
+        lastAppliedDrawableSize = .zero
+        updateMetalLayerGeometry(
+            for: CGRect(origin: .zero, size: bounds.size),
+            scale: UIScreen.main.nativeScale,
+            transitionReason: reason,
+            // The system animates the Picture in Picture transition itself, so
+            // the snapshot cross fade would only show a stale frame over it.
+            animated: false
+        )
+    }
+
     func updateMetalLayerGeometry(
         for targetBounds: CGRect,
         scale: CGFloat,
