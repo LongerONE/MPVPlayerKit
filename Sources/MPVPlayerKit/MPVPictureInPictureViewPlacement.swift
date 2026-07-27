@@ -12,9 +12,6 @@ final class MPVPictureInPictureViewPlacement {
     private weak var playerView: MPVPlayerView?
     private weak var originalSuperview: UIView?
     private let originalSubviewIndex: Int
-    private let originalFrame: CGRect
-    private let originalAutoresizingMask: UIView.AutoresizingMask
-    private let originalTranslatesAutoresizingMaskIntoConstraints: Bool
     /// The anchor AVKit tracks. It stays in the inline hierarchy for the whole
     /// lifetime of the placement, so the system keeps a stable source rect even
     /// while the player view itself is in the Picture in Picture window.
@@ -22,6 +19,7 @@ final class MPVPictureInPictureViewPlacement {
     private var originalConstraints: [NSLayoutConstraint] = []
     private var sourceConstraints: [NSLayoutConstraint] = []
     private var pictureInPictureConstraints: [NSLayoutConstraint] = []
+    private var restoredFullscreenConstraints: [NSLayoutConstraint] = []
     private(set) var isPlayerInPictureInPictureContainer = false
 
     init?(playerView: MPVPlayerView) {
@@ -34,10 +32,6 @@ final class MPVPictureInPictureViewPlacement {
         self.playerView = playerView
         originalSuperview = superview
         originalSubviewIndex = index
-        originalFrame = playerView.frame
-        originalAutoresizingMask = playerView.autoresizingMask
-        originalTranslatesAutoresizingMaskIntoConstraints =
-            playerView.translatesAutoresizingMaskIntoConstraints
 
         sourceView.backgroundColor = .clear
         sourceView.isUserInteractionEnabled = false
@@ -55,6 +49,8 @@ final class MPVPictureInPictureViewPlacement {
             return false
         }
 
+        restoredFullscreenConstraints.forEach { $0.isActive = false }
+        restoredFullscreenConstraints.removeAll()
         originalConstraints.forEach { $0.isActive = false }
         playerView.removeFromSuperview()
         playerView.translatesAutoresizingMaskIntoConstraints = false
@@ -89,19 +85,18 @@ final class MPVPictureInPictureViewPlacement {
         playerView.removeFromSuperview()
         let insertionIndex = min(originalSubviewIndex, originalSuperview.subviews.count)
         originalSuperview.insertSubview(playerView, at: insertionIndex)
-        playerView.translatesAutoresizingMaskIntoConstraints =
-            originalTranslatesAutoresizingMaskIntoConstraints
-        playerView.autoresizingMask = originalAutoresizingMask
-        originalConstraints.forEach { $0.isActive = true }
-        // The recorded frame is only authoritative while the layout is driven
-        // by autoresizing. Under constraints it is a snapshot from before the
-        // window was shown, and the host may have laid out differently since,
-        // so the reactivated constraints decide the size instead.
-        if originalTranslatesAutoresizingMaskIntoConstraints {
-            playerView.frame = originalFrame
-        }
-        // Settle the inline layout now, so the caller sizes the renderer
-        // against the frame the view actually returns to.
+        // A PiP return may restore the old, PiP-sized frame before the host
+        // gets another layout pass. Do not wait for a rotation to repair it:
+        // the renderer always returns as the full inline playback surface.
+        originalConstraints.forEach { $0.isActive = false }
+        playerView.translatesAutoresizingMaskIntoConstraints = false
+        restoredFullscreenConstraints = [
+            playerView.leadingAnchor.constraint(equalTo: originalSuperview.leadingAnchor),
+            playerView.trailingAnchor.constraint(equalTo: originalSuperview.trailingAnchor),
+            playerView.topAnchor.constraint(equalTo: originalSuperview.topAnchor),
+            playerView.bottomAnchor.constraint(equalTo: originalSuperview.bottomAnchor),
+        ]
+        NSLayoutConstraint.activate(restoredFullscreenConstraints)
         originalSuperview.layoutIfNeeded()
         isPlayerInPictureInPictureContainer = false
         return true

@@ -219,7 +219,7 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertFalse(placement.isPlayerInPictureInPictureContainer)
         XCTAssertTrue(playerView.isDescendant(of: container))
         XCTAssertEqual(container.subviews.firstIndex(of: playerView), 1)
-        XCTAssertEqual(playerView.frame, CGRect(x: 0, y: 100, width: 390, height: 220))
+        XCTAssertEqual(playerView.frame, container.bounds)
 
         placement.tearDown()
 
@@ -325,6 +325,8 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertFalse(placement.restorePlayer())
         XCTAssertTrue(placement.movePlayer(to: pictureInPictureContainer))
         XCTAssertFalse(placement.movePlayer(to: pictureInPictureContainer))
+        XCTAssertTrue(placement.restorePlayer())
+        XCTAssertTrue(placement.movePlayer(to: pictureInPictureContainer))
         XCTAssertTrue(placement.restorePlayer())
         XCTAssertFalse(placement.restorePlayer())
     }
