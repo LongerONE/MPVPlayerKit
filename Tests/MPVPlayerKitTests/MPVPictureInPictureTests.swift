@@ -6,6 +6,15 @@ import Metal
 
 final class MPVPictureInPictureTests: XCTestCase {
 
+    private final class ReentrantLayoutView: UIView {
+        var onLayout: (() -> Void)?
+
+        override func layoutSubviews() {
+            super.layoutSubviews()
+            onLayout?()
+        }
+    }
+
     func testPictureInPictureContentSizeUsesVideoDisplaySizeAndFallback() {
         XCTAssertEqual(
             MPVPictureInPictureContentSize.resolve(
@@ -283,6 +292,26 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertFalse(placement.movePlayer(to: pictureInPictureContainer))
         XCTAssertTrue(placement.restorePlayer())
         XCTAssertFalse(placement.restorePlayer())
+    }
+
+    @MainActor
+    func testPlacementRejectsAReentrantMoveDuringPictureInPictureLayout() throws {
+        let container = UIView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
+        let playerView = MPVPlayerView(frame: CGRect(x: 0, y: 0, width: 390, height: 220))
+        let pictureInPictureContainer = ReentrantLayoutView(
+            frame: CGRect(x: 0, y: 0, width: 320, height: 180)
+        )
+        container.addSubview(playerView)
+        let placement = try XCTUnwrap(MPVPictureInPictureViewPlacement(playerView: playerView))
+        var reentrantMoveResult: Bool?
+
+        pictureInPictureContainer.onLayout = {
+            reentrantMoveResult = placement.movePlayer(to: pictureInPictureContainer)
+        }
+
+        XCTAssertTrue(placement.movePlayer(to: pictureInPictureContainer))
+        XCTAssertEqual(reentrantMoveResult, false)
+        XCTAssertTrue(placement.isPlayerInPictureInPictureContainer)
     }
 
     /// Moving the view must not disturb the renderer: the Metal layer and the

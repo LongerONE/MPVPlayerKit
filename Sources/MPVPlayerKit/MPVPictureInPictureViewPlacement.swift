@@ -66,8 +66,12 @@ final class MPVPictureInPictureViewPlacement {
             playerView.bottomAnchor.constraint(equalTo: containerView.bottomAnchor),
         ]
         NSLayoutConstraint.activate(pictureInPictureConstraints)
-        containerView.layoutIfNeeded()
+        // `layoutIfNeeded()` synchronously calls the Picture in Picture
+        // content controller's `viewDidLayoutSubviews()`. Mark the move first
+        // so that callback cannot enter this method again while the hierarchy
+        // is still being updated.
         isPlayerInPictureInPictureContainer = true
+        containerView.layoutIfNeeded()
         return true
     }
 
