@@ -20,7 +20,7 @@ public protocol MPVSubtitleRenderer: AnyObject {
 @MainActor
 public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
     private static let shadowOpacity: Float = 0.6
-    private static let shadowRadius: CGFloat = 1.25
+    private static let shadowRadius: CGFloat = 1.75
 
     public let view = UIView()
     private let label = UILabel()
