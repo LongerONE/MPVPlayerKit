@@ -81,7 +81,7 @@ final class MPVSubtitleStyleTests: XCTestCase {
         assertColor(UIColor(cgColor: shadowCGColor), red: 0x10, green: 0x20, blue: 0x30, alpha: 0xFF)
         assertColor(backgroundColor, red: 0x01, green: 0x02, blue: 0x03, alpha: 0x80)
         XCTAssertEqual(label.layer.shadowOpacity, 0.6)
-        XCTAssertEqual(label.layer.shadowRadius, 1.75)
+        XCTAssertEqual(label.layer.shadowRadius, 4)
     }
 
     @MainActor
@@ -95,7 +95,7 @@ final class MPVSubtitleStyleTests: XCTestCase {
         guard let label = renderer.view.subviews.compactMap({ $0 as? UILabel }).first else {
             return XCTFail("Renderer should create a subtitle label")
         }
-        XCTAssertEqual(label.layer.shadowRadius, 1.75)
+        XCTAssertEqual(label.layer.shadowRadius, 4)
         XCTAssertEqual(label.layer.shadowOffset, CGSize(width: 0, height: 10))
     }
 
