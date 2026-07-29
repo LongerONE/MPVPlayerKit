@@ -241,7 +241,7 @@ public final class MPVPlayerView: UIView {
         MPVProperty.subtitleOutlineSize: "0.000",
         MPVProperty.subtitleOutlineColor: "#FF000000",
         MPVProperty.subtitleShadowOffset: "0.000",
-        MPVProperty.subtitleBackColor: "#00000000",
+        MPVProperty.subtitleBackColor: "#FF000000",
         MPVProperty.subtitleBorderStyle: "outline-and-shadow",
         MPVProperty.subtitleMarginY: "34",
     ]

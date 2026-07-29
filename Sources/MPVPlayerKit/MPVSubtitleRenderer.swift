@@ -66,7 +66,7 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
             .backgroundColor: UIColor(mpvHex: style.backgroundColor, fallback: .clear),
             .paragraphStyle: paragraph,
         ])
-        label.layer.shadowColor = UIColor.black.cgColor
+        label.layer.shadowColor = UIColor(mpvHex: style.shadowColor, fallback: .black).cgColor
         label.layer.shadowOpacity = style.shadowOffset > 0 ? 0.85 : 0
         label.layer.shadowRadius = CGFloat(style.shadowOffset)
         label.layer.shadowOffset = CGSize(width: 0, height: CGFloat(style.shadowOffset))

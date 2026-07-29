@@ -276,15 +276,18 @@ extension MPVPlayerView {
     }
 
     @objc public func updateSubtitleStyle(_ options: NSDictionary) {
+        let shadowOffset = (options["shadowOffset"] as? NSNumber)?.doubleValue ?? 0
+        let shadowColor = Self.subtitleShadowColor(from: options, shadowOffset: shadowOffset)
         applyClientSubtitleStyle(MPVSubtitleStyle(
             fontSize: (options["fontSize"] as? NSNumber)?.doubleValue ?? 38,
             bold: boolValue(options["bold"]),
             textColor: options["textColor"] as? String ?? "#FFFFFFFF",
             outlineSize: (options["outlineSize"] as? NSNumber)?.doubleValue ?? 0,
             outlineColor: options["outlineColor"] as? String ?? "#FF000000",
-            shadowOffset: (options["shadowOffset"] as? NSNumber)?.doubleValue ?? 0,
+            shadowOffset: shadowOffset,
             backgroundColor: options["backgroundColor"] as? String ?? "#00000000",
-            bottomOffset: (options["bottomOffset"] as? NSNumber)?.doubleValue ?? 34
+            bottomOffset: (options["bottomOffset"] as? NSNumber)?.doubleValue ?? 34,
+            shadowColor: shadowColor
         ))
         let values = [
             MPVProperty.subtitleFontSize: decimalString(options["fontSize"], fallback: 38),
@@ -293,7 +296,7 @@ extension MPVPlayerView {
             MPVProperty.subtitleOutlineSize: decimalString(options["outlineSize"], fallback: 0),
             MPVProperty.subtitleOutlineColor: options["outlineColor"] as? String ?? "#FF000000",
             MPVProperty.subtitleShadowOffset: decimalString(options["shadowOffset"], fallback: 0),
-            MPVProperty.subtitleBackColor: options["backgroundColor"] as? String ?? "#00000000",
+            MPVProperty.subtitleBackColor: shadowColor,
             MPVProperty.subtitleBorderStyle: "outline-and-shadow",
             MPVProperty.subtitleMarginY: subtitleMarginYString(options["bottomOffset"]),
         ]
@@ -320,6 +323,32 @@ extension MPVPlayerView {
                 self.restoreSubtitleSelection(snapshot)
             }
         }
+    }
+
+    nonisolated static func subtitleShadowColor(
+        from options: NSDictionary,
+        shadowOffset: Double
+    ) -> String {
+        if let shadowColor = options["shadowColor"] as? String, shadowColor.isEmpty == false {
+            return shadowColor
+        }
+        guard shadowOffset > 0,
+              let backgroundColor = options["backgroundColor"] as? String,
+              isVisibleSubtitleColor(backgroundColor) else {
+            return "#FF000000"
+        }
+        return backgroundColor
+    }
+
+    nonisolated private static func isVisibleSubtitleColor(_ value: String) -> Bool {
+        let clean = value
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard clean.count == 6 || clean.count == 8,
+              let raw = UInt64(clean, radix: 16) else {
+            return false
+        }
+        return clean.count == 6 || ((raw >> 24) & 0xFF) > 0
     }
 
     @objc public func updateSubtitleDelay(_ value: NSNumber) {

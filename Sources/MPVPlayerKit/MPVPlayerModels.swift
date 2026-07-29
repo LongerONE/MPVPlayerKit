@@ -114,6 +114,7 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
     public var shadowOffset: Double
     public var backgroundColor: String
     public var bottomOffset: Double
+    public var shadowColor: String
 
     public init(
         fontSize: Double = 38,
@@ -123,7 +124,8 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
         outlineColor: String = "#FF000000",
         shadowOffset: Double = 0,
         backgroundColor: String = "#00000000",
-        bottomOffset: Double = 34
+        bottomOffset: Double = 34,
+        shadowColor: String = "#FF000000"
     ) {
         self.fontSize = fontSize.isFinite ? min(max(fontSize, 8), 120) : 38
         self.bold = bold
@@ -133,6 +135,7 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
         self.shadowOffset = shadowOffset.isFinite ? min(max(shadowOffset, 0), 10) : 0
         self.backgroundColor = backgroundColor
         self.bottomOffset = bottomOffset.isFinite ? min(max(bottomOffset, 0), 300) : 34
+        self.shadowColor = shadowColor
     }
 
     public static let defaultStyle = MPVSubtitleStyle()
@@ -142,7 +145,8 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
         bold: true,
         outlineSize: 2,
         shadowOffset: 1,
-        backgroundColor: "#80000000"
+        backgroundColor: "#80000000",
+        shadowColor: "#FF000000"
     )
 
     var bridgeDictionary: NSDictionary {
@@ -155,6 +159,7 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
             "shadowOffset": NSNumber(value: shadowOffset),
             "backgroundColor": backgroundColor,
             "bottomOffset": NSNumber(value: bottomOffset),
+            "shadowColor": shadowColor,
         ] as NSDictionary
     }
 }
