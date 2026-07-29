@@ -54,7 +54,7 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
         let widthScale = max(hostBounds.width, 320) / 1080
         let fontSize = max(8, CGFloat(style.fontSize) * widthScale)
         let font = style.bold
-            ? UIFont.boldSystemFont(ofSize: fontSize)
+            ? UIFont.systemFont(ofSize: fontSize, weight: .heavy)
             : UIFont.systemFont(ofSize: fontSize)
         let outlineSize = max(0, CGFloat(style.outlineSize) * widthScale)
         let strokeWidth = outlineSize > 0 ? -(outlineSize / fontSize * 100) : 0

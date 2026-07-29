@@ -371,11 +371,11 @@ extension MPVPlayerView {
             notifyOnFailure: false
         )
         checkError(
-            mpv_set_option_string(handle, MPVProperty.subtitleFont, "NotoSansSC-Regular"),
-            operation: "set_option sub-font=NotoSansSC-Regular",
+            mpv_set_option_string(handle, MPVProperty.subtitleFont, MPVSubtitleFont.regular),
+            operation: "set_option sub-font=\(MPVSubtitleFont.regular)",
             notifyOnFailure: false
         )
-        mpvDebugLog("bundled subtitle fonts configured default=NotoSansSC-Regular count=\(requiredFontResources.count)")
+        mpvDebugLog("bundled subtitle fonts configured default=\(MPVSubtitleFont.regular) count=\(requiredFontResources.count)")
     }
 
     func ensureMPVReady() -> Bool {

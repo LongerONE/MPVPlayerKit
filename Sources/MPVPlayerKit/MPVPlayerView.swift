@@ -81,6 +81,15 @@ enum MPVProperty {
     static let osdMarginBottom = "osd-dimensions/mb"
 }
 
+enum MPVSubtitleFont {
+    static let regular = "NotoSansSC-Regular"
+    static let bold = "NotoSansCJKjp-Bold"
+
+    static func name(isBold: Bool) -> String {
+        isBold ? bold : regular
+    }
+}
+
 struct MPVSetupProfile {
     let name: String
     let options: [(String, String)]
@@ -235,6 +244,7 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var subtitleDelayValue = 0.0
     let clientSubtitleController = MPVSubtitlePresentationController()
     nonisolated(unsafe) var subtitleStyleValues: [String: String] = [
+        MPVProperty.subtitleFont: MPVSubtitleFont.regular,
         MPVProperty.subtitleFontSize: "38.000",
         MPVProperty.subtitleBold: "no",
         MPVProperty.subtitleColor: "#FFFFFFFF",

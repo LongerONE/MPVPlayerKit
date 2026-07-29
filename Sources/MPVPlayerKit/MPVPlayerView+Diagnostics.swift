@@ -239,6 +239,7 @@ extension MPVPlayerView {
 
     nonisolated var subtitleStylePropertyNames: [String] {
         [
+            MPVProperty.subtitleFont,
             MPVProperty.subtitleFontSize,
             MPVProperty.subtitleBold,
             MPVProperty.subtitleColor,

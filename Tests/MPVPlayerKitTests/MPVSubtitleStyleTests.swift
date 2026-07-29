@@ -3,6 +3,12 @@ import UIKit
 @testable import MPVPlayerKit
 
 final class MPVSubtitleStyleTests: XCTestCase {
+    func testBoldSubtitleUsesHeavierBundledFont() {
+        XCTAssertEqual(MPVSubtitleFont.name(isBold: false), MPVSubtitleFont.regular)
+        XCTAssertEqual(MPVSubtitleFont.name(isBold: true), MPVSubtitleFont.bold)
+        XCTAssertEqual(MPVSubtitleFont.bold, "NotoSansCJKjp-Bold")
+    }
+
     func testSubtitleStyleResolvesShadowColorForCurrentAndLegacyDictionaries() {
         XCTAssertEqual(
             MPVPlayerView.subtitleShadowColor(
