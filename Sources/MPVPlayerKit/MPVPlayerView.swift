@@ -67,6 +67,7 @@ enum MPVProperty {
     static let subtitleColor = "sub-color"
     static let subtitleOutlineSize = "sub-outline-size"
     static let subtitleOutlineColor = "sub-outline-color"
+    static let subtitleBlur = "sub-blur"
     static let subtitleShadowOffset = "sub-shadow-offset"
     static let subtitleBackColor = "sub-back-color"
     static let subtitleBorderStyle = "sub-border-style"
@@ -250,6 +251,7 @@ public final class MPVPlayerView: UIView {
         MPVProperty.subtitleColor: "#FFFFFFFF",
         MPVProperty.subtitleOutlineSize: "0.000",
         MPVProperty.subtitleOutlineColor: "#FF000000",
+        MPVProperty.subtitleBlur: "0.000",
         MPVProperty.subtitleShadowOffset: "0.000",
         MPVProperty.subtitleBackColor: "#FF000000",
         MPVProperty.subtitleBorderStyle: "outline-and-shadow",

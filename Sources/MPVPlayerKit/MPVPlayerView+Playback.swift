@@ -278,6 +278,7 @@ extension MPVPlayerView {
     @objc public func updateSubtitleStyle(_ options: NSDictionary) {
         let shadowOffset = (options["shadowOffset"] as? NSNumber)?.doubleValue ?? 0
         let shadowColor = Self.subtitleShadowColor(from: options, shadowOffset: shadowOffset)
+        let shadowBlur = Self.subtitleShadowBlur(from: options, shadowOffset: shadowOffset)
         let isBold = boolValue(options["bold"])
         applyClientSubtitleStyle(MPVSubtitleStyle(
             fontSize: (options["fontSize"] as? NSNumber)?.doubleValue ?? 38,
@@ -288,7 +289,8 @@ extension MPVPlayerView {
             shadowOffset: shadowOffset,
             backgroundColor: options["backgroundColor"] as? String ?? "#00000000",
             bottomOffset: (options["bottomOffset"] as? NSNumber)?.doubleValue ?? 34,
-            shadowColor: shadowColor
+            shadowColor: shadowColor,
+            shadowBlur: shadowBlur
         ))
         let values = [
             MPVProperty.subtitleFont: MPVSubtitleFont.name(isBold: isBold),
@@ -297,6 +299,7 @@ extension MPVPlayerView {
             MPVProperty.subtitleColor: options["textColor"] as? String ?? "#FFFFFFFF",
             MPVProperty.subtitleOutlineSize: decimalString(options["outlineSize"], fallback: 0),
             MPVProperty.subtitleOutlineColor: options["outlineColor"] as? String ?? "#FF000000",
+            MPVProperty.subtitleBlur: String(format: "%.3f", locale: Locale(identifier: "en_US_POSIX"), shadowBlur),
             MPVProperty.subtitleShadowOffset: decimalString(options["shadowOffset"], fallback: 0),
             MPVProperty.subtitleBackColor: shadowColor,
             MPVProperty.subtitleBorderStyle: "outline-and-shadow",

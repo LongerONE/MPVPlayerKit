@@ -245,6 +245,7 @@ extension MPVPlayerView {
             MPVProperty.subtitleColor,
             MPVProperty.subtitleOutlineSize,
             MPVProperty.subtitleOutlineColor,
+            MPVProperty.subtitleBlur,
             MPVProperty.subtitleShadowOffset,
             MPVProperty.subtitleBackColor,
             MPVProperty.subtitleBorderStyle,
@@ -261,6 +262,13 @@ extension MPVPlayerView {
         let offset = (bottomOffset as? NSNumber)?.doubleValue ?? 0
         guard offset.isFinite else { return "34" }
         return String(max(0, 34 + Int(offset.rounded())))
+    }
+
+    nonisolated static func subtitleShadowBlur(from options: NSDictionary, shadowOffset: Double) -> Double {
+        guard shadowOffset > 0 else { return 0 }
+        let blur = (options["shadowBlur"] as? NSNumber)?.doubleValue ?? 1.25
+        guard blur.isFinite else { return 1.25 }
+        return min(max(blur, 0), 10)
     }
 
     @discardableResult

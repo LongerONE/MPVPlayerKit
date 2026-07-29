@@ -67,8 +67,10 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
             .paragraphStyle: paragraph,
         ])
         label.layer.shadowColor = UIColor(mpvHex: style.shadowColor, fallback: .black).cgColor
-        label.layer.shadowOpacity = style.shadowOffset > 0 ? 0.85 : 0
-        label.layer.shadowRadius = CGFloat(style.shadowOffset)
+        label.layer.shadowOpacity = style.shadowOffset > 0 ? 0.6 : 0
+        label.layer.shadowRadius = style.shadowOffset > 0
+            ? CGFloat(style.shadowOffset + style.shadowBlur)
+            : 0
         label.layer.shadowOffset = CGSize(width: 0, height: CGFloat(style.shadowOffset))
         let heightScale = max(hostBounds.height, 180) / 720
         updateBottomOffset(Double(CGFloat(style.bottomOffset) * heightScale))
