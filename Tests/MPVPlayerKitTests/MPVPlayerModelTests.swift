@@ -259,12 +259,11 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(style.outlineSize, 0)
         XCTAssertEqual(style.shadowOffset, 10)
         XCTAssertEqual(style.bottomOffset, 0)
-        XCTAssertEqual(style.shadowBlur, 1.25)
         XCTAssertEqual((style.bridgeDictionary["fontSize"] as? NSNumber)?.doubleValue, 120)
         XCTAssertEqual((style.bridgeDictionary["bold"] as? NSNumber)?.boolValue, true)
         XCTAssertEqual(style.shadowColor, "#FF000000")
         XCTAssertEqual(style.bridgeDictionary["shadowColor"] as? String, "#FF000000")
-        XCTAssertEqual((style.bridgeDictionary["shadowBlur"] as? NSNumber)?.doubleValue, 1.25)
+        XCTAssertNil(style.bridgeDictionary["shadowBlur"])
     }
 
     func testSubtitleDocumentDecodesUTF8SRTAndCleansASSOverrides() throws {

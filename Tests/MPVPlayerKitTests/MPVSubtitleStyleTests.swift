@@ -37,13 +37,23 @@ final class MPVSubtitleStyleTests: XCTestCase {
         )
     }
 
-    func testSubtitleStyleResolvesSoftShadowBlur() {
-        XCTAssertEqual(
-            MPVPlayerView.subtitleShadowBlur(from: ["shadowBlur": 2.5], shadowOffset: 2),
-            2.5
-        )
-        XCTAssertEqual(MPVPlayerView.subtitleShadowBlur(from: [:], shadowOffset: 2), 1.25)
-        XCTAssertEqual(MPVPlayerView.subtitleShadowBlur(from: ["shadowBlur": 8], shadowOffset: 0), 0)
+    @MainActor
+    func testNativeSubtitleStyleAlwaysResetsGlyphBlur() async {
+        let playerView = MPVPlayerView(frame: .zero)
+        let transfer = UnsafeTransfer(value: playerView)
+        playerView.updateSubtitleStyle([
+            "shadowOffset": 2,
+            "shadowBlur": 8,
+        ])
+
+        let blurValue: String? = await withCheckedContinuation { continuation in
+            playerView.queue.async {
+                continuation.resume(
+                    returning: transfer.value.subtitleStyleValues[MPVProperty.subtitleBlur]
+                )
+            }
+        }
+        XCTAssertEqual(blurValue, "0.000")
     }
 
     @MainActor
@@ -52,8 +62,7 @@ final class MPVSubtitleStyleTests: XCTestCase {
         let style = MPVSubtitleStyle(
             shadowOffset: 2,
             backgroundColor: "#80010203",
-            shadowColor: "#FF102030",
-            shadowBlur: 1.25
+            shadowColor: "#FF102030"
         )
         renderer.render(MPVSubtitlePresentation(
             cues: [MPVSubtitleCue(startTime: 0, endTime: 1, text: "Subtitle")],
@@ -72,7 +81,38 @@ final class MPVSubtitleStyleTests: XCTestCase {
         assertColor(UIColor(cgColor: shadowCGColor), red: 0x10, green: 0x20, blue: 0x30, alpha: 0xFF)
         assertColor(backgroundColor, red: 0x01, green: 0x02, blue: 0x03, alpha: 0x80)
         XCTAssertEqual(label.layer.shadowOpacity, 0.6)
-        XCTAssertEqual(label.layer.shadowRadius, 3.25)
+        XCTAssertEqual(label.layer.shadowRadius, 1.25)
+    }
+
+    @MainActor
+    func testDefaultSubtitleRendererKeepsShadowSpreadIndependentFromOffset() {
+        let renderer = MPVDefaultSubtitleRenderer()
+        renderer.render(MPVSubtitlePresentation(
+            cues: [MPVSubtitleCue(startTime: 0, endTime: 1, text: "Subtitle")],
+            style: MPVSubtitleStyle(shadowOffset: 10)
+        ))
+
+        guard let label = renderer.view.subviews.compactMap({ $0 as? UILabel }).first else {
+            return XCTFail("Renderer should create a subtitle label")
+        }
+        XCTAssertEqual(label.layer.shadowRadius, 1.25)
+        XCTAssertEqual(label.layer.shadowOffset, CGSize(width: 0, height: 10))
+    }
+
+    @MainActor
+    func testDefaultSubtitleRendererClearsShadowLayerWhenDisabled() {
+        let renderer = MPVDefaultSubtitleRenderer()
+        renderer.render(MPVSubtitlePresentation(
+            cues: [MPVSubtitleCue(startTime: 0, endTime: 1, text: "Subtitle")],
+            style: MPVSubtitleStyle(shadowOffset: 0)
+        ))
+
+        guard let label = renderer.view.subviews.compactMap({ $0 as? UILabel }).first else {
+            return XCTFail("Renderer should create a subtitle label")
+        }
+        XCTAssertEqual(label.layer.shadowOpacity, 0)
+        XCTAssertEqual(label.layer.shadowRadius, 0)
+        XCTAssertEqual(label.layer.shadowOffset, .zero)
     }
 
     private func assertColor(
@@ -98,4 +138,8 @@ final class MPVSubtitleStyleTests: XCTestCase {
         XCTAssertEqual(actualBlue, CGFloat(blue) / 255, accuracy: 0.001, file: file, line: line)
         XCTAssertEqual(actualAlpha, CGFloat(alpha) / 255, accuracy: 0.001, file: file, line: line)
     }
+}
+
+private struct UnsafeTransfer<Value>: @unchecked Sendable {
+    let value: Value
 }

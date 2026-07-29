@@ -19,6 +19,9 @@ public protocol MPVSubtitleRenderer: AnyObject {
 
 @MainActor
 public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
+    private static let shadowOpacity: Float = 0.6
+    private static let shadowRadius: CGFloat = 1.25
+
     public let view = UIView()
     private let label = UILabel()
     private var bottomConstraint: NSLayoutConstraint!
@@ -67,11 +70,12 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
             .paragraphStyle: paragraph,
         ])
         label.layer.shadowColor = UIColor(mpvHex: style.shadowColor, fallback: .black).cgColor
-        label.layer.shadowOpacity = style.shadowOffset > 0 ? 0.6 : 0
-        label.layer.shadowRadius = style.shadowOffset > 0
-            ? CGFloat(style.shadowOffset + style.shadowBlur)
-            : 0
-        label.layer.shadowOffset = CGSize(width: 0, height: CGFloat(style.shadowOffset))
+        let showsShadow = style.shadowOffset > 0
+        label.layer.shadowOpacity = showsShadow ? Self.shadowOpacity : 0
+        label.layer.shadowRadius = showsShadow ? Self.shadowRadius : 0
+        label.layer.shadowOffset = showsShadow
+            ? CGSize(width: 0, height: CGFloat(style.shadowOffset))
+            : .zero
         let heightScale = max(hostBounds.height, 180) / 720
         updateBottomOffset(Double(CGFloat(style.bottomOffset) * heightScale))
         label.isHidden = false
