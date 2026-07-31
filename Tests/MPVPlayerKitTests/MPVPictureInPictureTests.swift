@@ -402,6 +402,9 @@ final class MPVPictureInPictureTests: XCTestCase {
         let edrOptions = MPVPictureInPictureRendererInvariantSnapshot.optionMap(
             MPVPlayerView.edrMetalVideoOutputOptions
         )
+        let dolbyVisionOptions = MPVPictureInPictureRendererInvariantSnapshot.optionMap(
+            MPVPlayerView.dolbyVisionEDRMetalVideoOutputOptions
+        )
         let sdrOptions = MPVPictureInPictureRendererInvariantSnapshot.optionMap(
             MPVPlayerView.sdrMetalVideoOutputOptions
         )
@@ -434,6 +437,14 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertEqual(edrOptions["image-subs-hdr-peak"], "100")
         XCTAssertNil(edrOptions["target-trc"])
         XCTAssertNil(edrOptions["target-prim"])
+        XCTAssertEqual(dolbyVisionOptions["target-colorspace-hint"], "yes")
+        XCTAssertEqual(dolbyVisionOptions["target-colorspace-hint-mode"], "source")
+        XCTAssertEqual(dolbyVisionOptions["hdr-compute-peak"], "yes")
+        XCTAssertEqual(dolbyVisionOptions["hdr-peak-percentile"], "99.995")
+        XCTAssertEqual(dolbyVisionOptions["hdr-contrast-recovery"], "0.30")
+        XCTAssertEqual(dolbyVisionOptions["hdr-contrast-smoothness"], "6.5")
+        XCTAssertEqual(dolbyVisionOptions["gamma"], "5")
+        XCTAssertNil(dolbyVisionOptions["inverse-tone-mapping"])
         XCTAssertEqual(sdrOptions["target-trc"], "srgb")
         XCTAssertEqual(sdrOptions["target-prim"], "bt.709")
         XCTAssertEqual(sdrOptions["sub-hdr-peak"], "100")
@@ -484,7 +495,7 @@ final class MPVPictureInPictureTests: XCTestCase {
         playerView.isDolbyVisionPlayback = true
         XCTAssertRendererOptionsAndProfiles(
             playerView: playerView,
-            expectedColorOptions: MPVPlayerView.edrMetalVideoOutputOptions,
+            expectedColorOptions: MPVPlayerView.dolbyVisionEDRMetalVideoOutputOptions,
             expectedHintMode: "source"
         )
     }
