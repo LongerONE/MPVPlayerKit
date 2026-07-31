@@ -115,15 +115,20 @@ extension MPVQuickPlayerViewController {
 
     func updatePlaybackControlSafeAreaInsets() {
         guard isViewLoaded else { return }
+        let usesManualLandscape = isUsingManualLandscape && isLandscapeForced
         let insets = Self.playbackControlHorizontalInsets(
             rootBounds: view.bounds,
             rootSafeAreaInsets: view.safeAreaInsets,
-            usesManualLandscape: isUsingManualLandscape && isLandscapeForced
+            usesManualLandscape: usesManualLandscape
         )
         closeButtonLeadingConstraint?.constant = 12 + insets.left
         statusLabelTrailingConstraint?.constant = -(12 + insets.right)
         transportStackLeadingConstraint?.constant = 12 + insets.left
         progressSliderTrailingConstraint?.constant = -(12 + insets.right)
+        closeButtonTopSafeAreaConstraint?.isActive = usesManualLandscape == false
+        closeButtonTopEdgeConstraint?.isActive = usesManualLandscape
+        trackButtonStackBottomSafeAreaConstraint?.isActive = usesManualLandscape == false
+        trackButtonStackBottomEdgeConstraint?.isActive = usesManualLandscape
     }
 
     static func playbackControlHorizontalInsets(
@@ -151,10 +156,12 @@ extension MPVQuickPlayerViewController {
         guard isViewLoaded else { return }
         view.setNeedsLayout()
         layoutOrientationContentView()
+        updatePlaybackControlSafeAreaInsets()
     }
 
     private func restoreManualLandscape() {
         guard isViewLoaded else { return }
         layoutOrientationContentView()
+        updatePlaybackControlSafeAreaInsets()
     }
 }

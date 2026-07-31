@@ -72,6 +72,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var statusLabelTrailingConstraint: NSLayoutConstraint!
     var transportStackLeadingConstraint: NSLayoutConstraint!
     var progressSliderTrailingConstraint: NSLayoutConstraint!
+    var closeButtonTopSafeAreaConstraint: NSLayoutConstraint!
+    var closeButtonTopEdgeConstraint: NSLayoutConstraint!
+    var trackButtonStackBottomSafeAreaConstraint: NSLayoutConstraint!
+    var trackButtonStackBottomEdgeConstraint: NSLayoutConstraint!
 
     enum PanDirection {
         case none
@@ -340,6 +344,26 @@ public final class MPVQuickPlayerViewController: UIViewController {
             equalTo: controlsView.trailingAnchor,
             constant: -12
         )
+        closeButtonTopSafeAreaConstraint = closeButton.topAnchor.constraint(
+            equalTo: topSafeArea.topAnchor,
+            constant: 8
+        )
+        closeButtonTopEdgeConstraint = closeButton.topAnchor.constraint(
+            equalTo: topBar.topAnchor,
+            constant: 8
+        )
+        trackButtonStackBottomSafeAreaConstraint = trackButtonStack.bottomAnchor.constraint(
+            equalTo: controlsSafeArea.bottomAnchor,
+            constant: -10
+        )
+        trackButtonStackBottomEdgeConstraint = trackButtonStack.bottomAnchor.constraint(
+            equalTo: controlsView.bottomAnchor,
+            constant: -10
+        )
+        closeButtonTopSafeAreaConstraint.isActive = isUsingManualLandscape == false
+        closeButtonTopEdgeConstraint.isActive = isUsingManualLandscape
+        trackButtonStackBottomSafeAreaConstraint.isActive = isUsingManualLandscape == false
+        trackButtonStackBottomEdgeConstraint.isActive = isUsingManualLandscape
         NSLayoutConstraint.activate([
             player.playbackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             player.playbackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
@@ -351,7 +375,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
             topBar.topAnchor.constraint(equalTo: contentView.topAnchor),
 
             closeButtonLeadingConstraint,
-            closeButton.topAnchor.constraint(equalTo: topSafeArea.topAnchor, constant: 8),
             closeButton.bottomAnchor.constraint(equalTo: topBar.bottomAnchor, constant: -8),
             closeButton.widthAnchor.constraint(equalToConstant: 36),
             closeButton.heightAnchor.constraint(equalToConstant: 36),
@@ -390,10 +413,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
             ),
             trackButtonStack.trailingAnchor.constraint(
                 lessThanOrEqualTo: timeLabel.trailingAnchor
-            ),
-            trackButtonStack.bottomAnchor.constraint(
-                equalTo: controlsSafeArea.bottomAnchor,
-                constant: -10
             ),
 
             systemVolumeView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),

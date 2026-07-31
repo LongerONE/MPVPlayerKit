@@ -15,6 +15,7 @@ final class MPVQuickPlayerTests: XCTestCase {
         controller.view.bounds = CGRect(x: 0, y: 0, width: 390, height: 844)
         controller.isUsingManualLandscape = true
         controller.layoutOrientationContentView()
+        controller.updatePlaybackControlSafeAreaInsets()
 
         XCTAssertEqual(controller.supportedInterfaceOrientations, .portrait)
         XCTAssertEqual(controller.preferredInterfaceOrientationForPresentation, .portrait)
@@ -35,6 +36,10 @@ final class MPVQuickPlayerTests: XCTestCase {
         )
         XCTAssertEqual(manualInsets.left, 59)
         XCTAssertEqual(manualInsets.right, 34)
+        XCTAssertFalse(controller.closeButtonTopSafeAreaConstraint.isActive)
+        XCTAssertTrue(controller.closeButtonTopEdgeConstraint.isActive)
+        XCTAssertFalse(controller.trackButtonStackBottomSafeAreaConstraint.isActive)
+        XCTAssertTrue(controller.trackButtonStackBottomEdgeConstraint.isActive)
 
         let landscapeBounds = controller.contentView.bounds
         let landscapeCenter = controller.contentView.center
@@ -49,6 +54,10 @@ final class MPVQuickPlayerTests: XCTestCase {
         XCTAssertEqual(controller.supportedInterfaceOrientations, .all)
         XCTAssertEqual(controller.preferredInterfaceOrientationForPresentation, .portrait)
         XCTAssertEqual(controller.contentView.transform, .identity)
+        XCTAssertTrue(controller.closeButtonTopSafeAreaConstraint.isActive)
+        XCTAssertFalse(controller.closeButtonTopEdgeConstraint.isActive)
+        XCTAssertTrue(controller.trackButtonStackBottomSafeAreaConstraint.isActive)
+        XCTAssertFalse(controller.trackButtonStackBottomEdgeConstraint.isActive)
     }
 
     func testQuickPlayerCanHideAndRestorePlaybackControls() throws {
