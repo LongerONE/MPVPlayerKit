@@ -163,13 +163,12 @@ public final class MPVPlayerView: UIView {
     static let edrMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [
         ("fbo-format", "rgba16f"),
         ("target-colorspace-hint", "yes"),
+        // Keep the swapchain metadata stable. `source-dynamic` turns Dolby
+        // Vision scene metadata into changing HDR10 luminance hints, but the
+        // iOS EDR compositor does not expose a matching dynamic-HDR contract.
+        // Passing those hints through MoltenVK can make the compositor remap
+        // already reshaped frames again, crushing low-light scene detail.
         ("target-colorspace-hint-mode", "source"),
-    ]
-
-    static let dolbyVisionEDRMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [
-        ("fbo-format", "rgba16f"),
-        ("target-colorspace-hint", "yes"),
-        ("target-colorspace-hint-mode", "source-dynamic"),
     ]
 
     static let sdrMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [

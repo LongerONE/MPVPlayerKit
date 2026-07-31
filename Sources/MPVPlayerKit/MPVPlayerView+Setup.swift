@@ -96,9 +96,7 @@ extension MPVPlayerView {
 
     var metalVideoOutputOptions: [(String, String)] {
         let colorOptions: [(String, String)]
-        if usesExtendedDynamicRangeOutput && isDolbyVisionPlayback {
-            colorOptions = Self.dolbyVisionEDRMetalVideoOutputOptions
-        } else if usesExtendedDynamicRangeOutput {
+        if usesExtendedDynamicRangeOutput {
             colorOptions = Self.edrMetalVideoOutputOptions
         } else {
             colorOptions = Self.sdrMetalVideoOutputOptions
