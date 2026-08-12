@@ -118,6 +118,21 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
         }
     }
 
+    @available(iOS 16.0, tvOS 16.0, *)
+    override var wantsExtendedDynamicRangeContent: Bool {
+        get { super.wantsExtendedDynamicRangeContent }
+        set {
+            guard Thread.isMainThread == false else {
+                super.wantsExtendedDynamicRangeContent = newValue
+                return
+            }
+            let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
+            DispatchQueue.main.sync {
+                transfer.value.0.wantsExtendedDynamicRangeContent = transfer.value.1
+            }
+        }
+    }
+
     override var drawableSize: CGSize {
         get {
             super.drawableSize
@@ -137,24 +152,22 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
     }
 
     override func setNeedsDisplay() {
-        guard Thread.isMainThread == false else {
-            super.setNeedsDisplay()
+        // MPV presents frames through Vulkan/MoltenVK. Calling
+        // `setNeedsDisplay` from its `vo_thread` only creates a Core Animation
+        // display invalidation and, on recent iOS versions, can commit an
+        // Auto Layout transaction from that renderer thread. The Vulkan
+        // present path does not need this invalidation, so drop background
+        // calls and keep UIKit/Core Animation work on the main thread.
+        guard Thread.isMainThread else {
             return
         }
-        let transfer = MPVPlayerMetalLayerTransfer(value: self)
-        DispatchQueue.main.async {
-            transfer.value.setNeedsDisplay()
-        }
+        super.setNeedsDisplay()
     }
 
     override func setNeedsDisplay(_ rect: CGRect) {
-        guard Thread.isMainThread == false else {
-            super.setNeedsDisplay(rect)
+        guard Thread.isMainThread else {
             return
         }
-        let transfer = MPVPlayerMetalLayerTransfer(value: (self, rect))
-        DispatchQueue.main.async {
-            transfer.value.0.setNeedsDisplay(transfer.value.1)
-        }
+        super.setNeedsDisplay(rect)
     }
 }
