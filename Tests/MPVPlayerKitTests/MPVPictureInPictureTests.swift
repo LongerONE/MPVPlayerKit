@@ -438,12 +438,15 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertNil(edrOptions["target-trc"])
         XCTAssertNil(edrOptions["target-prim"])
         XCTAssertEqual(dolbyVisionOptions["target-colorspace-hint"], "yes")
-        XCTAssertEqual(dolbyVisionOptions["target-colorspace-hint-mode"], "source")
+        XCTAssertEqual(dolbyVisionOptions["target-colorspace-hint-mode"], "target")
         XCTAssertEqual(dolbyVisionOptions["hdr-compute-peak"], "yes")
-        XCTAssertEqual(dolbyVisionOptions["hdr-peak-percentile"], "99.995")
-        XCTAssertEqual(dolbyVisionOptions["hdr-contrast-recovery"], "0.30")
+        XCTAssertEqual(dolbyVisionOptions["hdr-peak-percentile"], "99.99")
+        XCTAssertEqual(dolbyVisionOptions["hdr-peak-decay-rate"], "8")
+        XCTAssertEqual(dolbyVisionOptions["hdr-scene-threshold-low"], "0.75")
+        XCTAssertEqual(dolbyVisionOptions["hdr-scene-threshold-high"], "2.0")
+        XCTAssertEqual(dolbyVisionOptions["hdr-contrast-recovery"], "0.20")
         XCTAssertEqual(dolbyVisionOptions["hdr-contrast-smoothness"], "6.5")
-        XCTAssertEqual(dolbyVisionOptions["gamma"], "5")
+        XCTAssertNil(dolbyVisionOptions["gamma"])
         XCTAssertNil(dolbyVisionOptions["inverse-tone-mapping"])
         XCTAssertEqual(sdrOptions["target-trc"], "srgb")
         XCTAssertEqual(sdrOptions["target-prim"], "bt.709")
@@ -496,7 +499,7 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertRendererOptionsAndProfiles(
             playerView: playerView,
             expectedColorOptions: MPVPlayerView.dolbyVisionEDRMetalVideoOutputOptions,
-            expectedHintMode: "source"
+            expectedHintMode: "target"
         )
     }
 

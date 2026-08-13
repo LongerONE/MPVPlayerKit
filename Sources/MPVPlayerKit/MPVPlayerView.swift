@@ -174,16 +174,25 @@ public final class MPVPlayerView: UIView {
         ("target-colorspace-hint-mode", "source"),
     ]
 
-    /// Dolby Vision is often mastered with very small, intense highlights in
-    /// otherwise dark scenes. Measure the scene instead of letting those few
-    /// pixels reserve most of the EDR range, then gently lift midtones without
-    /// raising the black floor.
-    static let dolbyVisionEDRMetalVideoOutputOptions = edrMetalVideoOutputOptions + [
+    /// Dolby Vision commonly mixes small, intense highlights with very dark
+    /// scenes. Map it to the EDR target instead of passing the source HDR
+    /// range straight through to the compositor: this rolls off excessive
+    /// highlights while retaining the panel's black floor. A faster peak
+    /// response also stops a preceding bright scene from suppressing the
+    /// shadows in the following dark scene.
+    static let dolbyVisionEDRMetalVideoOutputOptions =
+        edrMetalVideoOutputOptions.map { option in
+            option.0 == "target-colorspace-hint-mode"
+                ? (option.0, "target")
+                : option
+        } + [
         ("hdr-compute-peak", "yes"),
-        ("hdr-peak-percentile", "99.995"),
-        ("hdr-contrast-recovery", "0.30"),
+        ("hdr-peak-percentile", "99.99"),
+        ("hdr-peak-decay-rate", "8"),
+        ("hdr-scene-threshold-low", "0.75"),
+        ("hdr-scene-threshold-high", "2.0"),
+        ("hdr-contrast-recovery", "0.20"),
         ("hdr-contrast-smoothness", "6.5"),
-        ("gamma", "5"),
     ]
 
     static let sdrMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [
