@@ -192,7 +192,7 @@ Open `Demo/MPVPlayerKitDemo.xcodeproj` and run the `MPVPlayerKitDemo` scheme. Th
 
 ## Notes
 
-- MPVKit uses a semantic-versioned dependency starting at `0.41.0`, so tagged releases of this package remain reproducible and compatible with SwiftPM's version rules.
+- MPVKit is pinned to the `1.0.0` release so the native runtime and its transitive binary dependencies remain reproducible.
 - The package is distributed as a dynamic library so MPVKit's native runtime stays isolated from an app's other media dependencies.
 - The bundled Noto fonts are used for consistent multilingual subtitle rendering. Their original license files are included under `Resources`.
 
