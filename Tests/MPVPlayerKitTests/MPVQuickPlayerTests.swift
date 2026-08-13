@@ -3,6 +3,7 @@ import UIKit
 @testable import MPVPlayerKit
 
 final class MPVQuickPlayerTests: XCTestCase {
+    @MainActor
     func testQuickPlayerCanForceLandscapeWhenHostOnlySupportsPortrait() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false, forceLandscape: true)
@@ -40,6 +41,8 @@ final class MPVQuickPlayerTests: XCTestCase {
         XCTAssertTrue(controller.closeButtonTopEdgeConstraint.isActive)
         XCTAssertFalse(controller.trackButtonStackBottomSafeAreaConstraint.isActive)
         XCTAssertTrue(controller.trackButtonStackBottomEdgeConstraint.isActive)
+        XCTAssertTrue(controller.compactPlaybackControlLayoutConstraints.allSatisfy(\.isActive))
+        XCTAssertFalse(controller.regularPlaybackControlLayoutConstraints.allSatisfy(\.isActive))
 
         let landscapeBounds = controller.contentView.bounds
         let landscapeCenter = controller.contentView.center
@@ -58,8 +61,11 @@ final class MPVQuickPlayerTests: XCTestCase {
         XCTAssertFalse(controller.closeButtonTopEdgeConstraint.isActive)
         XCTAssertTrue(controller.trackButtonStackBottomSafeAreaConstraint.isActive)
         XCTAssertFalse(controller.trackButtonStackBottomEdgeConstraint.isActive)
+        XCTAssertFalse(controller.compactPlaybackControlLayoutConstraints.allSatisfy(\.isActive))
+        XCTAssertTrue(controller.regularPlaybackControlLayoutConstraints.allSatisfy(\.isActive))
     }
 
+    @MainActor
     func testQuickPlayerCanHideAndRestorePlaybackControls() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false)

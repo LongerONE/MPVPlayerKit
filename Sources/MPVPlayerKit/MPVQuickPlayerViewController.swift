@@ -76,6 +76,8 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var closeButtonTopEdgeConstraint: NSLayoutConstraint!
     var trackButtonStackBottomSafeAreaConstraint: NSLayoutConstraint!
     var trackButtonStackBottomEdgeConstraint: NSLayoutConstraint!
+    var regularPlaybackControlLayoutConstraints = [NSLayoutConstraint]()
+    var compactPlaybackControlLayoutConstraints = [NSLayoutConstraint]()
 
     enum PanDirection {
         case none
@@ -364,6 +366,22 @@ public final class MPVQuickPlayerViewController: UIViewController {
         closeButtonTopEdgeConstraint.isActive = isUsingManualLandscape
         trackButtonStackBottomSafeAreaConstraint.isActive = isUsingManualLandscape == false
         trackButtonStackBottomEdgeConstraint.isActive = isUsingManualLandscape
+        regularPlaybackControlLayoutConstraints = [
+            timeLabel.trailingAnchor.constraint(equalTo: progressSlider.trailingAnchor),
+            trackButtonStack.topAnchor.constraint(equalTo: timeLabel.bottomAnchor, constant: 6),
+            trackButtonStack.centerXAnchor.constraint(equalTo: controlsView.centerXAnchor),
+            trackButtonStack.leadingAnchor.constraint(
+                greaterThanOrEqualTo: timeLabel.leadingAnchor
+            ),
+            trackButtonStack.trailingAnchor.constraint(
+                lessThanOrEqualTo: timeLabel.trailingAnchor
+            ),
+        ]
+        compactPlaybackControlLayoutConstraints = [
+            timeLabel.trailingAnchor.constraint(equalTo: trackButtonStack.leadingAnchor, constant: -8),
+            trackButtonStack.centerYAnchor.constraint(equalTo: timeLabel.centerYAnchor),
+            trackButtonStack.trailingAnchor.constraint(equalTo: progressSlider.trailingAnchor),
+        ]
         NSLayoutConstraint.activate([
             player.playbackView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             player.playbackView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
@@ -404,16 +422,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
             timeLabel.leadingAnchor.constraint(equalTo: transportStack.leadingAnchor),
             timeLabel.topAnchor.constraint(equalTo: progressSlider.bottomAnchor, constant: 6),
-            timeLabel.trailingAnchor.constraint(equalTo: progressSlider.trailingAnchor),
-
-            trackButtonStack.topAnchor.constraint(equalTo: timeLabel.bottomAnchor, constant: 6),
-            trackButtonStack.centerXAnchor.constraint(equalTo: controlsView.centerXAnchor),
-            trackButtonStack.leadingAnchor.constraint(
-                greaterThanOrEqualTo: timeLabel.leadingAnchor
-            ),
-            trackButtonStack.trailingAnchor.constraint(
-                lessThanOrEqualTo: timeLabel.trailingAnchor
-            ),
 
             systemVolumeView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
             systemVolumeView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
@@ -438,6 +446,11 @@ public final class MPVQuickPlayerViewController: UIViewController {
             gestureHUDProgress.trailingAnchor.constraint(equalTo: hudContentView.trailingAnchor, constant: -16),
             gestureHUDProgress.bottomAnchor.constraint(equalTo: hudContentView.bottomAnchor, constant: -14),
         ])
+        NSLayoutConstraint.activate(
+            isUsingManualLandscape
+                ? compactPlaybackControlLayoutConstraints
+                : regularPlaybackControlLayoutConstraints
+        )
     }
 
     func configureGestures() {
