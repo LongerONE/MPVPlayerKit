@@ -232,7 +232,10 @@ public final class MPVPlayerView: UIView {
     var pictureInPictureVideoDisplaySize: CGSize = .zero
     var usesExtendedDynamicRangeOutput = false
     var url: URL?
-    var headers: [String: String] = [:]
+    // libmpv setup consumes this immutable request snapshot on `queue`.
+    // The host configures it before playback starts, so it must not inherit
+    // UIView's main-actor isolation when the queue prepares HTTP headers.
+    nonisolated(unsafe) var headers: [String: String] = [:]
     var userAgent: String?
     nonisolated let queue = DispatchQueue(label: "com.mpvplayerkit.player", qos: .userInitiated)
     let queueSpecificKey = DispatchSpecificKey<Void>()

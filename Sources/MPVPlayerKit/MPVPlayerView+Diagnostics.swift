@@ -10,7 +10,7 @@ import libmpv
 #endif
 
 extension MPVPlayerView {
-    func logEffectiveSubtitleConfiguration() {
+    nonisolated func logEffectiveSubtitleConfiguration() {
         #if DEBUG
         let optionNames = [
             "sub-font-provider",
@@ -29,10 +29,12 @@ extension MPVPlayerView {
         let options = optionNames.map { name in
             "\(name)=\(getString("options/\(name)") ?? "<unavailable>")"
         }.joined(separator: " ")
-        let systemFont = UIFont(name: "PingFangSC-Regular", size: 20)
-        let resolvedFont = systemFont.map { "fontName=\($0.fontName) family=\($0.familyName)" } ?? "unavailable"
         mpvDebugLog("subtitle diagnostics options \(options)")
-        mpvDebugLog("subtitle diagnostics CoreText font \(resolvedFont)")
+        DispatchQueue.main.async {
+            let systemFont = UIFont(name: "PingFangSC-Regular", size: 20)
+            let resolvedFont = systemFont.map { "fontName=\($0.fontName) family=\($0.familyName)" } ?? "unavailable"
+            self.mpvDebugLog("subtitle diagnostics CoreText font \(resolvedFont)")
+        }
         #endif
     }
 

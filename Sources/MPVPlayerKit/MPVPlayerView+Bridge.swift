@@ -138,7 +138,7 @@ extension MPVPlayerView {
         return cargs
     }
 
-    func makeMPVHTTPHeaderFields() -> (fields: [String], skippedAuthHeaders: Int) {
+    nonisolated func makeMPVHTTPHeaderFields() -> (fields: [String], skippedAuthHeaders: Int) {
         var fields: [String] = []
         var skippedAuthHeaders = 0
         for (key, value) in headers.sorted(by: { $0.key < $1.key }) {
@@ -157,7 +157,7 @@ extension MPVPlayerView {
         return (fields, skippedAuthHeaders)
     }
 
-    func isMPVAuthorizationHeader(_ key: String) -> Bool {
+    nonisolated func isMPVAuthorizationHeader(_ key: String) -> Bool {
         key.caseInsensitiveCompare("Authorization") == .orderedSame
             || key.caseInsensitiveCompare("X-Emby-Authorization") == .orderedSame
     }
