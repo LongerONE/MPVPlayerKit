@@ -179,7 +179,8 @@ public final class MPVPlayerView: UIView {
     /// range straight through to the compositor: this rolls off excessive
     /// highlights while retaining the panel's black floor. A faster peak
     /// response also stops a preceding bright scene from suppressing the
-    /// shadows in the following dark scene.
+    /// shadows in the following dark scene. A restrained positive gamma then
+    /// opens near-black detail without changing the SDR or ordinary HDR paths.
     static let dolbyVisionEDRMetalVideoOutputOptions =
         edrMetalVideoOutputOptions.map { option in
             option.0 == "target-colorspace-hint-mode"
@@ -193,6 +194,7 @@ public final class MPVPlayerView: UIView {
         ("hdr-scene-threshold-high", "2.0"),
         ("hdr-contrast-recovery", "0.20"),
         ("hdr-contrast-smoothness", "6.5"),
+        ("gamma", "10"),
     ]
 
     static let sdrMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [

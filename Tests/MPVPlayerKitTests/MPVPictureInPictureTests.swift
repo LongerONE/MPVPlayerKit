@@ -446,7 +446,7 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertEqual(dolbyVisionOptions["hdr-scene-threshold-high"], "2.0")
         XCTAssertEqual(dolbyVisionOptions["hdr-contrast-recovery"], "0.20")
         XCTAssertEqual(dolbyVisionOptions["hdr-contrast-smoothness"], "6.5")
-        XCTAssertNil(dolbyVisionOptions["gamma"])
+        XCTAssertEqual(dolbyVisionOptions["gamma"], "10")
         XCTAssertNil(dolbyVisionOptions["inverse-tone-mapping"])
         XCTAssertEqual(sdrOptions["target-trc"], "srgb")
         XCTAssertEqual(sdrOptions["target-prim"], "bt.709")
