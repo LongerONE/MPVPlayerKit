@@ -46,7 +46,12 @@ extension MPVPlayerView {
             ),
             activeProfileIndex: 0
         )
-        mpvDebugLog("setupMPV begin url=\(redactedURLDescription(url)) bounds=\(bounds) headers=\(headers.count) profiles=\(setupProfiles.map(\.name).joined(separator: ","))")
+        // Playback setup runs on `queue`, so UIKit geometry must be sampled on
+        // the main thread before it is included in diagnostics. Reading
+        // `UIView.bounds` here triggers Main Thread Checker and can terminate a
+        // debug session while libmpv is starting.
+        let boundsSnapshot = currentViewBoundsSnapshot()
+        mpvDebugLog("setupMPV begin url=\(redactedURLDescription(url)) bounds=\(boundsSnapshot) headers=\(headers.count) profiles=\(setupProfiles.map(\.name).joined(separator: ","))")
 
         while activeSetupProfileIndex < setupProfiles.count {
             let profile = setupProfiles[activeSetupProfileIndex]
@@ -390,6 +395,15 @@ extension MPVPlayerView {
         }
         setupMPV()
         return mpv != nil
+    }
+
+    private func currentViewBoundsSnapshot() -> CGRect {
+        if Thread.isMainThread {
+            return bounds
+        }
+        return DispatchQueue.main.sync { [weak self] in
+            self?.bounds ?? .zero
+        }
     }
 
     func failSetup() {
