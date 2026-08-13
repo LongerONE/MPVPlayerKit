@@ -174,14 +174,17 @@ public final class MPVPlayerView: UIView {
         ("target-colorspace-hint-mode", "source"),
     ]
 
-    /// Keep Dolby Vision on the same neutral EDR path as other HDR sources.
-    ///
-    /// A previous Dolby-only gamma lift and sub-100 peak percentile altered
-    /// the mastered signal before the iOS EDR compositor could present it. It
-    /// raised shadow detail at the cost of the black floor and clipped small
-    /// specular highlights. Content-specific tuning must be based on measured
-    /// device output, rather than a global playback override.
-    static let dolbyVisionEDRMetalVideoOutputOptions = edrMetalVideoOutputOptions
+    /// Dolby Vision is often mastered with very small, intense highlights in
+    /// otherwise dark scenes. Measure the scene instead of letting those few
+    /// pixels reserve most of the EDR range, then gently lift midtones without
+    /// raising the black floor.
+    static let dolbyVisionEDRMetalVideoOutputOptions = edrMetalVideoOutputOptions + [
+        ("hdr-compute-peak", "yes"),
+        ("hdr-peak-percentile", "99.995"),
+        ("hdr-contrast-recovery", "0.30"),
+        ("hdr-contrast-smoothness", "6.5"),
+        ("gamma", "5"),
+    ]
 
     static let sdrMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [
         ("target-trc", "srgb"),
