@@ -185,12 +185,14 @@ public final class MPVPlayerView: UIView {
                 : option
         } + [
         ("tone-mapping", "spline"),
-        ("tone-mapping-param", "0.22"),
+        ("tone-mapping-param", "0.20"),
         ("hdr-compute-peak", "yes"),
         // Preserve all highlights for a continuous roll-off instead of
         // discarding sparse specular detail.
-        ("target-peak", "450"),
-        ("target-contrast", "inf"),
+        ("target-peak", "400"),
+        // Model a tiny non-zero black point to make near-black Dolby Vision
+        // detail visible without applying a global gamma lift.
+        ("target-contrast", "100000"),
         ("hdr-peak-percentile", "100"),
         ("hdr-peak-decay-rate", "8"),
         ("hdr-scene-threshold-low", "0.75"),
