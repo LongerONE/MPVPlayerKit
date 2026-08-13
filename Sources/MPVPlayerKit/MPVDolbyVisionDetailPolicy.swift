@@ -19,13 +19,15 @@ struct MPVDolbyVisionDetailPolicy {
     static let dolbyVisionColorMatrix = "dolbyvision"
 
     static let enhancedCommands = [
-        MPVDolbyVisionDetailCommand(property: "gamma", value: "3"),
+        MPVDolbyVisionDetailCommand(property: "gamma", value: "7"),
+        MPVDolbyVisionDetailCommand(property: "contrast", value: "-7"),
         MPVDolbyVisionDetailCommand(property: "hdr-contrast-recovery", value: "0.30"),
         MPVDolbyVisionDetailCommand(property: "hdr-contrast-smoothness", value: "3.5"),
     ]
 
     static let standardCommands = [
         MPVDolbyVisionDetailCommand(property: "gamma", value: "0"),
+        MPVDolbyVisionDetailCommand(property: "contrast", value: "0"),
         MPVDolbyVisionDetailCommand(property: "hdr-contrast-recovery", value: "0"),
         MPVDolbyVisionDetailCommand(property: "hdr-contrast-smoothness", value: "3.5"),
     ]
@@ -56,7 +58,7 @@ struct MPVDolbyVisionDetailRuntimeState: Equatable, Sendable {
         self.hostHint = hostHint
         lastActualDetection = nil
         // Do not assume property writes survived handle replacement. The first
-        // reliable decision explicitly establishes all three values.
+        // reliable decision explicitly establishes all four values.
         appliedValues = [:]
     }
 
