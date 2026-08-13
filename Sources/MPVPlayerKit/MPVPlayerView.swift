@@ -188,6 +188,7 @@ public final class MPVPlayerView: UIView {
                 : option
         } + [
         ("hdr-compute-peak", "yes"),
+        ("target-peak", "800"),
         ("hdr-peak-percentile", "99.98"),
         ("hdr-peak-decay-rate", "8"),
         ("hdr-scene-threshold-low", "0.75"),

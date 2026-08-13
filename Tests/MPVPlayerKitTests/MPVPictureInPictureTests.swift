@@ -440,6 +440,7 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertEqual(dolbyVisionOptions["target-colorspace-hint"], "yes")
         XCTAssertEqual(dolbyVisionOptions["target-colorspace-hint-mode"], "target")
         XCTAssertEqual(dolbyVisionOptions["hdr-compute-peak"], "yes")
+        XCTAssertEqual(dolbyVisionOptions["target-peak"], "800")
         XCTAssertEqual(dolbyVisionOptions["hdr-peak-percentile"], "99.98")
         XCTAssertEqual(dolbyVisionOptions["hdr-peak-decay-rate"], "8")
         XCTAssertEqual(dolbyVisionOptions["hdr-scene-threshold-low"], "0.75")
