@@ -236,6 +236,10 @@ public final class MPVPlayerView: UIView {
     var userAgent: String?
     nonisolated let queue = DispatchQueue(label: "com.mpvplayerkit.player", qos: .userInitiated)
     let queueSpecificKey = DispatchSpecificKey<Void>()
+    // Resolve the resource bundle while the UIView is created on the main
+    // thread. `setupMPV` runs on `queue`; querying Bundle from there can trip
+    // Swift's executor assertion in a Swift package build.
+    nonisolated let systemSubtitleFontDirectory: String?
     let contentModeSnapshotLock = NSLock()
     var contentModeSnapshot: MPVContentModeSnapshot = .fit
     nonisolated let mediaTracksCacheLock = NSLock()
@@ -341,10 +345,23 @@ public final class MPVPlayerView: UIView {
         MPVPictureInPictureRendererRuntimeState()
 
     @objc public override init(frame: CGRect) {
+        systemSubtitleFontDirectory = Self.resolveSystemSubtitleFontDirectory()
         super.init(frame: frame)
         queue.setSpecific(key: queueSpecificKey, value: ())
         setupLayer()
         clientSubtitleController.install(in: self)
+    }
+
+    private static func resolveSystemSubtitleFontDirectory() -> String? {
+        #if SWIFT_PACKAGE
+        let resourceBundle = Bundle.module
+        #else
+        let resourceBundle = Bundle(for: MPVPlayerView.self)
+        #endif
+        return resourceBundle
+            .url(forResource: "NotoSansSC-Regular", withExtension: "otf")?
+            .deletingLastPathComponent()
+            .path
     }
 
     public convenience init(url: URL, headers: [String: String], userAgent: String?) {

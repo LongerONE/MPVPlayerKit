@@ -336,31 +336,7 @@ extension MPVPlayerView {
     }
 
     func configureSystemSubtitleFont(for handle: OpaquePointer) {
-        #if SWIFT_PACKAGE
-        let resourceBundle = Bundle.module
-        #else
-        let resourceBundle = Bundle(for: MPVPlayerView.self)
-        #endif
-        let requiredFontResources: [(String, String)] = [
-            ("NotoSansSC-Regular", "otf"),
-            ("NotoSansCJK-Regular", "ttc"),
-            ("NotoSansCJK-Bold", "ttc"),
-            ("NotoSans-Variable", "ttf"),
-            ("NotoSansArabic-Variable", "ttf"),
-            ("NotoSansHebrew-Variable", "ttf"),
-            ("NotoSansThai-Variable", "ttf"),
-            ("NotoSansDevanagari-Variable", "ttf"),
-        ]
-        let missingFontResources = requiredFontResources.compactMap { name, fileExtension in
-            resourceBundle.url(forResource: name, withExtension: fileExtension) == nil
-                ? "\(name).\(fileExtension)"
-                : nil
-        }
-        guard missingFontResources.isEmpty else {
-            mpvDebugLog("bundled subtitle fonts missing resources=\(missingFontResources.joined(separator: ","))")
-            return
-        }
-        guard let fontURL = resourceBundle.url(forResource: "NotoSansSC-Regular", withExtension: "otf") else {
+        guard let fontDirectory = systemSubtitleFontDirectory else {
             mpvDebugLog("bundled subtitle font missing")
             return
         }
@@ -370,7 +346,7 @@ extension MPVPlayerView {
             notifyOnFailure: false
         )
         checkError(
-            mpv_set_option_string(handle, "sub-fonts-dir", fontURL.deletingLastPathComponent().path),
+            mpv_set_option_string(handle, "sub-fonts-dir", fontDirectory),
             operation: "set_option sub-fonts-dir",
             notifyOnFailure: false
         )
@@ -379,7 +355,7 @@ extension MPVPlayerView {
             operation: "set_option sub-font=\(MPVSubtitleFont.regular)",
             notifyOnFailure: false
         )
-        mpvDebugLog("bundled subtitle fonts configured default=\(MPVSubtitleFont.regular) count=\(requiredFontResources.count)")
+        mpvDebugLog("bundled subtitle fonts configured default=\(MPVSubtitleFont.regular)")
     }
 
     func ensureMPVReady() -> Bool {
