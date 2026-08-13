@@ -182,11 +182,8 @@ extension MPVPlayerView {
 
     func setupMPV(url: URL, profile: MPVSetupProfile) -> Bool {
         mpvDebugLog("setupMPV profile begin name=\(profile.name) index=\(activeSetupProfileIndex + 1)/\(setupProfiles.count)")
-        let profileDescription = profile.options
-            .map { "\($0.0)=\($0.1)" }
-            .joined(separator: " ")
         mpvDebugLog(
-            "setupMPV profile options name=\(profile.name) [\(profileDescription)]"
+            "setupMPV profile options name=\(profile.name) count=\(profile.options.count)"
         )
         performOnMPVQueueSync {
             lastMPVTimeSnapshot = nil
