@@ -384,7 +384,7 @@ extension MPVPlayerView {
         if mpv != nil {
             return true
         }
-        guard stopped == false, setupFailed == false else {
+        guard isStopped() == false, isSetupFailed() == false else {
             notifyState(.error)
             return false
         }
@@ -393,7 +393,7 @@ extension MPVPlayerView {
     }
 
     func failSetup() {
-        setupFailed = true
+        setSetupFailed(true)
         destroyMPVHandle(reason: "setup-failed")
         pictureInPictureRendererRuntimeState.reset()
         notifyState(.error)
@@ -405,12 +405,25 @@ extension MPVPlayerView {
                 self.stopPictureInPictureForPlayerTeardown()
             }
         } else {
-            DispatchQueue.main.sync {
+            DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     self.stopPictureInPictureForPlayerTeardown()
                 }
             }
         }
+
+        if DispatchQueue.getSpecific(key: queueSpecificKey) != nil {
+            destroyMPVHandleOnMPVQueue(reason: reason, sendStopCommand: sendStopCommand)
+        } else {
+            // mpv_terminate_destroy may wait for decoder/rendering work. The
+            // caller must not synchronously wait for the MPV queue here.
+            queue.async { [self] in
+                destroyMPVHandleOnMPVQueue(reason: reason, sendStopCommand: sendStopCommand)
+            }
+        }
+    }
+
+    private func destroyMPVHandleOnMPVQueue(reason: String, sendStopCommand: Bool) {
         MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         setDecoderMode(.initializing)
         stopTimeTimer()

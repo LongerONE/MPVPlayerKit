@@ -10,6 +10,57 @@ import libmpv
 #endif
 
 extension MPVPlayerView {
+    nonisolated func nextPlaybackIntentGeneration() -> UInt64 {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        playbackIntentGeneration &+= 1
+        return playbackIntentGeneration
+    }
+
+    nonisolated func currentPlaybackIntentGeneration() -> UInt64 {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return playbackIntentGeneration
+    }
+
+    nonisolated func isPlaybackIntentCurrent(_ generation: UInt64) -> Bool {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return playbackIntentGeneration == generation
+    }
+
+    nonisolated func isStopped() -> Bool {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return stopped
+    }
+
+    nonisolated func isSetupFailed() -> Bool {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return setupFailed
+    }
+
+    nonisolated func setStopped(_ value: Bool) {
+        playbackStateLock.lock()
+        stopped = value
+        playbackStateLock.unlock()
+    }
+
+    nonisolated func setSetupFailed(_ value: Bool) {
+        playbackStateLock.lock()
+        setupFailed = value
+        playbackStateLock.unlock()
+    }
+
+    nonisolated func markStoppedIfNeeded() -> Bool {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        guard stopped == false else { return false }
+        stopped = true
+        return true
+    }
+
     @discardableResult
     nonisolated func command(
         _ command: String,

@@ -220,7 +220,7 @@ extension MPVPlayerView {
     private func beginMetalGeometryTransition() {
         isMetalGeometryTransitionInProgress = true
         queue.async { [weak self] in
-            guard let self, let mpv = self.mpv, self.stopped == false else {
+            guard let self, let mpv = self.mpv, self.isStopped() == false else {
                 DispatchQueue.main.async { [weak self] in
                     self?.applyPendingMetalGeometryWithoutVideoOutput()
                 }
@@ -271,7 +271,7 @@ extension MPVPlayerView {
 
         let contentModeSnapshot = currentContentModeSnapshot()
         queue.async { [weak self] in
-            guard let self, let mpv = self.mpv, self.stopped == false else {
+            guard let self, let mpv = self.mpv, self.isStopped() == false else {
                 DispatchQueue.main.async { [weak self] in
                     self?.finishMetalGeometryTransition()
                 }

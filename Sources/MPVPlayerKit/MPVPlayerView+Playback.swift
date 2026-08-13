@@ -23,40 +23,83 @@ extension MPVPlayerView {
     }
 
     @objc public func play() {
-        playbackIntentGeneration &+= 1
-        mpvDebugLog("play requested stopped=\(stopped) setupFailed=\(setupFailed) hasHandle=\(mpv != nil)")
-        guard ensureMPVReady() else {
+        let generation = nextPlaybackIntentGeneration()
+        mpvDebugLog("play requested stopped=\(isStopped()) setupFailed=\(isSetupFailed())")
+        guard isStopped() == false, isSetupFailed() == false else {
+            notifyState(.error)
             return
         }
-        setFlag(MPVProperty.pause, false)
-        isPlaying = true
-        notifyState(hasReportedReadyToPlay ? .bufferFinished : .buffering)
-        MPVSystemPlaybackCoordinator.shared.activate(playerView: self)
-        startTimeTimer()
+
+        // mpv_initialize and the first loadfile can perform decoder, GPU, and
+        // network setup. Keep them off the main actor so the presenting view
+        // remains responsive while playback becomes ready.
+        queue.async { [weak self] in
+            guard let self,
+                  self.isPlaybackIntentCurrent(generation),
+                  self.isStopped() == false,
+                  self.isSetupFailed() == false
+            else {
+                return
+            }
+
+            guard self.ensureMPVReady(),
+                  self.isPlaybackIntentCurrent(generation),
+                  self.isStopped() == false,
+                  self.isSetupFailed() == false,
+                  self.mpv != nil
+            else {
+                self.notifyOnMain {
+                    self.isPlaying = false
+                }
+                return
+            }
+
+            self.setFlag(MPVProperty.pause, false)
+            self.startTimeTimer()
+            let state: MPVPlayerState = self.hasReportedReadyToPlay ? .bufferFinished : .buffering
+            self.notifyOnMain {
+                guard self.isPlaybackIntentCurrent(generation), self.isStopped() == false else {
+                    return
+                }
+                self.isPlaying = true
+                self.notifyState(state)
+                MPVSystemPlaybackCoordinator.shared.activate(playerView: self)
+            }
+        }
     }
 
     @objc public func pause() {
-        playbackIntentGeneration &+= 1
-        guard mpv != nil else { return }
+        let generation = nextPlaybackIntentGeneration()
         mpvDebugLog("pause")
-        setFlag(MPVProperty.pause, true)
-        isPlaying = false
-        stopTimeTimer()
-        notifyState(.paused)
-        MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
+        queue.async { [weak self] in
+            guard let self,
+                  self.isPlaybackIntentCurrent(generation),
+                  self.mpv != nil
+            else {
+                return
+            }
+            self.setFlag(MPVProperty.pause, true)
+            self.stopTimeTimer()
+            self.notifyOnMain {
+                guard self.isPlaybackIntentCurrent(generation) else { return }
+                self.isPlaying = false
+                self.notifyState(.paused)
+                MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
+            }
+        }
     }
 
     @objc public func stop() {
-        playbackIntentGeneration &+= 1
+        _ = nextPlaybackIntentGeneration()
         clientSubtitleController.clear()
         stopPictureInPictureForPlayerTeardown()
         setDecoderMode(.initializing)
         pictureInPictureRendererRuntimeState.reset()
-        guard stopped == false else {
+        guard markStoppedIfNeeded() else {
             mpvDebugLog("stop ignored already stopped")
             return
         }
-        stopped = true
+        isPlaying = false
         MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         destroyMPVHandle(reason: "stop")
     }
@@ -76,7 +119,7 @@ extension MPVPlayerView {
             requestID: requestID,
             targetTime: max(0.0, time),
             autoPlay: autoPlay,
-            playbackIntentGeneration: playbackIntentGeneration
+            playbackIntentGeneration: currentPlaybackIntentGeneration()
         )
         publishSeekTarget(request.targetTime)
         mpvDebugLog(

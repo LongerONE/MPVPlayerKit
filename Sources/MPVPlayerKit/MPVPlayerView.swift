@@ -247,9 +247,10 @@ public final class MPVPlayerView: UIView {
     var hasReportedReadyToPlay = false
     nonisolated(unsafe) var hasPlaybackRestarted = false
     nonisolated(unsafe) var hasLoggedVideoColorParameters = false
-    var stopped = false
-    var setupFailed = false
-    var playbackIntentGeneration: UInt64 = 0
+    let playbackStateLock = NSLock()
+    nonisolated(unsafe) var stopped = false
+    nonisolated(unsafe) var setupFailed = false
+    nonisolated(unsafe) var playbackIntentGeneration: UInt64 = 0
     var forceSoftwareDecode = false
     var isDolbyVisionPlayback = false
     nonisolated(unsafe) var currentSubtitleUsesOriginalStyle = false
@@ -415,8 +416,8 @@ public final class MPVPlayerView: UIView {
         debandEnabled = boolValue(configuration["debandEnabled"])
         interpolationOptions = MPVInterpolationOptions(bridgeDictionary: configuration)
         setDecoderMode(.initializing)
-        stopped = false
-        setupFailed = false
+        setStopped(false)
+        setSetupFailed(false)
         hasReportedReadyToPlay = false
         resetPictureInPictureVideoDisplaySize()
         hasPlaybackRestarted = false

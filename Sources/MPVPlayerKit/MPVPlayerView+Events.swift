@@ -208,7 +208,7 @@ extension MPVPlayerView {
             if MPVSeekReplyResolver.shouldAutoPlay(
                    request: request,
                    resolution: resolution,
-                   currentPlaybackIntentGeneration: self.playbackIntentGeneration
+                   currentPlaybackIntentGeneration: self.currentPlaybackIntentGeneration()
             ) {
                 // libmpv's asynchronous reply is the sequencing barrier for play.
                 self.play()
