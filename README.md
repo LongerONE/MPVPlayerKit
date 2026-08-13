@@ -58,10 +58,11 @@ Picture in Picture updates.
 ## Picture in Picture
 
 Picture in Picture is available through `startPictureInPicture()`,
-`stopPictureInPicture()`, and `togglePictureInPicture()`. Set
-`allowsAutomaticPictureInPictureFromInline` when the host app wants the system
-to enter Picture in Picture as playback moves to the background. The host app
-must enable the Audio, AirPlay, and Picture in Picture background mode.
+`stopPictureInPicture()`, and `togglePictureInPicture()`. The built-in quick
+player starts Picture in Picture only after its button is tapped. Hosts that
+explicitly opt into background-initiated Picture in Picture may set
+`allowsAutomaticPictureInPictureFromInline`; this requires the Audio, AirPlay,
+and Picture in Picture background mode.
 
 The window is fed by raw MPV video screenshots, and is kept consistent with the
 inline `MPVPlayerView`:

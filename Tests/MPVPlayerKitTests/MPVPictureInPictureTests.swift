@@ -64,7 +64,7 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertEqual(controller.pictureInPictureButton.isEnabled, controller.player.isPictureInPictureSupported)
         if controller.player.isPictureInPictureSupported {
             XCTAssertTrue(controller.preparePictureInPicturePlayback(activateAudioSession: {}))
-            XCTAssertTrue(controller.player.allowsAutomaticPictureInPictureFromInline)
+            XCTAssertFalse(controller.player.allowsAutomaticPictureInPictureFromInline)
         }
     }
 

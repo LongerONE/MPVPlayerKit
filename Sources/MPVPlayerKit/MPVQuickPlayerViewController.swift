@@ -155,9 +155,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
         super.viewDidAppear(animated)
         applyPreferredOrientationIfNeeded()
         updateIdleTimer(for: playbackState)
-        if player.isPictureInPictureSupported {
-            _ = preparePictureInPicturePlayback()
-        }
         if autoplay, player.isPlaying == false {
             player.play()
         }
@@ -523,7 +520,8 @@ public final class MPVQuickPlayerViewController: UIViewController {
         guard player.isPictureInPictureSupported else { return false }
         do {
             try activateAudioSession()
-            player.allowsAutomaticPictureInPictureFromInline = true
+            // PiP is deliberately started only from the explicit control below.
+            player.allowsAutomaticPictureInPictureFromInline = false
             return true
         } catch {
             return false
