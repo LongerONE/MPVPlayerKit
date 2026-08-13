@@ -30,6 +30,7 @@ enum MPVPlayerKitNotification {
     static let didUpdateBufferingProgress = Notification.Name("MPVPlayerViewDidUpdateBufferingProgress")
     static let didUpdateDecoderMode = Notification.Name("MPVPlayerViewDidUpdateDecoderMode")
     static let didLoadSubtitle = Notification.Name("MPVPlayerViewDidLoadSubtitle")
+    static let didCompleteSeek = Notification.Name("MPVPlayerViewDidCompleteSeek")
     static let didChangePictureInPicture = Notification.Name(
         "MPVPlayerViewDidChangePictureInPicture"
     )
@@ -43,6 +44,8 @@ enum MPVPlayerKitNotificationKey {
     static let decoderMode = "decoderMode"
     static let requestID = "requestID"
     static let success = "success"
+    static let targetTime = "targetTime"
+    static let errorCode = "errorCode"
 }
 
 enum MPVProperty {
@@ -244,6 +247,7 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var hasLoggedVideoColorParameters = false
     var stopped = false
     var setupFailed = false
+    var playbackIntentGeneration: UInt64 = 0
     var forceSoftwareDecode = false
     var isDolbyVisionPlayback = false
     nonisolated(unsafe) var currentSubtitleUsesOriginalStyle = false
@@ -279,6 +283,11 @@ public final class MPVPlayerView: UIView {
         var requestIDs: [String]
     }
 
+    struct PendingSeek {
+        let userdata: UInt64
+        let request: MPVSeekRequest
+    }
+
     struct SubtitleSelectionSnapshot {
         let usesOriginalStyle: Bool
         let subtitleID: Int64?
@@ -296,9 +305,10 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var loadedExternalSubtitleIDs: [String: Int64] = [:]
     nonisolated(unsafe) var pendingExternalSubtitleLoad: PendingExternalSubtitleLoad?
     nonisolated(unsafe) var canceledExternalSubtitleCommands: [UInt64: PendingExternalSubtitleLoad] = [:]
+    nonisolated(unsafe) var pendingSeekCommands: [UInt64: PendingSeek] = [:]
     nonisolated(unsafe) var activeExternalSubtitleActivation: ExternalSubtitleActivation?
     nonisolated(unsafe) var committedSubtitleSelection: SubtitleSelectionSnapshot?
-    nonisolated(unsafe) var nextSubtitleLoadUserdata: UInt64 = 1
+    nonisolated(unsafe) var nextMPVCommandUserdata: UInt64 = 1
     nonisolated(unsafe) var subtitleSelectionEpoch: UInt64 = 0
     nonisolated(unsafe) var lastLoggedSubtitleText = ""
     nonisolated(unsafe) var hasLoggedSubtitleTextEvent = false

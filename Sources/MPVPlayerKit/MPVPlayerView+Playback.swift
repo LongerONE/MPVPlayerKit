@@ -23,6 +23,7 @@ extension MPVPlayerView {
     }
 
     @objc public func play() {
+        playbackIntentGeneration &+= 1
         mpvDebugLog("play requested stopped=\(stopped) setupFailed=\(setupFailed) hasHandle=\(mpv != nil)")
         guard ensureMPVReady() else {
             return
@@ -35,6 +36,7 @@ extension MPVPlayerView {
     }
 
     @objc public func pause() {
+        playbackIntentGeneration &+= 1
         guard mpv != nil else { return }
         mpvDebugLog("pause")
         setFlag(MPVProperty.pause, true)
@@ -45,6 +47,7 @@ extension MPVPlayerView {
     }
 
     @objc public func stop() {
+        playbackIntentGeneration &+= 1
         clientSubtitleController.clear()
         stopPictureInPictureForPlayerTeardown()
         setDecoderMode(.initializing)
@@ -65,15 +68,48 @@ extension MPVPlayerView {
             return false
         }
 
-        mpvDebugLog("seek time=\(max(0.0, time)) autoPlay=\(autoPlay)")
-        let status = command("seek", args: [String(max(0.0, time)), "absolute+exact"])
-        if status >= 0 {
-            publishSeekTarget(max(0.0, time))
+        let requestID = (options["requestID"] as? NSString).flatMap { value in
+            let string = String(value)
+            return string.isEmpty ? nil : string
+        } ?? UUID().uuidString
+        let request = MPVSeekRequest(
+            requestID: requestID,
+            targetTime: max(0.0, time),
+            autoPlay: autoPlay,
+            playbackIntentGeneration: playbackIntentGeneration
+        )
+        publishSeekTarget(request.targetTime)
+        mpvDebugLog(
+            "seek accepted request=\(request.requestID) time=\(request.targetTime) autoPlay=\(autoPlay)"
+        )
+        queue.async { [weak self] in
+            self?.enqueueSeekOnMPVQueue(request)
         }
-        if autoPlay {
-            play()
+        return true
+    }
+
+    nonisolated func enqueueSeekOnMPVQueue(_ request: MPVSeekRequest) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard mpv != nil else {
+            handleSeekReply(request: request, error: MPV_ERROR_UNINITIALIZED.rawValue)
+            return
         }
-        return status >= 0
+
+        let userdata = allocateMPVCommandUserdata()
+        pendingSeekCommands[userdata] = PendingSeek(userdata: userdata, request: request)
+        let status = commandAsync(
+            "seek",
+            args: [String(request.targetTime), "absolute+exact"],
+            replyUserdata: userdata
+        )
+        guard status >= 0 else {
+            pendingSeekCommands.removeValue(forKey: userdata)
+            handleSeekReply(request: request, error: status)
+            return
+        }
+        mpvDebugLog(
+            "seek async queued request=\(request.requestID) userdata=\(userdata) status=\(status)"
+        )
     }
 
     /// MPV reports a new position only on its next time update, and not at all
@@ -224,8 +260,7 @@ extension MPVPlayerView {
         }
 
         let source = normalizedMPVSource(urlString)
-        let userdata = nextSubtitleLoadUserdata
-        nextSubtitleLoadUserdata &+= 1
+        let userdata = allocateMPVCommandUserdata()
         pendingExternalSubtitleLoad = PendingExternalSubtitleLoad(
             userdata: userdata,
             selectionEpoch: selectionEpoch,
@@ -236,13 +271,12 @@ extension MPVPlayerView {
             previousSelection: previousSelection,
             requestIDs: [requestID]
         )
-        var cargs = makeOwnedCArgs("sub-add", [source, "auto"])
-        defer {
-            for pointer in cargs where pointer != nil {
-                free(UnsafeMutablePointer(mutating: pointer!))
-            }
-        }
-        let status = mpv_command_async(mpv, userdata, &cargs)
+        let status = commandAsync(
+            "sub-add",
+            args: [source, "auto"],
+            replyUserdata: userdata,
+            handle: mpv
+        )
         if status < 0 {
             pendingExternalSubtitleLoad = nil
             notifySubtitleLoad(requestID: requestID, success: false)

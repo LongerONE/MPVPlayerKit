@@ -188,9 +188,10 @@ extension MPVPlayerView {
             loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)
             pendingExternalSubtitleLoad = nil
             canceledExternalSubtitleCommands.removeAll(keepingCapacity: true)
+            pendingSeekCommands.removeAll(keepingCapacity: true)
             activeExternalSubtitleActivation = nil
             committedSubtitleSelection = nil
-            nextSubtitleLoadUserdata = 1
+            nextMPVCommandUserdata = 1
             subtitleSelectionEpoch = 0
         }
         lastLoggedSubtitleText = ""
@@ -427,11 +428,23 @@ extension MPVPlayerView {
                 mpv_abort_async_command(mpv, pending.userdata)
             }
             pendingExternalSubtitleLoad = nil
+            let pendingSeekRequests = Array(pendingSeekCommands.values)
+            pendingSeekCommands.removeAll(keepingCapacity: true)
+            if pendingSeekRequests.isEmpty == false, mpv != nil {
+                publishTime()
+            }
+            pendingSeekRequests.forEach {
+                notifySeekCompletion(
+                    request: $0.request,
+                    success: false,
+                    error: MPV_ERROR_UNINITIALIZED.rawValue
+                )
+            }
             loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)
             canceledExternalSubtitleCommands.removeAll(keepingCapacity: true)
             activeExternalSubtitleActivation = nil
             committedSubtitleSelection = nil
-            nextSubtitleLoadUserdata = 1
+            nextMPVCommandUserdata = 1
             subtitleSelectionEpoch = 0
             currentSubtitleUsesOriginalStyle = false
             pendingRequestIDs.forEach { notifySubtitleLoad(requestID: $0, success: false) }

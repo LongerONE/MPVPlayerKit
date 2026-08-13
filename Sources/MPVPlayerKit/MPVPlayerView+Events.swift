@@ -25,28 +25,37 @@ func makeMPVTimeTimerHandler(_ playerView: MPVPlayerView) -> @Sendable () -> Voi
 }
 
 extension MPVPlayerView {
-    nonisolated func publishTime() {
-        guard mpv != nil else { return }
+    nonisolated func readMPVTimeSnapshot() -> MPVPlaybackTimeSnapshot? {
+        guard mpv != nil else { return nil }
         let current = getDouble(MPVProperty.timePosition)
+        guard current.isFinite else { return nil }
         let total = getDouble(MPVProperty.duration)
-        guard current.isFinite else { return }
+        return MPVPlaybackTimeSnapshot(
+            currentTime: max(0.0, current),
+            duration: total.isFinite && total > 0.0 ? total : nil
+        )
+    }
 
-        let nextCurrentTime = max(0.0, current)
-        let nextDuration = total.isFinite && total > 0.0 ? total : nil
+    func applyMPVTimeSnapshot(_ snapshot: MPVPlaybackTimeSnapshot) {
+        currentTime = snapshot.currentTime
+        if let duration = snapshot.duration {
+            self.duration = duration
+        }
+        updateClientSubtitle(at: currentTime)
+        notifyTime(currentTime: currentTime, duration: self.duration)
+        MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
+    }
+
+    nonisolated func publishTime() {
+        guard let snapshot = readMPVTimeSnapshot() else { return }
         notifyOnMain {
             guard self.mpv != nil else { return }
-            self.currentTime = nextCurrentTime
-            if let nextDuration {
-                self.duration = nextDuration
-            }
+            self.applyMPVTimeSnapshot(snapshot)
 
             if self.hasReportedReadyToPlay == false, self.duration > 0.0 {
                 self.hasReportedReadyToPlay = true
                 self.notifyState(.readyToPlay)
             }
-            self.updateClientSubtitle(at: self.currentTime)
-            self.notifyTime(currentTime: self.currentTime, duration: self.duration)
-            MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
         }
     }
 
@@ -91,6 +100,16 @@ extension MPVPlayerView {
                     self.handleEndFile(event)
                 case MPV_EVENT_SHUTDOWN:
                     self.mpvDebugLog("event shutdown")
+                    let pendingSeekRequests = Array(self.pendingSeekCommands.values)
+                    self.pendingSeekCommands.removeAll(keepingCapacity: true)
+                    let recoverySnapshot = self.readMPVTimeSnapshot()
+                    pendingSeekRequests.forEach { pending in
+                        self.handleSeekReply(
+                            request: pending.request,
+                            error: MPV_ERROR_UNINITIALIZED.rawValue,
+                            recoverySnapshot: recoverySnapshot
+                        )
+                    }
                     self.notifyOnMain {
                         self.stopTimeTimer()
                         self.isPlaying = false
@@ -111,6 +130,10 @@ extension MPVPlayerView {
         let userdata = event.pointee.reply_userdata
         if let canceled = canceledExternalSubtitleCommands.removeValue(forKey: userdata) {
             restoreAfterStaleExternalReplyIfNeeded(canceled)
+            return
+        }
+        if let pendingSeek = pendingSeekCommands.removeValue(forKey: userdata) {
+            handleSeekReply(request: pendingSeek.request, error: event.pointee.error)
             return
         }
         guard let pending = pendingExternalSubtitleLoad,
@@ -143,6 +166,79 @@ extension MPVPlayerView {
         }
         mpvDebugLog("loadSubtitle reply requests=\(pending.requestIDs) userdata=\(userdata) sid=\(subtitleID.map(String.init) ?? "nil") success=\(success) error=\(event.pointee.error)")
         pending.requestIDs.forEach { notifySubtitleLoad(requestID: $0, success: success) }
+    }
+
+    nonisolated func handleSeekReply(
+        request: MPVSeekRequest,
+        error: Int32,
+        recoverySnapshot: MPVPlaybackTimeSnapshot? = nil
+    ) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard let resolution = MPVSeekReplyResolver.resolve(
+            request: request,
+            error: error
+        ) else {
+            return
+        }
+        mpvDebugLog(
+            "seek reply request=\(request.requestID) success=\(resolution.success) "
+                + "autoPlay=\(resolution.shouldAutoPlay) error=\(error)"
+        )
+        let snapshot = resolution.shouldRestoreTime
+            ? recoverySnapshot ?? readMPVTimeSnapshot()
+            : nil
+        notifyOnMain {
+            if let snapshot {
+                // The optimistic target must not remain visible after a failed seek.
+                self.applyMPVTimeSnapshot(snapshot)
+            }
+            if MPVSeekReplyResolver.shouldAutoPlay(
+                   request: request,
+                   resolution: resolution,
+                   currentPlaybackIntentGeneration: self.playbackIntentGeneration
+            ) {
+                // libmpv's asynchronous reply is the sequencing barrier for play.
+                self.play()
+            }
+            self.postSeekCompletion(
+                request: request,
+                success: resolution.success,
+                error: error
+            )
+        }
+    }
+
+    func postSeekCompletion(request: MPVSeekRequest, success: Bool, error: Int32) {
+        NotificationCenter.default.post(
+            name: MPVPlayerKitNotification.didCompleteSeek,
+            object: self,
+            userInfo: [
+                MPVPlayerKitNotificationKey.requestID: request.requestID,
+                MPVPlayerKitNotificationKey.success: success,
+                MPVPlayerKitNotificationKey.targetTime: request.targetTime,
+                MPVPlayerKitNotificationKey.errorCode: error,
+            ]
+        )
+    }
+
+    nonisolated func notifySeekCompletion(
+        request: MPVSeekRequest,
+        success: Bool,
+        error: Int32
+    ) {
+        notifyOnMain {
+            self.postSeekCompletion(request: request, success: success, error: error)
+        }
+    }
+
+    nonisolated func allocateMPVCommandUserdata() -> UInt64 {
+        dispatchPrecondition(condition: .onQueue(queue))
+        let userdata = nextMPVCommandUserdata
+        nextMPVCommandUserdata &+= 1
+        if nextMPVCommandUserdata == 0 {
+            nextMPVCommandUserdata = 1
+        }
+        return userdata
     }
 
     nonisolated func cancelPendingExternalSubtitleLoad(handle: OpaquePointer, reason: String) {

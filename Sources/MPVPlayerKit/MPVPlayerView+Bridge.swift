@@ -34,6 +34,33 @@ extension MPVPlayerView {
         return returnValue
     }
 
+    @discardableResult
+    nonisolated func commandAsync(
+        _ command: String,
+        args: [String?] = [],
+        replyUserdata: UInt64,
+        handle: OpaquePointer? = nil
+    ) -> Int32 {
+        guard let mpv = handle ?? self.mpv else {
+            return MPV_ERROR_UNINITIALIZED.rawValue
+        }
+        var cargs = makeOwnedCArgs(command, args)
+        defer {
+            for pointer in cargs where pointer != nil {
+                free(UnsafeMutablePointer(mutating: pointer!))
+            }
+        }
+
+        mpvDebugLog(
+            "command async \(command) argCount=\(args.count) userdata=\(replyUserdata)"
+        )
+        let returnValue = mpv_command_async(mpv, replyUserdata, &cargs)
+        mpvDebugLog(
+            "command async \(command) status=\(returnValue) userdata=\(replyUserdata)"
+        )
+        return returnValue
+    }
+
     nonisolated func makeCArgs(_ command: String, _ args: [String?]) -> [String?] {
         var stringArgs = args
         stringArgs.insert(command, at: 0)
