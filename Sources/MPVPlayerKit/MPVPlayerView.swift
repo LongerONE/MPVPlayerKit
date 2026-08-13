@@ -188,8 +188,11 @@ public final class MPVPlayerView: UIView {
                 : option
         } + [
         ("hdr-compute-peak", "yes"),
-        ("target-peak", "800"),
-        ("hdr-peak-percentile", "99.98"),
+        // Preserve every highlight sample so BT.2446a can roll it off instead
+        // of clipping it, while the lower target peak limits the output on a
+        // bright iPhone display.
+        ("target-peak", "600"),
+        ("hdr-peak-percentile", "100"),
         ("hdr-peak-decay-rate", "8"),
         ("hdr-scene-threshold-low", "0.75"),
         ("hdr-scene-threshold-high", "2.0"),
