@@ -14,7 +14,7 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
                 return
             }
             let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
-            DispatchQueue.main.sync {
+            DispatchQueue.main.async {
                 transfer.value.0.pixelFormat = transfer.value.1
             }
         }
@@ -28,7 +28,7 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
                 return
             }
             let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
-            DispatchQueue.main.sync {
+            DispatchQueue.main.async {
                 transfer.value.0.maximumDrawableCount = transfer.value.1
             }
         }
@@ -42,7 +42,7 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
                 return
             }
             let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
-            DispatchQueue.main.sync {
+            DispatchQueue.main.async {
                 transfer.value.0.minificationFilter = transfer.value.1
             }
         }
@@ -56,7 +56,7 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
                 return
             }
             let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
-            DispatchQueue.main.sync {
+            DispatchQueue.main.async {
                 transfer.value.0.magnificationFilter = transfer.value.1
             }
         }
@@ -70,7 +70,7 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
                 return
             }
             let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
-            DispatchQueue.main.sync {
+            DispatchQueue.main.async {
                 transfer.value.0.contentsGravity = transfer.value.1
             }
         }
@@ -84,7 +84,7 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
                 return
             }
             let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
-            DispatchQueue.main.sync {
+            DispatchQueue.main.async {
                 transfer.value.0.framebufferOnly = transfer.value.1
             }
         }
@@ -98,7 +98,7 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
                 return
             }
             let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
-            DispatchQueue.main.sync {
+            DispatchQueue.main.async {
                 transfer.value.0.isOpaque = transfer.value.1
             }
         }
@@ -112,7 +112,7 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
                 return
             }
             let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
-            DispatchQueue.main.sync {
+            DispatchQueue.main.async {
                 transfer.value.0.colorspace = transfer.value.1
             }
         }
@@ -140,7 +140,7 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
                     return
                 }
                 let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
-                DispatchQueue.main.sync {
+                DispatchQueue.main.async {
                     transfer.value.0.drawableSize = transfer.value.1
                 }
             }

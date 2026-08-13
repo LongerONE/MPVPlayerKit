@@ -398,12 +398,8 @@ extension MPVPlayerView {
     }
 
     private func currentViewBoundsSnapshot() -> CGRect {
-        if Thread.isMainThread {
-            return bounds
-        }
-        return DispatchQueue.main.sync { [weak self] in
-            self?.bounds ?? .zero
-        }
+        guard Thread.isMainThread else { return .zero }
+        return bounds
     }
 
     func failSetup() {
