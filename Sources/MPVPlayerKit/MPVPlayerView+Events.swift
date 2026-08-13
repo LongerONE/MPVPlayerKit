@@ -520,7 +520,7 @@ extension MPVPlayerView {
         let oldProfile = activeProfileDescription
         destroyMPVHandle(reason: "profile-\(oldProfile)-end-file-error-\(errorCode)", sendStopCommand: false)
         activeSetupProfileIndex = nextIndex
-        pictureInPictureRendererRuntimeState.setActiveProfileIndex(nextIndex)
+        prepareProfilesForNextRenderer()
         hasReportedReadyToPlay = false
         hasPlaybackRestarted = false
         resetPictureInPictureVideoDisplaySize()

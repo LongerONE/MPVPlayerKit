@@ -37,15 +37,7 @@ extension MPVPlayerView {
             return
         }
 
-        let profiles = makeSetupProfiles()
-        setupProfiles = profiles
         activeSetupProfileIndex = 0
-        pictureInPictureRendererRuntimeState.store(
-            profiles: profiles.map(
-                MPVPictureInPictureRendererInvariantSnapshot.SetupProfile.init
-            ),
-            activeProfileIndex: 0
-        )
         // Playback setup runs on `queue`, so UIKit geometry must be sampled on
         // the main thread before it is included in diagnostics. Reading
         // `UIView.bounds` here triggers Main Thread Checker and can terminate a
@@ -53,7 +45,9 @@ extension MPVPlayerView {
         let boundsSnapshot = currentViewBoundsSnapshot()
         mpvDebugLog("setupMPV begin url=\(redactedURLDescription(url)) bounds=\(boundsSnapshot) headers=\(headers.count) profiles=\(setupProfiles.map(\.name).joined(separator: ","))")
 
-        while activeSetupProfileIndex < setupProfiles.count {
+        while true {
+            prepareProfilesForNextRenderer()
+            guard activeSetupProfileIndex < setupProfiles.count else { break }
             let profile = setupProfiles[activeSetupProfileIndex]
             if setupMPV(url: url, profile: profile) {
                 return
@@ -66,6 +60,20 @@ extension MPVPlayerView {
 
         mpvDebugLog("setupMPV exhausted all profiles")
         failSetup()
+    }
+
+    func prepareProfilesForNextRenderer() {
+        // Reserve the renderer slot before reading options. Screen changes
+        // after this point become pending instead of mutating CAMetalLayer
+        // during profile or handle construction.
+        prepareColorOutputForRendererSetup()
+        setupProfiles = makeSetupProfiles()
+        pictureInPictureRendererRuntimeState.store(
+            profiles: setupProfiles.map(
+                MPVPictureInPictureRendererInvariantSnapshot.SetupProfile.init
+            ),
+            activeProfileIndex: activeSetupProfileIndex
+        )
     }
 
     func makeSetupProfiles() -> [MPVSetupProfile] {
@@ -100,14 +108,10 @@ extension MPVPlayerView {
     }
 
     var metalVideoOutputOptions: [(String, String)] {
-        let colorOptions: [(String, String)]
-        if usesExtendedDynamicRangeOutput && isDolbyVisionPlayback {
-            colorOptions = Self.dolbyVisionEDRMetalVideoOutputOptions
-        } else if usesExtendedDynamicRangeOutput {
-            colorOptions = Self.edrMetalVideoOutputOptions
-        } else {
-            colorOptions = Self.sdrMetalVideoOutputOptions
-        }
+        let outputMode = MPVColorMappingPolicy.outputMode(
+            usesExtendedDynamicRangeOutput: usesExtendedDynamicRangeOutput
+        )
+        let colorOptions = MPVColorMappingPolicy.options(for: outputMode)
         #if targetEnvironment(simulator)
         return colorOptions + [
             ("gpu-dumb-mode", "yes"),
@@ -447,6 +451,7 @@ extension MPVPlayerView {
             pendingRequestIDs.forEach { notifySubtitleLoad(requestID: $0, success: false) }
             guard let mpv else {
                 lastMPVTimeSnapshot = nil
+                markColorOutputRendererStopped()
                 mpvDebugLog("destroyMPVHandle skipped reason=\(reason) handle=nil")
                 return
             }
@@ -461,6 +466,7 @@ extension MPVPlayerView {
             }
             mpvDebugLog("destroyMPVHandle stage=terminate-begin reason=\(reason)")
             mpv_terminate_destroy(mpv)
+            markColorOutputRendererStopped()
             mpvDebugLog("destroyMPVHandle stage=terminate-end reason=\(reason)")
             lastMPVTimeSnapshot = nil
         }

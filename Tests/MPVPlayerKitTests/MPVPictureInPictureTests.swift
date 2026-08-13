@@ -433,26 +433,24 @@ final class MPVPictureInPictureTests: XCTestCase {
             playerView.metalLayer.superlayer.map(ObjectIdentifier.init)
         )
         XCTAssertEqual(edrOptions["target-colorspace-hint"], "yes")
-        XCTAssertEqual(edrOptions["target-colorspace-hint-mode"], "source")
+        XCTAssertEqual(edrOptions["target-colorspace-hint-mode"], "target")
         XCTAssertEqual(edrOptions["sub-hdr-peak"], "100")
         XCTAssertEqual(edrOptions["image-subs-hdr-peak"], "100")
         XCTAssertNil(edrOptions["target-trc"])
         XCTAssertNil(edrOptions["target-prim"])
-        XCTAssertEqual(dolbyVisionOptions["target-colorspace-hint"], "yes")
-        XCTAssertEqual(dolbyVisionOptions["target-colorspace-hint-mode"], "target")
-        XCTAssertEqual(dolbyVisionOptions["tone-mapping"], "spline")
-        XCTAssertEqual(dolbyVisionOptions["tone-mapping-param"], "0.20")
-        XCTAssertEqual(dolbyVisionOptions["hdr-compute-peak"], "yes")
-        XCTAssertEqual(dolbyVisionOptions["target-peak"], "400")
-        XCTAssertEqual(dolbyVisionOptions["target-contrast"], "100000")
-        XCTAssertEqual(dolbyVisionOptions["hdr-peak-percentile"], "100")
-        XCTAssertEqual(dolbyVisionOptions["hdr-peak-decay-rate"], "8")
-        XCTAssertEqual(dolbyVisionOptions["hdr-scene-threshold-low"], "0.75")
-        XCTAssertEqual(dolbyVisionOptions["hdr-scene-threshold-high"], "2.0")
-        XCTAssertEqual(dolbyVisionOptions["hdr-contrast-recovery"], "0.30")
-        XCTAssertEqual(dolbyVisionOptions["hdr-contrast-smoothness"], "6.5")
-        XCTAssertNil(dolbyVisionOptions["gamma"])
-        XCTAssertNil(dolbyVisionOptions["inverse-tone-mapping"])
+        XCTAssertEqual(dolbyVisionOptions, edrOptions)
+        XCTAssertEqual(dolbyVisionOptions["hdr-compute-peak"], "auto")
+        XCTAssertEqual(dolbyVisionOptions["gamut-mapping-mode"], "auto")
+        XCTAssertNil(dolbyVisionOptions["tone-mapping"])
+        XCTAssertNil(dolbyVisionOptions["tone-mapping-param"])
+        XCTAssertNil(dolbyVisionOptions["target-peak"])
+        XCTAssertNil(dolbyVisionOptions["target-contrast"])
+        XCTAssertNil(dolbyVisionOptions["hdr-peak-percentile"])
+        XCTAssertNil(dolbyVisionOptions["hdr-peak-decay-rate"])
+        XCTAssertNil(dolbyVisionOptions["hdr-scene-threshold-low"])
+        XCTAssertNil(dolbyVisionOptions["hdr-scene-threshold-high"])
+        XCTAssertNil(dolbyVisionOptions["hdr-contrast-recovery"])
+        XCTAssertNil(dolbyVisionOptions["hdr-contrast-smoothness"])
         XCTAssertEqual(sdrOptions["target-trc"], "srgb")
         XCTAssertEqual(sdrOptions["target-prim"], "bt.709")
         XCTAssertEqual(sdrOptions["sub-hdr-peak"], "100")
@@ -461,23 +459,16 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertNil(sdrOptions["target-colorspace-hint"])
         XCTAssertNil(sdrOptions["target-colorspace-hint-mode"])
 
-        #if targetEnvironment(simulator)
+        // A detached view has no target UIScreen and safely starts in SDR.
         XCTAssertFalse(playerView.usesExtendedDynamicRangeOutput)
         XCTAssertFalse(snapshot.usesExtendedDynamicRangeOutput)
         XCTAssertEqual(snapshot.metalPixelFormat, MTLPixelFormat.bgra8Unorm_srgb.rawValue)
         XCTAssertEqual(playerView.metalLayer.pixelFormat, .bgra8Unorm_srgb)
         XCTAssertEqual(playerView.metalLayer.colorspace?.name, CGColorSpace.sRGB)
-        #else
         if #available(iOS 16.0, *) {
-            XCTAssertTrue(playerView.usesExtendedDynamicRangeOutput)
-            XCTAssertTrue(snapshot.usesExtendedDynamicRangeOutput)
-            XCTAssertEqual(snapshot.metalPixelFormat, MTLPixelFormat.rgba16Float.rawValue)
-            XCTAssertEqual(playerView.metalLayer.pixelFormat, .rgba16Float)
-            XCTAssertEqual(playerView.metalLayer.colorspace?.name, CGColorSpace.extendedLinearSRGB)
-            XCTAssertTrue(playerView.metalLayer.wantsExtendedDynamicRangeContent)
-            XCTAssertTrue(snapshot.metalWantsExtendedDynamicRangeContent)
+            XCTAssertFalse(playerView.metalLayer.wantsExtendedDynamicRangeContent)
+            XCTAssertFalse(snapshot.metalWantsExtendedDynamicRangeContent)
         }
-        #endif
     }
 
     @MainActor
@@ -497,14 +488,21 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertRendererOptionsAndProfiles(
             playerView: playerView,
             expectedColorOptions: MPVPlayerView.edrMetalVideoOutputOptions,
-            expectedHintMode: "source"
+            expectedHintMode: "target"
         )
 
+        let regularEDROptions = playerView.metalVideoOutputOptions
         playerView.isDolbyVisionPlayback = true
         XCTAssertRendererOptionsAndProfiles(
             playerView: playerView,
             expectedColorOptions: MPVPlayerView.dolbyVisionEDRMetalVideoOutputOptions,
             expectedHintMode: "target"
+        )
+        XCTAssertEqual(
+            MPVPictureInPictureRendererInvariantSnapshot.optionMap(
+                playerView.metalVideoOutputOptions
+            ),
+            MPVPictureInPictureRendererInvariantSnapshot.optionMap(regularEDROptions)
         )
     }
 

@@ -145,67 +145,6 @@ enum MPVContentModeSnapshot {
 
 @objc(MPVPlayerView)
 public final class MPVPlayerView: UIView {
-    /// SDR reference white, in nits, when subtitles are composited into HDR video.
-    static let subtitleHDRPeakNits = "100"
-
-    static let sharedMetalVideoOutputOptions: [(String, String)] = [
-        ("vo", "gpu-next"),
-        ("gpu-api", "vulkan"),
-        ("gpu-context", "moltenvk"),
-        ("blend-subtitles", "video"),
-        ("sub-hdr-peak", subtitleHDRPeakNits),
-        ("image-subs-hdr-peak", subtitleHDRPeakNits),
-        ("gpu-shader-cache", "yes"),
-        ("hdr-compute-peak", "auto"),
-        ("allow-delayed-peak-detect", "yes"),
-        ("gamut-mapping-mode", "auto"),
-        ("demuxer-hysteresis-secs", "10"),
-    ]
-
-    static let edrMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [
-        ("fbo-format", "rgba16f"),
-        ("target-colorspace-hint", "yes"),
-        // Keep the swapchain metadata stable. `source-dynamic` turns Dolby
-        // Vision scene metadata into changing HDR10 luminance hints, but the
-        // iOS EDR compositor does not expose a matching dynamic-HDR contract.
-        // Passing those hints through MoltenVK can make the compositor remap
-        // already reshaped frames again, crushing low-light scene detail.
-        ("target-colorspace-hint-mode", "source"),
-    ]
-
-    /// Dolby Vision combines intense specular highlights with near-black
-    /// shadow detail. The tunable gpu-next spline enters its roll-off before
-    /// the highlight ceiling while preserving all measured peak samples. The
-    /// OLED target contrast then lets libplacebo retain the panel black point
-    /// without relying on the unsupported global video gamma equalizer.
-    static let dolbyVisionEDRMetalVideoOutputOptions =
-        edrMetalVideoOutputOptions.map { option in
-            option.0 == "target-colorspace-hint-mode"
-                ? (option.0, "target")
-                : option
-        } + [
-        ("tone-mapping", "spline"),
-        ("tone-mapping-param", "0.20"),
-        ("hdr-compute-peak", "yes"),
-        // Preserve all highlights for a continuous roll-off instead of
-        // discarding sparse specular detail.
-        ("target-peak", "400"),
-        // Model a tiny non-zero black point to make near-black Dolby Vision
-        // detail visible without applying a global gamma lift.
-        ("target-contrast", "100000"),
-        ("hdr-peak-percentile", "100"),
-        ("hdr-peak-decay-rate", "8"),
-        ("hdr-scene-threshold-low", "0.75"),
-        ("hdr-scene-threshold-high", "2.0"),
-        ("hdr-contrast-recovery", "0.30"),
-        ("hdr-contrast-smoothness", "6.5"),
-    ]
-
-    static let sdrMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [
-        ("target-trc", "srgb"),
-        ("target-prim", "bt.709"),
-    ]
-
     @objc public internal(set) var isPlaying = false
     @objc public internal(set) var duration: TimeInterval = 0.0
     @objc public internal(set) var currentTime: TimeInterval = 0.0
@@ -246,6 +185,8 @@ public final class MPVPlayerView: UIView {
     /// Shapes the Picture in Picture window, which hosts this view.
     var pictureInPictureVideoDisplaySize: CGSize = .zero
     var usesExtendedDynamicRangeOutput = false
+    let colorOutputStateLock = NSLock()
+    nonisolated(unsafe) var colorOutputState = MPVColorOutputState()
     var url: URL?
     // libmpv setup consumes this immutable request snapshot on `queue`.
     // The host configures it before playback starts, so it must not inherit
@@ -274,6 +215,8 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var setupFailed = false
     nonisolated(unsafe) var playbackIntentGeneration: UInt64 = 0
     var forceSoftwareDecode = false
+    /// Host metadata hint retained for diagnostics. Frame metadata and display
+    /// capability, not this value, control color mapping.
     var isDolbyVisionPlayback = false
     nonisolated(unsafe) var currentSubtitleUsesOriginalStyle = false
     // Runtime playback updates are serialized on `queue`, not the UIView's
@@ -395,35 +338,84 @@ public final class MPVPlayerView: UIView {
         backgroundColor = .black
         metalLayer.framebufferOnly = true
         metalLayer.needsDisplayOnBoundsChange = true
-        #if os(iOS)
-        #if targetEnvironment(simulator)
-        // The simulator Metal driver has much tighter shared-memory limits than
-        // real devices. SDR output also matches the compatibility GPU renderer
-        // used by the simulator setup profile.
-        usesExtendedDynamicRangeOutput = false
-        metalLayer.pixelFormat = .bgra8Unorm_srgb
-        metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
-        #else
-        if #available(iOS 16.0, *) {
-            usesExtendedDynamicRangeOutput = true
-            metalLayer.pixelFormat = .rgba16Float
-            metalLayer.colorspace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)
-            metalLayer.wantsExtendedDynamicRangeContent = true
+        // A detached view has no target screen. Start conservatively in SDR;
+        // didMoveToWindow selects the actual screen before normal playback.
+        applyColorOutputMode(.sdr, reason: "initial-detached")
+        metalLayer.backgroundColor = UIColor.black.cgColor
+        layer.addSublayer(metalLayer)
+    }
+
+    func refreshColorOutputForTargetScreen(reason: String) {
+        let desiredMode: MPVColorOutputMode
+        #if os(iOS) && !targetEnvironment(simulator)
+        if #available(iOS 16.0, *), let targetScreen = window?.windowScene?.screen {
+            desiredMode = MPVColorMappingPolicy.supportsExtendedDynamicRange(
+                potentialHeadroom: targetScreen.potentialEDRHeadroom
+            ) ? .extendedDynamicRange : .sdr
         } else {
-            usesExtendedDynamicRangeOutput = false
+            desiredMode = .sdr
+        }
+        #else
+        desiredMode = .sdr
+        #endif
+
+        colorOutputStateLock.lock()
+        let modeToApply = colorOutputState.request(desiredMode)
+        let pendingMode = colorOutputState.pendingMode
+        colorOutputStateLock.unlock()
+
+        if let modeToApply {
+            applyColorOutputMode(modeToApply, reason: reason)
+        } else if pendingMode != nil {
+            // Changing CAMetalLayer format invalidates the active Vulkan
+            // swapchain. Preserve playback/PiP and consume this persisted mode
+            // immediately before the next renderer setup.
+            mpvDebugLog("color output change deferred reason=\(reason) renderer-active")
+        }
+    }
+
+    /// Called from the MPV queue before profiles or handles are created. All
+    /// CAMetalLayer mutation is synchronously transferred to the main actor so
+    /// the selected options and swapchain format are from the same state.
+    nonisolated func prepareColorOutputForRendererSetup() {
+        let prepare = { @MainActor [self] in
+            colorOutputStateLock.lock()
+            let modeToApply = colorOutputState.prepareForRendererSetup()
+            colorOutputStateLock.unlock()
+            if let modeToApply {
+                applyColorOutputMode(modeToApply, reason: "renderer-setup")
+            }
+        }
+        if Thread.isMainThread {
+            MainActor.assumeIsolated(prepare)
+        } else {
+            DispatchQueue.main.sync {
+                MainActor.assumeIsolated(prepare)
+            }
+        }
+    }
+
+    nonisolated func markColorOutputRendererStopped() {
+        colorOutputStateLock.lock()
+        colorOutputState.rendererDidStop()
+        colorOutputStateLock.unlock()
+    }
+
+    private func applyColorOutputMode(_ outputMode: MPVColorOutputMode, reason: String) {
+        usesExtendedDynamicRangeOutput = outputMode == .extendedDynamicRange
+        switch outputMode {
+        case .sdr:
             metalLayer.pixelFormat = .bgra8Unorm_srgb
             metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
+        case .extendedDynamicRange:
+            metalLayer.pixelFormat = .rgba16Float
+            metalLayer.colorspace = CGColorSpace(name: CGColorSpace.extendedLinearSRGB)
         }
-        #endif
-        #else
-        usesExtendedDynamicRangeOutput = false
-        metalLayer.pixelFormat = .bgra8Unorm_srgb
-        metalLayer.colorspace = CGColorSpace(name: CGColorSpace.sRGB)
-        #endif
-        metalLayer.backgroundColor = UIColor.black.cgColor
+        if #available(iOS 16.0, *) {
+            metalLayer.wantsExtendedDynamicRangeContent = usesExtendedDynamicRangeOutput
+        }
         let outputDescription = usesExtendedDynamicRangeOutput ? "EDR-scRGB" : "SDR-sRGB"
-        mpvDebugLog("setupLayer metal pixelFormat=\(metalLayer.pixelFormat.rawValue) output=\(outputDescription)")
-        layer.addSublayer(metalLayer)
+        mpvDebugLog("color output configured reason=\(reason) pixelFormat=\(metalLayer.pixelFormat.rawValue) output=\(outputDescription)")
     }
 
     @available(*, unavailable)
@@ -474,7 +466,10 @@ public final class MPVPlayerView: UIView {
         duration = 0.0
         isPlaying = false
         playbackSpeed = 1.0
-        mpvDebugLog("configure url=\(redactedURLDescription(url)) headers=\(headers.count) hasUserAgent=\(userAgent?.isEmpty == false) forceSoftwareDecode=\(forceSoftwareDecode)")
+        let colorHint = MPVColorMappingPolicy.contentHint(
+            isDolbyVisionPlayback: isDolbyVisionPlayback
+        )
+        mpvDebugLog("configure url=\(redactedURLDescription(url)) headers=\(headers.count) hasUserAgent=\(userAgent?.isEmpty == false) forceSoftwareDecode=\(forceSoftwareDecode) contentColorHint=\(colorHint.rawValue)")
     }
 
     public override func layoutSubviews() {
@@ -494,6 +489,7 @@ public final class MPVPlayerView: UIView {
 
     public override func didMoveToWindow() {
         super.didMoveToWindow()
+        refreshColorOutputForTargetScreen(reason: "did-move-to-window")
         pictureInPictureViewHierarchyDidChange()
     }
 

@@ -23,6 +23,7 @@ extension MPVPlayerView {
     }
 
     @objc public func play() {
+        refreshColorOutputForTargetScreen(reason: "play")
         let generation = nextPlaybackIntentGeneration()
         mpvDebugLog("play requested stopped=\(isStopped()) setupFailed=\(isSetupFailed())")
         guard isStopped() == false, isSetupFailed() == false else {
