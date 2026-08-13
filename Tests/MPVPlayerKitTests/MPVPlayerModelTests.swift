@@ -77,6 +77,36 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual((values["tscaleAntiring"] as? NSNumber)?.doubleValue, 0.0)
     }
 
+    func testVideoQualityPresetsUseCompleteTieredRendererOptions() {
+        let powerSaving = Dictionary(uniqueKeysWithValues: MPVVideoQualityPreset.powerSaving.options)
+        let balanced = Dictionary(uniqueKeysWithValues: MPVVideoQualityPreset.balanced.options)
+        let highQuality = Dictionary(uniqueKeysWithValues: MPVVideoQualityPreset.highQuality.options)
+
+        XCTAssertEqual(powerSaving["scale"], "bilinear")
+        XCTAssertEqual(powerSaving["cscale"], "bilinear")
+        XCTAssertEqual(powerSaving["dscale"], "bilinear")
+        XCTAssertEqual(powerSaving["linear-downscaling"], "no")
+        XCTAssertEqual(powerSaving["dither"], "no")
+        XCTAssertEqual(powerSaving["hdr-compute-peak"], "no")
+
+        XCTAssertEqual(balanced["scale"], "lanczos")
+        XCTAssertEqual(balanced["cscale"], "lanczos")
+        XCTAssertEqual(balanced["dscale"], "mitchell")
+        XCTAssertEqual(balanced["scale-antiring"], "0.3")
+        XCTAssertEqual(balanced["linear-downscaling"], "yes")
+        XCTAssertEqual(balanced["dither-depth"], "auto")
+
+        XCTAssertEqual(highQuality["scale"], "ewa_lanczossharp")
+        XCTAssertEqual(highQuality["cscale"], "ewa_lanczos")
+        XCTAssertEqual(highQuality["dscale"], "ewa_lanczos")
+        XCTAssertEqual(highQuality["scale-antiring"], "0.6")
+        XCTAssertEqual(highQuality["cscale-antiring"], "0.6")
+        XCTAssertEqual(highQuality["dscale-antiring"], "0.6")
+
+        XCTAssertEqual(Set(powerSaving.keys), Set(balanced.keys))
+        XCTAssertEqual(Set(balanced.keys), Set(highQuality.keys))
+    }
+
     func testHighQualityInterpolationPresetAndAdvancedValues() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let options = MPVInterpolationOptions(

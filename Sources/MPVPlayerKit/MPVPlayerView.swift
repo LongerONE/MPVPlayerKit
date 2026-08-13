@@ -111,24 +111,48 @@ enum MPVVideoQualityPreset: Int {
                 ("scale", "bilinear"),
                 ("cscale", "bilinear"),
                 ("dscale", "bilinear"),
+                ("scale-antiring", "0.0"),
+                ("cscale-antiring", "0.0"),
+                ("dscale-antiring", "0.0"),
                 ("correct-downscaling", "no"),
+                ("linear-downscaling", "no"),
                 ("sigmoid-upscaling", "no"),
+                ("dither", "no"),
+                ("dither-depth", "no"),
+                ("hdr-compute-peak", "no"),
+                ("allow-delayed-peak-detect", "yes"),
             ]
         case .balanced:
             return [
                 ("scale", "lanczos"),
-                ("cscale", "bilinear"),
-                ("dscale", "hermite"),
+                ("cscale", "lanczos"),
+                ("dscale", "mitchell"),
+                ("scale-antiring", "0.3"),
+                ("cscale-antiring", "0.3"),
+                ("dscale-antiring", "0.0"),
                 ("correct-downscaling", "yes"),
+                ("linear-downscaling", "yes"),
                 ("sigmoid-upscaling", "yes"),
+                ("dither", "fruit"),
+                ("dither-depth", "auto"),
+                ("hdr-compute-peak", "auto"),
+                ("allow-delayed-peak-detect", "no"),
             ]
         case .highQuality:
             return [
                 ("scale", "ewa_lanczossharp"),
                 ("cscale", "ewa_lanczos"),
-                ("dscale", "mitchell"),
+                ("dscale", "ewa_lanczos"),
+                ("scale-antiring", "0.6"),
+                ("cscale-antiring", "0.6"),
+                ("dscale-antiring", "0.6"),
                 ("correct-downscaling", "yes"),
+                ("linear-downscaling", "yes"),
                 ("sigmoid-upscaling", "yes"),
+                ("dither", "fruit"),
+                ("dither-depth", "auto"),
+                ("hdr-compute-peak", "auto"),
+                ("allow-delayed-peak-detect", "no"),
             ]
         }
     }
