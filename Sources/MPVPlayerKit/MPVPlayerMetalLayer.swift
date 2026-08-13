@@ -122,14 +122,10 @@ final class MPVPlayerMetalLayer: CAMetalLayer, @unchecked Sendable {
     override var wantsExtendedDynamicRangeContent: Bool {
         get { super.wantsExtendedDynamicRangeContent }
         set {
-            guard Thread.isMainThread == false else {
-                super.wantsExtendedDynamicRangeContent = newValue
+            guard Thread.isMainThread else {
                 return
             }
-            let transfer = MPVPlayerMetalLayerTransfer(value: (self, newValue))
-            DispatchQueue.main.sync {
-                transfer.value.0.wantsExtendedDynamicRangeContent = transfer.value.1
-            }
+            super.wantsExtendedDynamicRangeContent = newValue
         }
     }
 

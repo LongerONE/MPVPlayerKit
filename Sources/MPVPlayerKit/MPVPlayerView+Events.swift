@@ -30,10 +30,12 @@ extension MPVPlayerView {
         let current = getDouble(MPVProperty.timePosition)
         guard current.isFinite else { return nil }
         let total = getDouble(MPVProperty.duration)
-        return MPVPlaybackTimeSnapshot(
+        let snapshot = MPVPlaybackTimeSnapshot(
             currentTime: max(0.0, current),
             duration: total.isFinite && total > 0.0 ? total : nil
         )
+        lastMPVTimeSnapshot = snapshot
+        return snapshot
     }
 
     func applyMPVTimeSnapshot(_ snapshot: MPVPlaybackTimeSnapshot) {
@@ -62,7 +64,7 @@ extension MPVPlayerView {
     nonisolated func readEvents() {
         queue.async { [weak self] in
             guard let self else { return }
-            while let mpv = self.mpv {
+            eventLoop: while let mpv = self.mpv {
                 guard let event = mpv_wait_event(mpv, 0), event.pointee.event_id != MPV_EVENT_NONE else {
                     break
                 }
@@ -102,7 +104,7 @@ extension MPVPlayerView {
                     self.mpvDebugLog("event shutdown")
                     let pendingSeekRequests = Array(self.pendingSeekCommands.values)
                     self.pendingSeekCommands.removeAll(keepingCapacity: true)
-                    let recoverySnapshot = self.readMPVTimeSnapshot()
+                    let recoverySnapshot = self.lastMPVTimeSnapshot
                     pendingSeekRequests.forEach { pending in
                         self.handleSeekReply(
                             request: pending.request,
@@ -114,6 +116,7 @@ extension MPVPlayerView {
                         self.stopTimeTimer()
                         self.isPlaying = false
                     }
+                    break eventLoop
                 case MPV_EVENT_LOG_MESSAGE:
                     self.logMessage(event)
                 case MPV_EVENT_COMMAND_REPLY:
@@ -184,9 +187,19 @@ extension MPVPlayerView {
             "seek reply request=\(request.requestID) success=\(resolution.success) "
                 + "autoPlay=\(resolution.shouldAutoPlay) error=\(error)"
         )
-        let snapshot = resolution.shouldRestoreTime
-            ? recoverySnapshot ?? readMPVTimeSnapshot()
-            : nil
+        let snapshot: MPVPlaybackTimeSnapshot?
+        if resolution.shouldRestoreTime {
+            if let recoverySnapshot {
+                snapshot = recoverySnapshot
+            } else if error == MPV_ERROR_UNINITIALIZED.rawValue {
+                // MPV_EVENT_SHUTDOWN means the handle is no longer readable.
+                snapshot = nil
+            } else {
+                snapshot = readMPVTimeSnapshot()
+            }
+        } else {
+            snapshot = nil
+        }
         notifyOnMain {
             if let snapshot {
                 // The optimistic target must not remain visible after a failed seek.

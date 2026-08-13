@@ -184,6 +184,7 @@ extension MPVPlayerView {
             "setupMPV profile options name=\(profile.name) [\(profileDescription)]"
         )
         performOnMPVQueueSync {
+            lastMPVTimeSnapshot = nil
             currentSubtitleUsesOriginalStyle = false
             loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)
             pendingExternalSubtitleLoad = nil
@@ -449,6 +450,7 @@ extension MPVPlayerView {
             currentSubtitleUsesOriginalStyle = false
             pendingRequestIDs.forEach { notifySubtitleLoad(requestID: $0, success: false) }
             guard let mpv else {
+                lastMPVTimeSnapshot = nil
                 mpvDebugLog("destroyMPVHandle skipped reason=\(reason) handle=nil")
                 return
             }
@@ -464,6 +466,7 @@ extension MPVPlayerView {
             mpvDebugLog("destroyMPVHandle stage=terminate-begin reason=\(reason)")
             mpv_terminate_destroy(mpv)
             mpvDebugLog("destroyMPVHandle stage=terminate-end reason=\(reason)")
+            lastMPVTimeSnapshot = nil
         }
     }
 

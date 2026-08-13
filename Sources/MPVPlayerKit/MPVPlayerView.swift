@@ -241,6 +241,8 @@ public final class MPVPlayerView: UIView {
     nonisolated let mediaTracksCacheLock = NSLock()
     nonisolated(unsafe) var mediaTracksCache: [[String: Any]] = []
     nonisolated(unsafe) var mpv: OpaquePointer?
+    // Queue-bound cache used when libmpv has already reported shutdown.
+    nonisolated(unsafe) var lastMPVTimeSnapshot: MPVPlaybackTimeSnapshot?
     var timeTimer: DispatchSourceTimer?
     var hasReportedReadyToPlay = false
     nonisolated(unsafe) var hasPlaybackRestarted = false

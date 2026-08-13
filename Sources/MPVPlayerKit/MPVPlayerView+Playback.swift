@@ -64,7 +64,7 @@ extension MPVPlayerView {
     @objc public func seek(_ options: NSDictionary) -> Bool {
         let time = (options["time"] as? NSNumber)?.doubleValue ?? 0.0
         let autoPlay = (options["autoPlay"] as? NSNumber)?.boolValue ?? false
-        guard time.isFinite, mpv != nil else {
+        guard time.isFinite else {
             return false
         }
 
