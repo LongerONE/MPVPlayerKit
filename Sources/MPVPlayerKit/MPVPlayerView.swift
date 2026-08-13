@@ -156,7 +156,6 @@ public final class MPVPlayerView: UIView {
         ("sub-hdr-peak", subtitleHDRPeakNits),
         ("image-subs-hdr-peak", subtitleHDRPeakNits),
         ("gpu-shader-cache", "yes"),
-        ("tone-mapping", "bt.2446a"),
         ("hdr-compute-peak", "auto"),
         ("allow-delayed-peak-detect", "yes"),
         ("gamut-mapping-mode", "auto"),
@@ -174,31 +173,30 @@ public final class MPVPlayerView: UIView {
         ("target-colorspace-hint-mode", "source"),
     ]
 
-    /// Dolby Vision commonly mixes small, intense highlights with very dark
-    /// scenes. Map it to the EDR target instead of passing the source HDR
-    /// range straight through to the compositor: this rolls off excessive
-    /// highlights while retaining the panel's black floor. A faster peak
-    /// response also stops a preceding bright scene from suppressing the
-    /// shadows in the following dark scene. A restrained positive gamma then
-    /// opens near-black detail without changing the SDR or ordinary HDR paths.
+    /// Dolby Vision combines intense specular highlights with near-black
+    /// shadow detail. The tunable gpu-next spline enters its roll-off before
+    /// the highlight ceiling while preserving all measured peak samples. The
+    /// OLED target contrast then lets libplacebo retain the panel black point
+    /// without relying on the unsupported global video gamma equalizer.
     static let dolbyVisionEDRMetalVideoOutputOptions =
         edrMetalVideoOutputOptions.map { option in
             option.0 == "target-colorspace-hint-mode"
                 ? (option.0, "target")
                 : option
         } + [
+        ("tone-mapping", "spline"),
+        ("tone-mapping-param", "0.22"),
         ("hdr-compute-peak", "yes"),
-        // Preserve every highlight sample so BT.2446a can roll it off instead
-        // of clipping it, while the lower target peak limits the output on a
-        // bright iPhone display.
-        ("target-peak", "600"),
+        // Preserve all highlights for a continuous roll-off instead of
+        // discarding sparse specular detail.
+        ("target-peak", "450"),
+        ("target-contrast", "inf"),
         ("hdr-peak-percentile", "100"),
         ("hdr-peak-decay-rate", "8"),
         ("hdr-scene-threshold-low", "0.75"),
         ("hdr-scene-threshold-high", "2.0"),
-        ("hdr-contrast-recovery", "0.20"),
+        ("hdr-contrast-recovery", "0.30"),
         ("hdr-contrast-smoothness", "6.5"),
-        ("gamma", "10"),
     ]
 
     static let sdrMetalVideoOutputOptions = sharedMetalVideoOutputOptions + [
