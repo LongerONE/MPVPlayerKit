@@ -123,4 +123,21 @@ final class MPVQuickPlayerTests: XCTestCase {
             controller.forwardButton.actions(forTarget: controller, forControlEvent: .touchUpInside)?.contains(forwardAction) == true
         )
     }
+
+    @MainActor
+    func testQuickPlayerKeepsScreenAwakeDuringPlaybackAndRestoresIdleTimer() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
+        let controller = MPVQuickPlayerViewController(url: url, autoplay: false)
+        controller.loadViewIfNeeded()
+
+        let previousValue = UIApplication.shared.isIdleTimerDisabled
+        defer { UIApplication.shared.isIdleTimerDisabled = previousValue }
+
+        controller.player(controller.player, didChangeState: .bufferFinished)
+        XCTAssertEqual(controller.idleTimerDisabledBeforePlayback, previousValue)
+
+        controller.player(controller.player, didChangeState: .paused)
+        XCTAssertNil(controller.idleTimerDisabledBeforePlayback)
+        XCTAssertEqual(UIApplication.shared.isIdleTimerDisabled, previousValue)
+    }
 }

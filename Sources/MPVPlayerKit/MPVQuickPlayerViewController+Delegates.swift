@@ -33,6 +33,7 @@ extension MPVQuickPlayerViewController: UIGestureRecognizerDelegate {
 extension MPVQuickPlayerViewController: MPVPlayerDelegate {
     public func player(_ player: MPVPlayer, didChangeState state: MPVPlaybackState) {
         playbackState = state
+        updateIdleTimer(for: state)
         let isPlaying = state == .buffering || state == .readyToPlay || state == .bufferFinished
         playButton.setImage(
             MPVQuickPlayerSymbol.image(isPlaying ? .pause : .play, pointSize: 20),

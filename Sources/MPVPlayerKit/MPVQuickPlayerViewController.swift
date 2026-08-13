@@ -62,6 +62,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var panStartBrightness: CGFloat = 0
     var panStartVolume: Float = 0
     var playbackState = MPVPlaybackState.paused
+    var idleTimerDisabledBeforePlayback: Bool?
     var decoderMode = MPVDecoderMode.initializing
     var bufferingProgress = 0
     var pendingSubtitleRequestID: UUID?
@@ -153,6 +154,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
         applyPreferredOrientationIfNeeded()
+        updateIdleTimer(for: playbackState)
         if player.isPictureInPictureSupported {
             _ = preparePictureInPicturePlayback()
         }
@@ -174,6 +176,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
     public override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
+        restoreIdleTimer()
         if isBeingDismissed || navigationController?.isBeingDismissed == true {
             player.stop()
         }
