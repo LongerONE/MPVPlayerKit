@@ -20,6 +20,28 @@ final class MPVQuickPlayerTests: XCTestCase {
     }
 
     @MainActor
+    func testCustomActionSheetsUsePlayerOrientationLayout() {
+        let sheet = MPVQuickPlayerActionSheetViewController(
+            title: "视频轨道",
+            message: nil,
+            options: [],
+            cancelTitle: "取消"
+        )
+        sheet.loadViewIfNeeded()
+        let rootBounds = CGRect(x: 0, y: 0, width: 390, height: 844)
+
+        MPVQuickPlayerViewController.layoutPresentedView(
+            sheet.view,
+            rootBounds: rootBounds,
+            usesManualLandscape: true
+        )
+
+        XCTAssertEqual(sheet.view.bounds.size, CGSize(width: 844, height: 390))
+        XCTAssertEqual(sheet.view.center, CGPoint(x: 195, y: 422))
+        XCTAssertEqual(sheet.view.transform, CGAffineTransform(rotationAngle: .pi / 2))
+    }
+
+    @MainActor
     func testQuickPlayerCanForceLandscapeWhenHostOnlySupportsPortrait() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false, forceLandscape: true)

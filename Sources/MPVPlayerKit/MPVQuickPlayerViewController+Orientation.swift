@@ -121,7 +121,7 @@ extension MPVQuickPlayerViewController {
         }
     }
 
-    /// Keeps UIKit-owned sheets aligned when asynchronous geometry updates change root bounds.
+    /// Keeps custom presentation controllers aligned when asynchronous geometry updates change root bounds.
     func layoutPresentedViewControllerInPlayerOrientation(
         _ controller: UIViewController? = nil
     ) {

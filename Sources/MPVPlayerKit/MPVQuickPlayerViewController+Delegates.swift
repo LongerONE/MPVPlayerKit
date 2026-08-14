@@ -95,18 +95,22 @@ extension MPVQuickPlayerViewController: UIDocumentPickerDelegate {
         }
 
         presentAfterCurrentSheet { controller in
-            let alert = controller.actionSheet(
+            let options = [
+                MPVQuickPlayerActionSheetOption(title: mpvLocalized("subtitle.style.use_file")) {
+                    [weak controller] in
+                    controller?.loadExternalSubtitle(from: url, usesOriginalStyle: true)
+                },
+                MPVQuickPlayerActionSheetOption(title: mpvLocalized("subtitle.style.use_player")) {
+                    [weak controller] in
+                    controller?.loadExternalSubtitle(from: url, usesOriginalStyle: false)
+                },
+            ]
+            controller.presentActionSheet(
                 title: mpvLocalized("subtitle.style"),
-                sourceView: controller.subtitleButton
+                sourceView: controller.subtitleButton,
+                options: options,
+                cancelTitle: mpvLocalized("common.cancel")
             )
-            alert.addAction(UIAlertAction(title: mpvLocalized("subtitle.style.use_file"), style: .default) { [weak controller] _ in
-                controller?.loadExternalSubtitle(from: url, usesOriginalStyle: true)
-            })
-            alert.addAction(UIAlertAction(title: mpvLocalized("subtitle.style.use_player"), style: .default) { [weak controller] _ in
-                controller?.loadExternalSubtitle(from: url, usesOriginalStyle: false)
-            })
-            alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-            controller.presentInPlayerOrientation(alert)
         }
     }
 }

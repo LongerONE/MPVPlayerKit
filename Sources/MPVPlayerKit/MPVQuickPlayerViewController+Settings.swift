@@ -4,38 +4,43 @@ import UniformTypeIdentifiers
 
 extension MPVQuickPlayerViewController {
     @objc func showSettings() {
-        let alert = actionSheet(title: mpvLocalized("settings.title"), sourceView: settingsButton)
-        alert.addAction(UIAlertAction(title: mpvLocalized("settings.playback_speed.value", Self.rateTitle(playbackRate)), style: .default) { [weak self] _ in
-            self?.presentAfterCurrentSheet { $0.showPlaybackRatePicker() }
-        })
-        alert.addAction(UIAlertAction(title: mpvLocalized("settings.video_quality.value", Self.videoQualityTitle(videoQuality)), style: .default) { [weak self] _ in
-            self?.presentAfterCurrentSheet { $0.showVideoQualityPicker() }
-        })
-        alert.addAction(UIAlertAction(title: mpvLocalized("settings.frame_interpolation.value", Self.interpolationTitle(interpolationOptions.quality)), style: .default) { [weak self] _ in
-            self?.presentAfterCurrentSheet { $0.showInterpolationPicker() }
-        })
+        var options: [MPVQuickPlayerActionSheetOption] = [
+            .init(title: mpvLocalized("settings.playback_speed.value", Self.rateTitle(playbackRate))) {
+                [weak self] in self?.presentAfterCurrentSheet { $0.showPlaybackRatePicker() }
+            },
+            .init(title: mpvLocalized("settings.video_quality.value", Self.videoQualityTitle(videoQuality))) {
+                [weak self] in self?.presentAfterCurrentSheet { $0.showVideoQualityPicker() }
+            },
+            .init(title: mpvLocalized("settings.frame_interpolation.value", Self.interpolationTitle(interpolationOptions.quality))) {
+                [weak self] in self?.presentAfterCurrentSheet { $0.showInterpolationPicker() }
+            },
+        ]
         let debandTitle = mpvLocalized(
             debandEnabled ? "settings.disable_debanding" : "settings.enable_debanding"
         )
-        alert.addAction(UIAlertAction(title: debandTitle, style: .default) { [weak self] _ in
+        options.append(.init(title: debandTitle) { [weak self] in
             guard let self else { return }
             setDebandEnabled(debandEnabled == false)
         })
         let contentModeTitle = mpvLocalized(
             player.contentMode == .scaleAspectFill ? "settings.fit_video" : "settings.fill_screen"
         )
-        alert.addAction(UIAlertAction(title: contentModeTitle, style: .default) { [weak self] _ in
+        options.append(.init(title: contentModeTitle) { [weak self] in
             guard let self else { return }
             player.contentMode = player.contentMode == .scaleAspectFill ? .scaleAspectFit : .scaleAspectFill
         })
-        alert.addAction(UIAlertAction(title: mpvLocalized("subtitle.delay.value", Self.delayTitle(subtitleDelay)), style: .default) { [weak self] _ in
-            self?.presentAfterCurrentSheet { $0.showSubtitleDelayPicker() }
+        options.append(.init(title: mpvLocalized("subtitle.delay.value", Self.delayTitle(subtitleDelay))) {
+            [weak self] in self?.presentAfterCurrentSheet { $0.showSubtitleDelayPicker() }
         })
-        alert.addAction(UIAlertAction(title: mpvLocalized("subtitle.style"), style: .default) { [weak self] _ in
-            self?.presentAfterCurrentSheet { $0.showSubtitleStylePicker() }
+        options.append(.init(title: mpvLocalized("subtitle.style")) {
+            [weak self] in self?.presentAfterCurrentSheet { $0.showSubtitleStylePicker() }
         })
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        presentInPlayerOrientation(alert)
+        presentActionSheet(
+            title: mpvLocalized("settings.title"),
+            sourceView: settingsButton,
+            options: options,
+            cancelTitle: mpvLocalized("common.cancel")
+        )
     }
 
     public func setPlaybackRate(_ rate: Double) {
@@ -78,55 +83,73 @@ extension MPVQuickPlayerViewController {
     }
 
     func showPlaybackRatePicker() {
-        let alert = actionSheet(title: mpvLocalized("settings.playback_speed"), sourceView: settingsButton)
-        [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4].forEach { rate in
+        let options = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4].map { rate in
             let marker = abs(rate - playbackRate) < 0.001 ? "✓ " : ""
-            alert.addAction(UIAlertAction(title: marker + Self.rateTitle(rate), style: .default) { [weak self] _ in
-                self?.setPlaybackRate(rate)
-            })
+            return MPVQuickPlayerActionSheetOption(
+                title: marker + Self.rateTitle(rate),
+                action: { [weak self] in self?.setPlaybackRate(rate) }
+            )
         }
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        presentInPlayerOrientation(alert)
+        presentActionSheet(
+            title: mpvLocalized("settings.playback_speed"),
+            sourceView: settingsButton,
+            options: options,
+            cancelTitle: mpvLocalized("common.cancel")
+        )
     }
 
     func showVideoQualityPicker() {
-        let alert = actionSheet(title: mpvLocalized("settings.video_quality"), sourceView: settingsButton)
-        [MPVVideoQuality.powerSaving, .balanced, .highQuality].forEach { quality in
+        let options = [MPVVideoQuality.powerSaving, .balanced, .highQuality].map { quality in
             let marker = quality == videoQuality ? "✓ " : ""
-            alert.addAction(UIAlertAction(title: marker + Self.videoQualityTitle(quality), style: .default) { [weak self] _ in
-                self?.setVideoQuality(quality)
-            })
+            return MPVQuickPlayerActionSheetOption(
+                title: marker + Self.videoQualityTitle(quality),
+                action: { [weak self] in self?.setVideoQuality(quality) }
+            )
         }
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        presentInPlayerOrientation(alert)
+        presentActionSheet(
+            title: mpvLocalized("settings.video_quality"),
+            sourceView: settingsButton,
+            options: options,
+            cancelTitle: mpvLocalized("common.cancel")
+        )
     }
 
     func showInterpolationPicker() {
-        let alert = actionSheet(title: mpvLocalized("settings.frame_interpolation"), sourceView: settingsButton)
-        MPVInterpolationQuality.allCases.forEach { quality in
+        let options = MPVInterpolationQuality.allCases.map { quality in
             let marker = quality == interpolationOptions.quality ? "✓ " : ""
-            alert.addAction(UIAlertAction(title: marker + Self.interpolationTitle(quality), style: .default) { [weak self] _ in
+            return MPVQuickPlayerActionSheetOption(
+                title: marker + Self.interpolationTitle(quality),
+                action: { [weak self] in
                 guard let self else { return }
                 setInterpolationOptions(MPVInterpolationOptions(quality: quality))
-            })
+                }
+            )
         }
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        presentInPlayerOrientation(alert)
+        presentActionSheet(
+            title: mpvLocalized("settings.frame_interpolation"),
+            sourceView: settingsButton,
+            options: options,
+            cancelTitle: mpvLocalized("common.cancel")
+        )
     }
 
     func showSubtitleDelayPicker() {
-        let alert = actionSheet(title: mpvLocalized("subtitle.delay"), sourceView: settingsButton)
-        [-2.0, -1, -0.5, 0, 0.5, 1, 2].forEach { delay in
+        var options = [-2.0, -1, -0.5, 0, 0.5, 1, 2].map { delay in
             let marker = abs(delay - subtitleDelay) < 0.001 ? "✓ " : ""
-            alert.addAction(UIAlertAction(title: marker + Self.delayTitle(delay), style: .default) { [weak self] _ in
-                self?.setSubtitleDelay(delay)
-            })
+            return MPVQuickPlayerActionSheetOption(
+                title: marker + Self.delayTitle(delay),
+                action: { [weak self] in self?.setSubtitleDelay(delay) }
+            )
         }
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.custom"), style: .default) { [weak self] _ in
+        options.append(.init(title: mpvLocalized("common.custom")) { [weak self] in
             self?.presentAfterCurrentSheet { $0.showCustomSubtitleDelayPrompt() }
         })
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        presentInPlayerOrientation(alert)
+        presentActionSheet(
+            title: mpvLocalized("subtitle.delay"),
+            sourceView: settingsButton,
+            options: options,
+            cancelTitle: mpvLocalized("common.cancel")
+        )
     }
 
     func showCustomSubtitleDelayPrompt() {
@@ -148,20 +171,24 @@ extension MPVQuickPlayerViewController {
     }
 
     func showSubtitleStylePicker() {
-        let alert = actionSheet(title: mpvLocalized("subtitle.style"), sourceView: settingsButton)
         let styles: [(String, MPVSubtitleStyle)] = [
             (mpvLocalized("subtitle.style.default"), .defaultStyle),
             (mpvLocalized("subtitle.style.large"), .large),
             (mpvLocalized("subtitle.style.high_contrast"), .highContrast),
         ]
-        styles.forEach { title, style in
+        let options = styles.map { title, style in
             let marker = style == subtitleStyle ? "✓ " : ""
-            alert.addAction(UIAlertAction(title: marker + title, style: .default) { [weak self] _ in
-                self?.setSubtitleStyle(style)
-            })
+            return MPVQuickPlayerActionSheetOption(
+                title: marker + title,
+                action: { [weak self] in self?.setSubtitleStyle(style) }
+            )
         }
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        presentInPlayerOrientation(alert)
+        presentActionSheet(
+            title: mpvLocalized("subtitle.style"),
+            sourceView: settingsButton,
+            options: options,
+            cancelTitle: mpvLocalized("common.cancel")
+        )
     }
 
     func actionSheet(title: String, sourceView: UIView) -> UIAlertController {
@@ -169,6 +196,37 @@ extension MPVQuickPlayerViewController {
         alert.popoverPresentationController?.sourceView = sourceView
         alert.popoverPresentationController?.sourceRect = sourceView.bounds
         return alert
+    }
+
+    func presentActionSheet(
+        title: String,
+        message: String? = nil,
+        sourceView: UIView,
+        options: [MPVQuickPlayerActionSheetOption],
+        cancelTitle: String
+    ) {
+        if isUsingManualLandscape && isLandscapeForced {
+            let sheet = MPVQuickPlayerActionSheetViewController(
+                title: title,
+                message: message,
+                options: options,
+                cancelTitle: cancelTitle
+            )
+            presentInPlayerOrientation(sheet)
+            return
+        }
+
+        let alert = actionSheet(title: title, sourceView: sourceView)
+        alert.message = message
+        options.forEach { option in
+            let title = option.isSelected ? "✓ " + option.title : option.title
+            let style: UIAlertAction.Style = option.isDestructive ? .destructive : .default
+            alert.addAction(UIAlertAction(title: title, style: style) { _ in
+                option.action()
+            })
+        }
+        alert.addAction(UIAlertAction(title: cancelTitle, style: .cancel))
+        presentInPlayerOrientation(alert)
     }
 
     func presentAfterCurrentSheet(_ presentation: @escaping (MPVQuickPlayerViewController) -> Void) {
@@ -187,35 +245,35 @@ extension MPVQuickPlayerViewController {
         case .subtitle: title = mpvLocalized("track.subtitle")
         }
 
-        let alert = actionSheet(title: title, sourceView: sourceView)
-
+        var options: [MPVQuickPlayerActionSheetOption] = []
         if type == .subtitle {
-            alert.addAction(UIAlertAction(title: mpvLocalized("common.off"), style: .default) { [weak self] _ in
+            options.append(.init(title: mpvLocalized("common.off")) { [weak self] in
                 self?.player.setSubtitlesVisible(false)
             })
-            alert.addAction(UIAlertAction(title: mpvLocalized("subtitle.load_external"), style: .default) { [weak self] _ in
+            options.append(.init(title: mpvLocalized("subtitle.load_external")) { [weak self] in
                 self?.presentAfterCurrentSheet { $0.presentExternalSubtitlePicker() }
             })
             if pendingSubtitleRequestID != nil {
-                alert.addAction(UIAlertAction(title: mpvLocalized("subtitle.cancel_load"), style: .destructive) { [weak self] _ in
+                options.append(.init(title: mpvLocalized("subtitle.cancel_load"), isDestructive: true) { [weak self] in
                     self?.cancelExternalSubtitleLoad()
                 })
             }
         }
-        for track in tracks {
-            let marker = track.isSelected ? "✓ " : ""
-            alert.addAction(UIAlertAction(title: marker + track.name, style: .default) { [weak self] _ in
+        options += tracks.map { track in
+            MPVQuickPlayerActionSheetOption(title: track.name, isSelected: track.isSelected) { [weak self] in
                 self?.player.select(track: track)
                 if type == .subtitle {
                     self?.player.setSubtitlesVisible(true)
                 }
-            })
+            }
         }
-        if tracks.isEmpty {
-            alert.message = mpvLocalized("track.none")
-        }
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        presentInPlayerOrientation(alert)
+        presentActionSheet(
+            title: title,
+            message: tracks.isEmpty ? mpvLocalized("track.none") : nil,
+            sourceView: sourceView,
+            options: options,
+            cancelTitle: mpvLocalized("common.cancel")
+        )
     }
 
     func presentExternalSubtitlePicker() {
