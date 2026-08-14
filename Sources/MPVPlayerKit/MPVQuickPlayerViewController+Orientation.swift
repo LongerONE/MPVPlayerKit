@@ -114,14 +114,29 @@ extension MPVQuickPlayerViewController {
     }
 
     func presentInPlayerOrientation(_ controller: UIViewController, animated: Bool = true) {
+        orientationSynchronizedPresentedViewController = controller
         present(controller, animated: animated) { [weak self, weak controller] in
-            guard let self, let presentedView = controller?.view else { return }
-            Self.layoutPresentedView(
-                presentedView,
-                rootBounds: view.bounds,
-                usesManualLandscape: isUsingManualLandscape && isLandscapeForced
-            )
+            guard let self, let controller else { return }
+            layoutPresentedViewControllerInPlayerOrientation(controller)
         }
+    }
+
+    /// Keeps UIKit-owned sheets aligned when asynchronous geometry updates change root bounds.
+    func layoutPresentedViewControllerInPlayerOrientation(
+        _ controller: UIViewController? = nil
+    ) {
+        guard let controller = controller ?? orientationSynchronizedPresentedViewController else { return }
+        guard presentedViewController === controller, let presentedView = controller.view else {
+            if controller.presentingViewController == nil {
+                orientationSynchronizedPresentedViewController = nil
+            }
+            return
+        }
+        Self.layoutPresentedView(
+            presentedView,
+            rootBounds: view.bounds,
+            usesManualLandscape: isUsingManualLandscape && isLandscapeForced
+        )
     }
 
     static func layoutPresentedView(
@@ -130,15 +145,25 @@ extension MPVQuickPlayerViewController {
         usesManualLandscape: Bool
     ) {
         let shouldRotate = usesManualLandscape && rootBounds.height > rootBounds.width
-        guard shouldRotate else { return }
+        let targetBounds = CGRect(
+            origin: .zero,
+            size: shouldRotate
+                ? CGSize(width: rootBounds.height, height: rootBounds.width)
+                : rootBounds.size
+        )
+        let targetCenter = CGPoint(x: rootBounds.midX, y: rootBounds.midY)
+        let targetTransform = shouldRotate
+            ? CGAffineTransform(rotationAngle: .pi / 2)
+            : .identity
+
+        guard presentedView.bounds != targetBounds
+                || presentedView.center != targetCenter
+                || presentedView.transform != targetTransform else { return }
 
         UIView.performWithoutAnimation {
-            presentedView.bounds = CGRect(
-                origin: .zero,
-                size: CGSize(width: rootBounds.height, height: rootBounds.width)
-            )
-            presentedView.center = CGPoint(x: rootBounds.midX, y: rootBounds.midY)
-            presentedView.transform = CGAffineTransform(rotationAngle: .pi / 2)
+            presentedView.bounds = targetBounds
+            presentedView.center = targetCenter
+            presentedView.transform = targetTransform
             presentedView.layoutIfNeeded()
         }
     }

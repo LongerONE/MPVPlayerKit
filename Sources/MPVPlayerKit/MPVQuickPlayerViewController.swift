@@ -68,6 +68,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var pendingSubtitleRequestID: UUID?
     var isCancellingSubtitleLoad = false
     var isUsingManualLandscape: Bool
+    weak var orientationSynchronizedPresentedViewController: UIViewController?
     var arePlaybackControlsHidden = false
     var closeButtonLeadingConstraint: NSLayoutConstraint!
     var statusLabelTrailingConstraint: NSLayoutConstraint!
@@ -163,6 +164,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         layoutOrientationContentView()
+        layoutPresentedViewControllerInPlayerOrientation()
         updatePlaybackControlSafeAreaInsets()
     }
 

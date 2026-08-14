@@ -35,6 +35,18 @@ final class MPVQuickPlayerTests: XCTestCase {
         XCTAssertEqual(presentedView.center, controller.view.center)
         XCTAssertEqual(presentedView.transform, controller.contentView.transform)
 
+        controller.view.bounds = CGRect(x: 0, y: 0, width: 844, height: 390)
+        MPVQuickPlayerViewController.layoutPresentedView(
+            presentedView,
+            rootBounds: controller.view.bounds,
+            usesManualLandscape: true
+        )
+        XCTAssertEqual(presentedView.bounds.size, controller.view.bounds.size)
+        XCTAssertEqual(presentedView.center, controller.view.center)
+        XCTAssertEqual(presentedView.transform, .identity)
+
+        controller.view.bounds = CGRect(x: 0, y: 0, width: 390, height: 844)
+
         let rootStart = CGPoint(x: controller.view.bounds.midX, y: 100)
         let rootEnd = CGPoint(x: controller.view.bounds.midX, y: 220)
         let contentStart = controller.contentView.convert(rootStart, from: controller.view)
