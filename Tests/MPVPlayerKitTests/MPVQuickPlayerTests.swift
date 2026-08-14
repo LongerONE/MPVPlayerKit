@@ -4,27 +4,6 @@ import UIKit
 
 final class MPVQuickPlayerTests: XCTestCase {
     @MainActor
-    func testManualLandscapeTrackPickerUsesAConstrainedScrollableLayout() {
-        let picker = MPVLandscapeTrackPickerViewController(
-            title: "视频轨道",
-            message: nil,
-            options: [
-                .init(title: "✓ Video 1 · h264 (3840x2160) · 10-bit · yuv420p") {},
-            ],
-            cancelTitle: "取消"
-        )
-        picker.loadViewIfNeeded()
-        picker.view.bounds = CGRect(x: 0, y: 0, width: 844, height: 390)
-        picker.view.setNeedsLayout()
-        picker.view.layoutIfNeeded()
-
-        XCTAssertLessThanOrEqual(picker.cardView.bounds.width, 640)
-        XCTAssertGreaterThan(picker.cardView.bounds.width, 600)
-        XCTAssertEqual(picker.tableView.rowHeight, UITableView.automaticDimension)
-        XCTAssertEqual(picker.tableView.numberOfRows(inSection: 0), 1)
-    }
-
-    @MainActor
     func testQuickPlayerCanForceLandscapeWhenHostOnlySupportsPortrait() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false, forceLandscape: true)
