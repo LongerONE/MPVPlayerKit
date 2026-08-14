@@ -4,6 +4,27 @@ import UIKit
 
 final class MPVQuickPlayerTests: XCTestCase {
     @MainActor
+    func testManualLandscapeTrackPickerUsesAConstrainedScrollableLayout() {
+        let picker = MPVLandscapeTrackPickerViewController(
+            title: "视频轨道",
+            message: nil,
+            options: [
+                .init(title: "✓ Video 1 · h264 (3840x2160) · 10-bit · yuv420p") {},
+            ],
+            cancelTitle: "取消"
+        )
+        picker.loadViewIfNeeded()
+        picker.view.bounds = CGRect(x: 0, y: 0, width: 844, height: 390)
+        picker.view.setNeedsLayout()
+        picker.view.layoutIfNeeded()
+
+        XCTAssertLessThanOrEqual(picker.cardView.bounds.width, 640)
+        XCTAssertGreaterThan(picker.cardView.bounds.width, 600)
+        XCTAssertEqual(picker.tableView.rowHeight, UITableView.automaticDimension)
+        XCTAssertEqual(picker.tableView.numberOfRows(inSection: 0), 1)
+    }
+
+    @MainActor
     func testQuickPlayerCanForceLandscapeWhenHostOnlySupportsPortrait() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false, forceLandscape: true)
@@ -46,15 +67,6 @@ final class MPVQuickPlayerTests: XCTestCase {
         XCTAssertEqual(presentedView.transform, .identity)
 
         controller.view.bounds = CGRect(x: 0, y: 0, width: 390, height: 844)
-        let menuWidth = MPVQuickPlayerViewController.actionSheetPreferredWidth(
-            titles: ["✓ Video 1 · hevc (3840x2160) · 10-bit · yuv420p"],
-            rootBounds: controller.view.bounds,
-            rootSafeAreaInsets: UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0),
-            usesManualLandscape: true
-        )
-        XCTAssertGreaterThan(menuWidth, 320)
-        XCTAssertLessThanOrEqual(menuWidth, 719)
-
         let rootStart = CGPoint(x: controller.view.bounds.midX, y: 100)
         let rootEnd = CGPoint(x: controller.view.bounds.midX, y: 220)
         let contentStart = controller.contentView.convert(rootStart, from: controller.view)
