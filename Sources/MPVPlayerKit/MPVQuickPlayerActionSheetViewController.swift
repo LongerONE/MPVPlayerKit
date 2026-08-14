@@ -34,7 +34,7 @@ final class MPVQuickPlayerMenuView: UIView {
 
     private let backdropButton = UIButton(type: .custom)
     private let cardView = UIView()
-    private let effectView: UIVisualEffectView
+    private let effectView = UIVisualEffectView()
     private let titleLabel = UILabel()
     private let messageLabel = UILabel()
     private let tableView = UITableView(frame: .zero, style: .plain)
@@ -76,7 +76,6 @@ final class MPVQuickPlayerMenuView: UIView {
         self.options = options
         self.cancelTitle = cancelTitle
         self.sourceView = sourceView
-        effectView = UIVisualEffectView(effect: Self.makeBackgroundEffect())
         super.init(frame: .zero)
         configureViews()
         configureLayout()
@@ -98,6 +97,9 @@ final class MPVQuickPlayerMenuView: UIView {
                 delay: 0,
                 options: [.beginFromCurrentState, .curveEaseOut],
                 animations: {
+                    // UIKit materializes Liquid Glass when the effect is set
+                    // after the visual effect view enters the hierarchy.
+                    self.installBackgroundEffect()
                     self.backdropButton.alpha = 1
                     self.cardView.transform = .identity
                 }
@@ -418,11 +420,12 @@ final class MPVQuickPlayerMenuView: UIView {
 
     private static let optionCellIdentifier = "MPVQuickPlayerActionSheetOption"
 
-    private static func makeBackgroundEffect() -> UIVisualEffect {
+    private func installBackgroundEffect() {
         if #available(iOS 26.0, *) {
-            return UIGlassEffect(style: .regular)
+            effectView.effect = UIGlassEffect(style: .regular)
+        } else {
+            effectView.effect = UIBlurEffect(style: .systemMaterial)
         }
-        return UIBlurEffect(style: .systemMaterial)
     }
 }
 
