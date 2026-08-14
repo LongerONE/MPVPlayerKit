@@ -35,7 +35,7 @@ extension MPVQuickPlayerViewController {
             self?.presentAfterCurrentSheet { $0.showSubtitleStylePicker() }
         })
         alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        present(alert, animated: true)
+        presentInPlayerOrientation(alert)
     }
 
     public func setPlaybackRate(_ rate: Double) {
@@ -86,7 +86,7 @@ extension MPVQuickPlayerViewController {
             })
         }
         alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        present(alert, animated: true)
+        presentInPlayerOrientation(alert)
     }
 
     func showVideoQualityPicker() {
@@ -98,7 +98,7 @@ extension MPVQuickPlayerViewController {
             })
         }
         alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        present(alert, animated: true)
+        presentInPlayerOrientation(alert)
     }
 
     func showInterpolationPicker() {
@@ -111,7 +111,7 @@ extension MPVQuickPlayerViewController {
             })
         }
         alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        present(alert, animated: true)
+        presentInPlayerOrientation(alert)
     }
 
     func showSubtitleDelayPicker() {
@@ -126,7 +126,7 @@ extension MPVQuickPlayerViewController {
             self?.presentAfterCurrentSheet { $0.showCustomSubtitleDelayPrompt() }
         })
         alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        present(alert, animated: true)
+        presentInPlayerOrientation(alert)
     }
 
     func showCustomSubtitleDelayPrompt() {
@@ -144,7 +144,7 @@ extension MPVQuickPlayerViewController {
             self?.setSubtitleDelay(value)
         })
         alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        present(alert, animated: true)
+        presentInPlayerOrientation(alert)
     }
 
     func showSubtitleStylePicker() {
@@ -161,7 +161,7 @@ extension MPVQuickPlayerViewController {
             })
         }
         alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        present(alert, animated: true)
+        presentInPlayerOrientation(alert)
     }
 
     func actionSheet(title: String, sourceView: UIView) -> UIAlertController {
@@ -214,7 +214,7 @@ extension MPVQuickPlayerViewController {
             alert.message = mpvLocalized("track.none")
         }
         alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        present(alert, animated: true)
+        presentInPlayerOrientation(alert)
     }
 
     func presentExternalSubtitlePicker() {
@@ -266,7 +266,7 @@ extension MPVQuickPlayerViewController {
         guard presentedViewController == nil else { return }
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: mpvLocalized("common.ok"), style: .default))
-        present(alert, animated: true)
+        presentInPlayerOrientation(alert)
     }
 
 }

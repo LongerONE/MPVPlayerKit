@@ -106,7 +106,7 @@ extension MPVQuickPlayerViewController: UIDocumentPickerDelegate {
                 controller?.loadExternalSubtitle(from: url, usesOriginalStyle: false)
             })
             alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-            controller.present(alert, animated: true)
+            controller.presentInPlayerOrientation(alert)
         }
     }
 }

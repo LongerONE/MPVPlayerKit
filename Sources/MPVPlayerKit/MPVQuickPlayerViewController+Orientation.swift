@@ -113,6 +113,36 @@ extension MPVQuickPlayerViewController {
         }
     }
 
+    func presentInPlayerOrientation(_ controller: UIViewController, animated: Bool = true) {
+        present(controller, animated: animated) { [weak self, weak controller] in
+            guard let self, let presentedView = controller?.view else { return }
+            Self.layoutPresentedView(
+                presentedView,
+                rootBounds: view.bounds,
+                usesManualLandscape: isUsingManualLandscape && isLandscapeForced
+            )
+        }
+    }
+
+    static func layoutPresentedView(
+        _ presentedView: UIView,
+        rootBounds: CGRect,
+        usesManualLandscape: Bool
+    ) {
+        let shouldRotate = usesManualLandscape && rootBounds.height > rootBounds.width
+        guard shouldRotate else { return }
+
+        UIView.performWithoutAnimation {
+            presentedView.bounds = CGRect(
+                origin: .zero,
+                size: CGSize(width: rootBounds.height, height: rootBounds.width)
+            )
+            presentedView.center = CGPoint(x: rootBounds.midX, y: rootBounds.midY)
+            presentedView.transform = CGAffineTransform(rotationAngle: .pi / 2)
+            presentedView.layoutIfNeeded()
+        }
+    }
+
     func updatePlaybackControlSafeAreaInsets() {
         guard isViewLoaded else { return }
         let usesManualLandscape = isUsingManualLandscape && isLandscapeForced
