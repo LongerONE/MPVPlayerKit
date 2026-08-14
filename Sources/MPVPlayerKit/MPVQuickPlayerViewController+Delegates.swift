@@ -4,6 +4,9 @@ import UniformTypeIdentifiers
 
 extension MPVQuickPlayerViewController: UIGestureRecognizerDelegate {
     public func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if actionSheetOverlay != nil {
+            return false
+        }
         if gestureRecognizer is UITapGestureRecognizer {
             return true
         }
@@ -20,6 +23,11 @@ extension MPVQuickPlayerViewController: UIGestureRecognizerDelegate {
         _ gestureRecognizer: UIGestureRecognizer,
         shouldReceive touch: UITouch
     ) -> Bool {
+        if let actionSheetOverlay,
+           let touchedView = touch.view,
+           touchedView.isDescendant(of: actionSheetOverlay) {
+            return false
+        }
         guard gestureRecognizer is UITapGestureRecognizer else { return true }
         var touchedView = touch.view
         while let view = touchedView {

@@ -19,32 +19,64 @@ struct MPVQuickPlayerActionSheetOption {
     }
 }
 
+/// A menu hosted by the player instead of a second view controller.
+///
+/// The menu is deliberately a view so it lives inside `contentView`. This means
+/// that it receives the same orientation transform as the player before its
+/// first frame is rendered, including the portrait-hosted manual landscape mode.
 @MainActor
-final class MPVQuickPlayerActionSheetViewController: UIViewController {
+final class MPVQuickPlayerMenuView: UIView {
     private let titleText: String
     private let message: String?
     private let options: [MPVQuickPlayerActionSheetOption]
     private let cancelTitle: String
+    private weak var sourceView: UIView?
 
+    private let backdropButton = UIButton(type: .custom)
     private let cardView = UIView()
+    private let effectView: UIVisualEffectView
     private let titleLabel = UILabel()
     private let messageLabel = UILabel()
     private let tableView = UITableView(frame: .zero, style: .plain)
     private let cancelButton = UIButton(type: .system)
+    private let safeAreaGuide = UILayoutGuide()
+    private var safeAreaLeadingConstraint: NSLayoutConstraint!
+    private var safeAreaTrailingConstraint: NSLayoutConstraint!
+    private var safeAreaTopConstraint: NSLayoutConstraint!
+    private var safeAreaBottomConstraint: NSLayoutConstraint!
+    private var cardCenterXConstraint: NSLayoutConstraint!
+    private var cardCenterYConstraint: NSLayoutConstraint!
+    private var sourceCenterXConstraint: NSLayoutConstraint!
+    private var sourceTopConstraint: NSLayoutConstraint!
+    private var sourceBottomConstraint: NSLayoutConstraint!
+    private var isUsingSourceViewPositioning = false
+    private var tableHeightConstraint: NSLayoutConstraint!
+    private var lastMeasuredTableHeight: CGFloat = -1
+    private var playerSafeAreaInsets = UIEdgeInsets.zero
+
+    /// Called after the menu has been removed from the view hierarchy.
+    var onDismiss: (() -> Void)?
 
     init(
         title: String,
         message: String?,
         options: [MPVQuickPlayerActionSheetOption],
-        cancelTitle: String
+        cancelTitle: String,
+        sourceView: UIView? = nil
     ) {
         titleText = title
         self.message = message
         self.options = options
         self.cancelTitle = cancelTitle
-        super.init(nibName: nil, bundle: nil)
-        modalPresentationStyle = .overFullScreen
-        modalTransitionStyle = .crossDissolve
+        self.sourceView = sourceView
+        if #available(iOS 26.0, *) {
+            effectView = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
+        } else {
+            effectView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
+        }
+        super.init(frame: .zero)
+        configureViews()
+        configureLayout()
     }
 
     @available(*, unavailable)
@@ -52,27 +84,101 @@ final class MPVQuickPlayerActionSheetViewController: UIViewController {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        configureViews()
-        configureLayout()
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil {
+            backdropButton.alpha = 0
+            cardView.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
+            layoutIfNeeded()
+            UIView.animate(
+                withDuration: 0.2,
+                delay: 0,
+                options: [.beginFromCurrentState, .curveEaseOut],
+                animations: {
+                    self.backdropButton.alpha = 1
+                    self.cardView.transform = .identity
+                }
+            )
+        }
+    }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateSourceViewPositioning()
+        updateTableHeightIfNeeded()
+    }
+
+    /// Updates the safe area in the already-rotated `contentView` coordinate space.
+    func updatePlayerSafeAreaInsets(_ insets: UIEdgeInsets) {
+        guard playerSafeAreaInsets != insets else { return }
+        playerSafeAreaInsets = insets
+        safeAreaLeadingConstraint.constant = insets.left
+        safeAreaTrailingConstraint.constant = -insets.right
+        safeAreaTopConstraint.constant = insets.top
+        safeAreaBottomConstraint.constant = -insets.bottom
+        updateTableHeightIfNeeded()
+    }
+
+    func dismiss(animated: Bool, completion: (() -> Void)? = nil) {
+        guard superview != nil else {
+            onDismiss?()
+            completion?()
+            return
+        }
+        let finish = { [weak self] in
+            guard let self else { return }
+            removeFromSuperview()
+            onDismiss?()
+            completion?()
+        }
+        guard animated else {
+            finish()
+            return
+        }
+        UIView.animate(
+            withDuration: 0.18,
+            delay: 0,
+            options: [.beginFromCurrentState, .curveEaseIn],
+            animations: {
+                self.backdropButton.alpha = 0
+                self.cardView.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
+            },
+            completion: { _ in finish() }
+        )
     }
 
     private func configureViews() {
-        view.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        translatesAutoresizingMaskIntoConstraints = false
+        backgroundColor = .clear
+        accessibilityViewIsModal = true
+        accessibilityIdentifier = "MPVQuickPlayer.menu"
 
-        cardView.backgroundColor = .secondarySystemBackground
+        backdropButton.translatesAutoresizingMaskIntoConstraints = false
+        backdropButton.backgroundColor = UIColor.black.withAlphaComponent(0.55)
+        backdropButton.accessibilityLabel = mpvLocalized("common.cancel")
+        backdropButton.addTarget(self, action: #selector(cancel), for: .touchUpInside)
+        addSubview(backdropButton)
+
+        cardView.translatesAutoresizingMaskIntoConstraints = false
+        cardView.backgroundColor = .clear
+        cardView.accessibilityIdentifier = "MPVQuickPlayer.menu.card"
         cardView.layer.cornerRadius = 18
         cardView.layer.cornerCurve = .continuous
         cardView.clipsToBounds = true
-        view.addSubview(cardView)
+        addSubview(cardView)
+
+        effectView.translatesAutoresizingMaskIntoConstraints = false
+        effectView.layer.cornerRadius = 18
+        effectView.layer.cornerCurve = .continuous
+        effectView.clipsToBounds = true
+        cardView.addSubview(effectView)
 
         titleLabel.font = .preferredFont(forTextStyle: .headline)
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textAlignment = .center
-        titleLabel.numberOfLines = 2
+        titleLabel.numberOfLines = 0
         titleLabel.text = titleText
-        cardView.addSubview(titleLabel)
+        effectView.contentView.addSubview(titleLabel)
 
         messageLabel.font = .preferredFont(forTextStyle: .subheadline)
         messageLabel.adjustsFontForContentSizeCategory = true
@@ -81,69 +187,170 @@ final class MPVQuickPlayerActionSheetViewController: UIViewController {
         messageLabel.numberOfLines = 0
         messageLabel.text = message
         messageLabel.isHidden = message == nil
-        cardView.addSubview(messageLabel)
+        effectView.contentView.addSubview(messageLabel)
 
         tableView.backgroundColor = .clear
+        tableView.alwaysBounceVertical = false
+        tableView.showsVerticalScrollIndicator = true
+        tableView.contentInsetAdjustmentBehavior = .never
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
         tableView.estimatedRowHeight = 54
         tableView.rowHeight = UITableView.automaticDimension
         tableView.register(UITableViewCell.self, forCellReuseIdentifier: Self.optionCellIdentifier)
         tableView.dataSource = self
         tableView.delegate = self
-        cardView.addSubview(tableView)
+        effectView.contentView.addSubview(tableView)
 
         cancelButton.titleLabel?.font = .preferredFont(forTextStyle: .headline)
         cancelButton.titleLabel?.adjustsFontForContentSizeCategory = true
         cancelButton.setTitle(cancelTitle, for: .normal)
+        cancelButton.accessibilityIdentifier = "MPVQuickPlayer.menu.cancel"
         cancelButton.addTarget(self, action: #selector(cancel), for: .touchUpInside)
-        cardView.addSubview(cancelButton)
+        effectView.contentView.addSubview(cancelButton)
     }
 
     private func configureLayout() {
-        [cardView, titleLabel, messageLabel, tableView, cancelButton].forEach {
-            $0.translatesAutoresizingMaskIntoConstraints = false
-        }
-
-        let guide = view.safeAreaLayoutGuide
+        [backdropButton, cardView, effectView, titleLabel, messageLabel, tableView, cancelButton]
+            .forEach { $0.translatesAutoresizingMaskIntoConstraints = false }
+        addLayoutGuide(safeAreaGuide)
+        let contentView = effectView.contentView
         let preferredCardWidth = cardView.widthAnchor.constraint(
-            equalTo: guide.widthAnchor,
+            equalTo: safeAreaGuide.widthAnchor,
             multiplier: 0.88
         )
         preferredCardWidth.priority = .defaultHigh
+        tableHeightConstraint = tableView.heightAnchor.constraint(
+            equalToConstant: options.isEmpty ? 0 : 54
+        )
+        tableHeightConstraint.priority = .required
+
+        cardCenterXConstraint = cardView.centerXAnchor.constraint(equalTo: safeAreaGuide.centerXAnchor)
+        cardCenterYConstraint = cardView.centerYAnchor.constraint(equalTo: safeAreaGuide.centerYAnchor)
+        cardCenterXConstraint.priority = .required
+        cardCenterYConstraint.priority = .required
+
+        // The source constraints are enabled only in regular width. Their high
+        // priority keeps the menu near the source view, while the safe-area
+        // constraints below remain required and clamp the card when there is
+        // not enough room near an edge.
+        sourceCenterXConstraint = cardView.centerXAnchor.constraint(equalTo: leadingAnchor)
+        sourceTopConstraint = cardView.topAnchor.constraint(equalTo: topAnchor)
+        sourceBottomConstraint = cardView.bottomAnchor.constraint(equalTo: topAnchor)
+        sourceCenterXConstraint.priority = .defaultHigh
+        sourceTopConstraint.priority = .defaultHigh
+        sourceBottomConstraint.priority = .defaultHigh
 
         NSLayoutConstraint.activate([
-            cardView.centerXAnchor.constraint(equalTo: guide.centerXAnchor),
-            cardView.centerYAnchor.constraint(equalTo: guide.centerYAnchor),
-            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: guide.leadingAnchor, constant: 16),
-            cardView.trailingAnchor.constraint(lessThanOrEqualTo: guide.trailingAnchor, constant: -16),
+            backdropButton.leadingAnchor.constraint(equalTo: leadingAnchor),
+            backdropButton.trailingAnchor.constraint(equalTo: trailingAnchor),
+            backdropButton.topAnchor.constraint(equalTo: topAnchor),
+            backdropButton.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            cardCenterXConstraint,
+            cardCenterYConstraint,
+            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: safeAreaGuide.leadingAnchor, constant: 16),
+            cardView.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaGuide.trailingAnchor, constant: -16),
             cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 640),
             preferredCardWidth,
-            cardView.topAnchor.constraint(greaterThanOrEqualTo: guide.topAnchor, constant: 16),
-            cardView.bottomAnchor.constraint(lessThanOrEqualTo: guide.bottomAnchor, constant: -16),
+            cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaGuide.topAnchor, constant: 16),
+            cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaGuide.bottomAnchor, constant: -16),
+            cardView.heightAnchor.constraint(lessThanOrEqualTo: safeAreaGuide.heightAnchor, constant: -32),
 
-            titleLabel.topAnchor.constraint(equalTo: cardView.topAnchor, constant: 18),
-            titleLabel.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 20),
-            titleLabel.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -20),
+            effectView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor),
+            effectView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor),
+            effectView.topAnchor.constraint(equalTo: cardView.topAnchor),
+            effectView.bottomAnchor.constraint(equalTo: cardView.bottomAnchor),
+
+            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 18),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
 
             messageLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
-            messageLabel.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 20),
-            messageLabel.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -20),
+            messageLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
+            messageLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
 
             tableView.topAnchor.constraint(
                 equalTo: message == nil ? titleLabel.bottomAnchor : messageLabel.bottomAnchor,
                 constant: 12
             ),
-            tableView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor),
-            tableView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor),
-            tableView.heightAnchor.constraint(lessThanOrEqualToConstant: 240),
-            tableView.heightAnchor.constraint(equalToConstant: options.isEmpty ? 0 : 180),
+            tableView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            tableHeightConstraint,
 
             cancelButton.topAnchor.constraint(equalTo: tableView.bottomAnchor, constant: 8),
-            cancelButton.leadingAnchor.constraint(equalTo: cardView.leadingAnchor, constant: 16),
-            cancelButton.trailingAnchor.constraint(equalTo: cardView.trailingAnchor, constant: -16),
+            cancelButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
+            cancelButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             cancelButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
-            cancelButton.bottomAnchor.constraint(equalTo: cardView.bottomAnchor, constant: -10),
+            cancelButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
         ])
+        safeAreaLeadingConstraint = safeAreaGuide.leadingAnchor.constraint(equalTo: leadingAnchor)
+        safeAreaTrailingConstraint = safeAreaGuide.trailingAnchor.constraint(equalTo: trailingAnchor)
+        safeAreaTopConstraint = safeAreaGuide.topAnchor.constraint(equalTo: topAnchor)
+        safeAreaBottomConstraint = safeAreaGuide.bottomAnchor.constraint(equalTo: bottomAnchor)
+        NSLayoutConstraint.activate([
+            safeAreaLeadingConstraint,
+            safeAreaTrailingConstraint,
+            safeAreaTopConstraint,
+            safeAreaBottomConstraint,
+        ])
+    }
+
+    private func updateSourceViewPositioning() {
+        guard let sourceView,
+              sourceView.superview != nil,
+              bounds.width >= 600,
+              bounds.height > 0
+        else {
+            guard isUsingSourceViewPositioning else { return }
+            isUsingSourceViewPositioning = false
+            sourceCenterXConstraint.isActive = false
+            sourceTopConstraint.isActive = false
+            sourceBottomConstraint.isActive = false
+            cardCenterXConstraint.priority = .required
+            cardCenterYConstraint.priority = .required
+            return
+        }
+
+        let sourceRect = sourceView.convert(sourceView.bounds, to: self)
+        sourceCenterXConstraint.constant = sourceRect.midX
+        sourceTopConstraint.constant = sourceRect.maxY + 8
+        sourceBottomConstraint.constant = sourceRect.minY - 8
+        sourceCenterXConstraint.isActive = true
+        sourceTopConstraint.isActive = sourceRect.midY <= bounds.midY
+        sourceBottomConstraint.isActive = sourceRect.midY > bounds.midY
+        cardCenterXConstraint.priority = .defaultLow
+        cardCenterYConstraint.priority = .defaultLow
+        isUsingSourceViewPositioning = true
+    }
+
+    private func updateTableHeightIfNeeded() {
+        guard bounds.width > 0, bounds.height > 0 else { return }
+        tableView.layoutIfNeeded()
+        let headerHeight = titleLabel.systemLayoutSizeFitting(
+            CGSize(width: max(bounds.width * 0.88 - 40, 1), height: .greatestFiniteMagnitude),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height
+        let messageHeight = message == nil ? 0 : messageLabel.systemLayoutSizeFitting(
+            CGSize(width: max(bounds.width * 0.88 - 40, 1), height: .greatestFiniteMagnitude),
+            withHorizontalFittingPriority: .required,
+            verticalFittingPriority: .fittingSizeLevel
+        ).height + 8
+        let minimumTableHeight: CGFloat = options.isEmpty ? 0 : 54
+        let fixedHeight = headerHeight + messageHeight + 18 + 12 + 8 + minimumTableHeight + 10
+        let availableHeight = max(
+            bounds.height - playerSafeAreaInsets.top - playerSafeAreaInsets.bottom - 32,
+            0
+        )
+        let maximumTableHeight = max(0, availableHeight - fixedHeight)
+        let contentHeight = tableView.contentSize.height
+        let measuredHeight = min(
+            max(contentHeight, minimumTableHeight),
+            maximumTableHeight
+        )
+        guard abs(measuredHeight - lastMeasuredTableHeight) > 0.5 else { return }
+        lastMeasuredTableHeight = measuredHeight
+        tableHeightConstraint.constant = measuredHeight
     }
 
     @objc private func cancel() {
@@ -153,7 +360,7 @@ final class MPVQuickPlayerActionSheetViewController: UIViewController {
     private static let optionCellIdentifier = "MPVQuickPlayerActionSheetOption"
 }
 
-extension MPVQuickPlayerActionSheetViewController: UITableViewDataSource, UITableViewDelegate {
+extension MPVQuickPlayerMenuView: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
         options.count
     }
@@ -183,5 +390,46 @@ extension MPVQuickPlayerActionSheetViewController: UITableViewDataSource, UITabl
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         let action = options[indexPath.row].action
         dismiss(animated: true, completion: action)
+    }
+}
+
+/// Compatibility wrapper for clients/tests that used the old controller type.
+/// Runtime player menus use `MPVQuickPlayerMenuView` directly.
+@MainActor
+final class MPVQuickPlayerActionSheetViewController: UIViewController {
+    private let menuView: MPVQuickPlayerMenuView
+
+    init(
+        title: String,
+        message: String?,
+        options: [MPVQuickPlayerActionSheetOption],
+        cancelTitle: String
+    ) {
+        menuView = MPVQuickPlayerMenuView(
+            title: title,
+            message: message,
+            options: options,
+            cancelTitle: cancelTitle
+        )
+        super.init(nibName: nil, bundle: nil)
+        modalPresentationStyle = .overFullScreen
+        modalTransitionStyle = .crossDissolve
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        view.backgroundColor = .clear
+        view.addSubview(menuView)
+        NSLayoutConstraint.activate([
+            menuView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            menuView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            menuView.topAnchor.constraint(equalTo: view.topAnchor),
+            menuView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+        ])
     }
 }

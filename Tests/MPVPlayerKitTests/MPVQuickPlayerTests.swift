@@ -42,6 +42,67 @@ final class MPVQuickPlayerTests: XCTestCase {
     }
 
     @MainActor
+    func testMenuSafeAreaMapsIntoManualLandscapeContentCoordinates() {
+        let mappedInsets = MPVQuickPlayerViewController.playerOrientationSafeAreaInsets(
+            rootBounds: CGRect(x: 0, y: 0, width: 390, height: 844),
+            rootSafeAreaInsets: UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0),
+            usesManualLandscape: true
+        )
+
+        XCTAssertEqual(mappedInsets, UIEdgeInsets(top: 0, left: 59, bottom: 0, right: 34))
+        XCTAssertEqual(
+            MPVQuickPlayerViewController.playerOrientationSafeAreaInsets(
+                rootBounds: CGRect(x: 0, y: 0, width: 844, height: 390),
+                rootSafeAreaInsets: UIEdgeInsets(top: 0, left: 59, bottom: 0, right: 34),
+                usesManualLandscape: true
+            ),
+            UIEdgeInsets(top: 0, left: 59, bottom: 0, right: 34)
+        )
+    }
+
+    @MainActor
+    func testRegularWidthMenuAnchorsNearSourceViewWithinSafeArea() {
+        let host = UIView(frame: CGRect(x: 0, y: 0, width: 1024, height: 768))
+        let sourceView = UIView(frame: CGRect(x: 492, y: 72, width: 40, height: 40))
+        host.addSubview(sourceView)
+        let menu = MPVQuickPlayerMenuView(
+            title: "设置",
+            message: nil,
+            options: [
+                MPVQuickPlayerActionSheetOption(title: "选项一", action: {}),
+                MPVQuickPlayerActionSheetOption(title: "选项二", action: {}),
+            ],
+            cancelTitle: "取消",
+            sourceView: sourceView
+        )
+        host.addSubview(menu)
+        NSLayoutConstraint.activate([
+            menu.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+            menu.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+            menu.topAnchor.constraint(equalTo: host.topAnchor),
+            menu.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+        ])
+        menu.updatePlayerSafeAreaInsets(UIEdgeInsets(top: 24, left: 24, bottom: 24, right: 24))
+        host.layoutIfNeeded()
+
+        guard let card = menu.subviews.first(
+            where: { $0.accessibilityIdentifier == "MPVQuickPlayer.menu.card" }
+        ) else {
+            XCTFail("Menu card was not installed")
+            return
+        }
+        XCTAssertEqual(card.frame.midX, sourceView.frame.midX, accuracy: 1)
+        XCTAssertGreaterThanOrEqual(card.frame.minY, sourceView.frame.maxY + 8 - 1)
+        XCTAssertGreaterThanOrEqual(card.frame.minX, 24 + 16 - 1)
+        XCTAssertLessThanOrEqual(card.frame.maxX, host.bounds.maxX - 24 - 16 + 1)
+        XCTAssertLessThanOrEqual(card.frame.maxY, host.bounds.maxY - 24 - 16 + 1)
+
+        host.frame.size.width = 390
+        host.layoutIfNeeded()
+        XCTAssertEqual(card.frame.midX, 195, accuracy: 1)
+    }
+
+    @MainActor
     func testQuickPlayerCanForceLandscapeWhenHostOnlySupportsPortrait() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false, forceLandscape: true)

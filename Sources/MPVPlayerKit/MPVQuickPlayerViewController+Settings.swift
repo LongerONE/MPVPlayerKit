@@ -191,13 +191,6 @@ extension MPVQuickPlayerViewController {
         )
     }
 
-    func actionSheet(title: String, sourceView: UIView) -> UIAlertController {
-        let alert = UIAlertController(title: title, message: nil, preferredStyle: .actionSheet)
-        alert.popoverPresentationController?.sourceView = sourceView
-        alert.popoverPresentationController?.sourceRect = sourceView.bounds
-        return alert
-    }
-
     func presentActionSheet(
         title: String,
         message: String? = nil,
@@ -205,35 +198,55 @@ extension MPVQuickPlayerViewController {
         options: [MPVQuickPlayerActionSheetOption],
         cancelTitle: String
     ) {
-        if isUsingManualLandscape && isLandscapeForced {
-            let sheet = MPVQuickPlayerActionSheetViewController(
-                title: title,
-                message: message,
-                options: options,
-                cancelTitle: cancelTitle
-            )
-            presentInPlayerOrientation(sheet)
-            return
-        }
+        dismissActionSheet(animated: false)
 
-        let alert = actionSheet(title: title, sourceView: sourceView)
-        alert.message = message
-        options.forEach { option in
-            let title = option.isSelected ? "✓ " + option.title : option.title
-            let style: UIAlertAction.Style = option.isDestructive ? .destructive : .default
-            alert.addAction(UIAlertAction(title: title, style: style) { _ in
-                option.action()
-            })
+        // Resolve the player geometry before installing the overlay. The menu is
+        // a child of contentView, so no presentation-time rotation is needed.
+        layoutOrientationContentView()
+        updatePlaybackControlSafeAreaInsets()
+        view.layoutIfNeeded()
+        contentView.layoutIfNeeded()
+
+        let menu = MPVQuickPlayerMenuView(
+            title: title,
+            message: message,
+            options: options,
+            cancelTitle: cancelTitle,
+            sourceView: sourceView
+        )
+        menu.onDismiss = { [weak self, weak menu] in
+            guard let self, actionSheetOverlay === menu else { return }
+            actionSheetOverlay = nil
         }
-        alert.addAction(UIAlertAction(title: cancelTitle, style: .cancel))
-        presentInPlayerOrientation(alert)
+        actionSheetOverlay = menu
+        contentView.addSubview(menu)
+        NSLayoutConstraint.activate([
+            menu.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            menu.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            menu.topAnchor.constraint(equalTo: contentView.topAnchor),
+            menu.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+        ])
+        menu.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        contentView.layoutIfNeeded()
     }
 
     func presentAfterCurrentSheet(_ presentation: @escaping (MPVQuickPlayerViewController) -> Void) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
+        guard let menu = actionSheetOverlay else {
+            presentation(self)
+            return
+        }
+        menu.dismiss(animated: true) { [weak self] in
             guard let self else { return }
             presentation(self)
         }
+    }
+
+    func dismissActionSheet(animated: Bool, completion: (() -> Void)? = nil) {
+        guard let menu = actionSheetOverlay else {
+            completion?()
+            return
+        }
+        menu.dismiss(animated: animated, completion: completion)
     }
 
     func presentTrackPicker(type: MPVMediaTrackType, sourceView: UIView) {

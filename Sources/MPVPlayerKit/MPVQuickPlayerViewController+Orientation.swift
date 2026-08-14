@@ -1,6 +1,26 @@
 import UIKit
 
 extension MPVQuickPlayerViewController {
+    public override func viewWillTransition(
+        to size: CGSize,
+        with coordinator: UIViewControllerTransitionCoordinator
+    ) {
+        super.viewWillTransition(to: size, with: coordinator)
+
+        let synchronizeMenuLayout = { [weak self] in
+            guard let self else { return }
+            view.layoutIfNeeded()
+            layoutOrientationContentView()
+            updatePlaybackControlSafeAreaInsets()
+            actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+            contentView.layoutIfNeeded()
+        }
+        coordinator.animate(
+            alongsideTransition: { _ in synchronizeMenuLayout() },
+            completion: { _ in synchronizeMenuLayout() }
+        )
+    }
+
     static var applicationSupportsLandscape: Bool {
         let deviceSpecificKey = UIDevice.current.userInterfaceIdiom == .pad
             ? "UISupportedInterfaceOrientations~ipad"
@@ -111,6 +131,34 @@ extension MPVQuickPlayerViewController {
             contentView.transform = targetTransform
             contentView.layoutIfNeeded()
         }
+        actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+    }
+
+    /// Safe-area insets expressed in the coordinate system of `contentView`.
+    /// Manual landscape rotates the content view while its host remains portrait,
+    /// so the root's four edges need to be mapped before Auto Layout runs.
+    func playerOrientationSafeAreaInsets() -> UIEdgeInsets {
+        Self.playerOrientationSafeAreaInsets(
+            rootBounds: view.bounds,
+            rootSafeAreaInsets: view.safeAreaInsets,
+            usesManualLandscape: isUsingManualLandscape && isLandscapeForced
+        )
+    }
+
+    static func playerOrientationSafeAreaInsets(
+        rootBounds: CGRect,
+        rootSafeAreaInsets: UIEdgeInsets,
+        usesManualLandscape: Bool
+    ) -> UIEdgeInsets {
+        guard usesManualLandscape && rootBounds.height > rootBounds.width else {
+            return rootSafeAreaInsets
+        }
+        return UIEdgeInsets(
+            top: rootSafeAreaInsets.right,
+            left: rootSafeAreaInsets.top,
+            bottom: rootSafeAreaInsets.left,
+            right: rootSafeAreaInsets.bottom
+        )
     }
 
     func presentInPlayerOrientation(_ controller: UIViewController, animated: Bool = true) {
@@ -234,11 +282,13 @@ extension MPVQuickPlayerViewController {
         view.setNeedsLayout()
         layoutOrientationContentView()
         updatePlaybackControlSafeAreaInsets()
+        actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
     private func restoreManualLandscape() {
         guard isViewLoaded else { return }
         layoutOrientationContentView()
         updatePlaybackControlSafeAreaInsets()
+        actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 }

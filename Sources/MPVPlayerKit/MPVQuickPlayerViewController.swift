@@ -69,6 +69,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var isCancellingSubtitleLoad = false
     var isUsingManualLandscape: Bool
     weak var orientationSynchronizedPresentedViewController: UIViewController?
+    weak var actionSheetOverlay: MPVQuickPlayerMenuView?
     var arePlaybackControlsHidden = false
     var closeButtonLeadingConstraint: NSLayoutConstraint!
     var statusLabelTrailingConstraint: NSLayoutConstraint!
@@ -166,11 +167,13 @@ public final class MPVQuickPlayerViewController: UIViewController {
         layoutOrientationContentView()
         layoutPresentedViewControllerInPlayerOrientation()
         updatePlaybackControlSafeAreaInsets()
+        actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
     public override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
         updatePlaybackControlSafeAreaInsets()
+        actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
     public override func viewDidDisappear(_ animated: Bool) {
