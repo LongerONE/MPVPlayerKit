@@ -115,6 +115,7 @@ extension MPVQuickPlayerViewController {
 
     func presentInPlayerOrientation(_ controller: UIViewController, animated: Bool = true) {
         orientationSynchronizedPresentedViewController = controller
+        updateActionSheetPreferredContentSize(for: controller)
         present(controller, animated: animated) { [weak self, weak controller] in
             guard let self, let controller else { return }
             layoutPresentedViewControllerInPlayerOrientation(controller)
@@ -132,11 +133,57 @@ extension MPVQuickPlayerViewController {
             }
             return
         }
+        updateActionSheetPreferredContentSize(for: controller)
         Self.layoutPresentedView(
             presentedView,
             rootBounds: view.bounds,
             usesManualLandscape: isUsingManualLandscape && isLandscapeForced
         )
+    }
+
+    private func updateActionSheetPreferredContentSize(for controller: UIViewController) {
+        guard let alert = controller as? UIAlertController, alert.preferredStyle == .actionSheet else {
+            return
+        }
+        let titles = [alert.title, alert.message].compactMap { $0 }
+            + alert.actions.compactMap(\.title)
+        let width = Self.actionSheetPreferredWidth(
+            titles: titles,
+            rootBounds: view.bounds,
+            rootSafeAreaInsets: view.safeAreaInsets,
+            usesManualLandscape: isUsingManualLandscape && isLandscapeForced
+        )
+        guard alert.preferredContentSize.width != width else { return }
+        alert.preferredContentSize = CGSize(width: width, height: 0)
+    }
+
+    static func actionSheetPreferredWidth(
+        titles: [String],
+        rootBounds: CGRect,
+        rootSafeAreaInsets: UIEdgeInsets,
+        usesManualLandscape: Bool
+    ) -> CGFloat {
+        let isManualLandscape = usesManualLandscape && rootBounds.height > rootBounds.width
+        let availableWidth: CGFloat
+        if isManualLandscape {
+            availableWidth = rootBounds.height
+                - rootSafeAreaInsets.top
+                - rootSafeAreaInsets.bottom
+                - 32
+        } else {
+            availableWidth = rootBounds.width
+                - rootSafeAreaInsets.left
+                - rootSafeAreaInsets.right
+                - 32
+        }
+        let maximumWidth = max(0, availableWidth)
+        let minimumWidth = min(320, maximumWidth)
+        let contentWidth = titles.map { title in
+            ceil((title as NSString).size(withAttributes: [
+                .font: UIFont.preferredFont(forTextStyle: .body),
+            ]).width)
+        }.max() ?? 0
+        return min(maximumWidth, max(minimumWidth, contentWidth + 64))
     }
 
     static func layoutPresentedView(

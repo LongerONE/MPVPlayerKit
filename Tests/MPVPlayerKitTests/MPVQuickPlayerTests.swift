@@ -46,6 +46,14 @@ final class MPVQuickPlayerTests: XCTestCase {
         XCTAssertEqual(presentedView.transform, .identity)
 
         controller.view.bounds = CGRect(x: 0, y: 0, width: 390, height: 844)
+        let menuWidth = MPVQuickPlayerViewController.actionSheetPreferredWidth(
+            titles: ["✓ Video 1 · hevc (3840x2160) · 10-bit · yuv420p"],
+            rootBounds: controller.view.bounds,
+            rootSafeAreaInsets: UIEdgeInsets(top: 59, left: 0, bottom: 34, right: 0),
+            usesManualLandscape: true
+        )
+        XCTAssertGreaterThan(menuWidth, 320)
+        XCTAssertLessThanOrEqual(menuWidth, 719)
 
         let rootStart = CGPoint(x: controller.view.bounds.midX, y: 100)
         let rootEnd = CGPoint(x: controller.view.bounds.midX, y: 220)
