@@ -132,11 +132,22 @@ extension MPVQuickPlayerViewController {
             }
             return
         }
+
+        // UIAlertController owns a private view hierarchy and lays out its action sheet
+        // in the host interface orientation. Changing its bounds or transform after
+        // presentation makes its internal constraints use the wrong coordinate space,
+        // which clips long action titles in manual landscape mode.
+        guard Self.shouldApplyManualLandscapeTransform(to: controller) else { return }
+
         Self.layoutPresentedView(
             presentedView,
             rootBounds: view.bounds,
             usesManualLandscape: isUsingManualLandscape && isLandscapeForced
         )
+    }
+
+    static func shouldApplyManualLandscapeTransform(to controller: UIViewController) -> Bool {
+        controller is UIAlertController == false
     }
 
     static func layoutPresentedView(

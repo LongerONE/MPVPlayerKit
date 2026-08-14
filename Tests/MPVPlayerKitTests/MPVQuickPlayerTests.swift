@@ -4,6 +4,22 @@ import UIKit
 
 final class MPVQuickPlayerTests: XCTestCase {
     @MainActor
+    func testNativeAlertsKeepUIKitManagedLayoutInManualLandscape() {
+        let alert = UIAlertController(
+            title: "视频轨道",
+            message: nil,
+            preferredStyle: .actionSheet
+        )
+
+        XCTAssertFalse(
+            MPVQuickPlayerViewController.shouldApplyManualLandscapeTransform(to: alert)
+        )
+        XCTAssertTrue(
+            MPVQuickPlayerViewController.shouldApplyManualLandscapeTransform(to: UIViewController())
+        )
+    }
+
+    @MainActor
     func testQuickPlayerCanForceLandscapeWhenHostOnlySupportsPortrait() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false, forceLandscape: true)
