@@ -50,9 +50,16 @@ final class MPVQuickPlayerMenuView: UIView {
     private var sourceTopConstraint: NSLayoutConstraint!
     private var sourceBottomConstraint: NSLayoutConstraint!
     private var isUsingSourceViewPositioning = false
+    private var preferredCardWidthConstraint: NSLayoutConstraint!
     private var tableHeightConstraint: NSLayoutConstraint!
+    private var lastMeasuredCardWidth: CGFloat = -1
     private var lastMeasuredTableHeight: CGFloat = -1
     private var playerSafeAreaInsets = UIEdgeInsets.zero
+
+    private static let minimumCardWidth: CGFloat = 220
+    private static let maximumCardWidth: CGFloat = 640
+    private static let cardEdgeInset: CGFloat = 16
+    private static let cardContentHorizontalInset: CGFloat = 40
 
     /// Called after the menu has been removed from the view hierarchy.
     var onDismiss: (() -> Void)?
@@ -69,11 +76,7 @@ final class MPVQuickPlayerMenuView: UIView {
         self.options = options
         self.cancelTitle = cancelTitle
         self.sourceView = sourceView
-        if #available(iOS 26.0, *) {
-            effectView = UIVisualEffectView(effect: UIGlassEffect(style: .regular))
-        } else {
-            effectView = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
-        }
+        effectView = UIVisualEffectView(effect: Self.makeBackgroundEffect())
         super.init(frame: .zero)
         configureViews()
         configureLayout()
@@ -105,7 +108,17 @@ final class MPVQuickPlayerMenuView: UIView {
     override func layoutSubviews() {
         super.layoutSubviews()
         updateSourceViewPositioning()
+        updateCardWidthIfNeeded()
         updateTableHeightIfNeeded()
+    }
+
+    override func traitCollectionDidChange(_ previousTraitCollection: UITraitCollection?) {
+        super.traitCollectionDidChange(previousTraitCollection)
+        guard previousTraitCollection?.preferredContentSizeCategory != traitCollection.preferredContentSizeCategory else {
+            return
+        }
+        lastMeasuredCardWidth = -1
+        setNeedsLayout()
     }
 
     /// Updates the safe area in the already-rotated `contentView` coordinate space.
@@ -214,11 +227,10 @@ final class MPVQuickPlayerMenuView: UIView {
             .forEach { $0.translatesAutoresizingMaskIntoConstraints = false }
         addLayoutGuide(safeAreaGuide)
         let contentView = effectView.contentView
-        let preferredCardWidth = cardView.widthAnchor.constraint(
-            equalTo: safeAreaGuide.widthAnchor,
-            multiplier: 0.88
+        preferredCardWidthConstraint = cardView.widthAnchor.constraint(
+            equalToConstant: Self.minimumCardWidth
         )
-        preferredCardWidth.priority = .defaultHigh
+        preferredCardWidthConstraint.priority = .defaultHigh
         tableHeightConstraint = tableView.heightAnchor.constraint(
             equalToConstant: options.isEmpty ? 0 : 54
         )
@@ -248,12 +260,24 @@ final class MPVQuickPlayerMenuView: UIView {
 
             cardCenterXConstraint,
             cardCenterYConstraint,
-            cardView.leadingAnchor.constraint(greaterThanOrEqualTo: safeAreaGuide.leadingAnchor, constant: 16),
-            cardView.trailingAnchor.constraint(lessThanOrEqualTo: safeAreaGuide.trailingAnchor, constant: -16),
-            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: 640),
-            preferredCardWidth,
-            cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaGuide.topAnchor, constant: 16),
-            cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaGuide.bottomAnchor, constant: -16),
+            cardView.leadingAnchor.constraint(
+                greaterThanOrEqualTo: safeAreaGuide.leadingAnchor,
+                constant: Self.cardEdgeInset
+            ),
+            cardView.trailingAnchor.constraint(
+                lessThanOrEqualTo: safeAreaGuide.trailingAnchor,
+                constant: -Self.cardEdgeInset
+            ),
+            cardView.widthAnchor.constraint(lessThanOrEqualToConstant: Self.maximumCardWidth),
+            preferredCardWidthConstraint,
+            cardView.topAnchor.constraint(
+                greaterThanOrEqualTo: safeAreaGuide.topAnchor,
+                constant: Self.cardEdgeInset
+            ),
+            cardView.bottomAnchor.constraint(
+                lessThanOrEqualTo: safeAreaGuide.bottomAnchor,
+                constant: -Self.cardEdgeInset
+            ),
             cardView.heightAnchor.constraint(lessThanOrEqualTo: safeAreaGuide.heightAnchor, constant: -32),
 
             effectView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor),
@@ -295,6 +319,40 @@ final class MPVQuickPlayerMenuView: UIView {
         ])
     }
 
+    private func updateCardWidthIfNeeded() {
+        guard bounds.width > 0, bounds.height > 0 else { return }
+
+        let availableWidth = max(
+            bounds.width - playerSafeAreaInsets.left - playerSafeAreaInsets.right - Self.cardEdgeInset * 2,
+            0
+        )
+        let maximumWidth = min(Self.maximumCardWidth, availableWidth)
+        guard maximumWidth > 0 else { return }
+
+        let titleWidth = measuredWidth(of: titleText, font: titleLabel.font)
+            + Self.cardContentHorizontalInset
+        let messageWidth = measuredWidth(of: message, font: messageLabel.font)
+            + Self.cardContentHorizontalInset
+        let optionWidth = (options.map { option in
+            measuredWidth(of: option.title, font: UIFont.preferredFont(forTextStyle: .body))
+        }.max() ?? 0) + 48
+        let cancelWidth = cancelButton.intrinsicContentSize.width + 32
+        let contentWidth = max(titleWidth, messageWidth, optionWidth, cancelWidth)
+        let cardWidth = min(
+            max(contentWidth, Self.minimumCardWidth),
+            maximumWidth
+        )
+
+        guard abs(cardWidth - lastMeasuredCardWidth) > 0.5 else { return }
+        lastMeasuredCardWidth = cardWidth
+        preferredCardWidthConstraint.constant = cardWidth
+    }
+
+    private func measuredWidth(of text: String?, font: UIFont) -> CGFloat {
+        guard let text, !text.isEmpty else { return 0 }
+        return ceil((text as NSString).size(withAttributes: [.font: font]).width)
+    }
+
     private func updateSourceViewPositioning() {
         guard let sourceView,
               sourceView.superview != nil,
@@ -326,13 +384,14 @@ final class MPVQuickPlayerMenuView: UIView {
     private func updateTableHeightIfNeeded() {
         guard bounds.width > 0, bounds.height > 0 else { return }
         tableView.layoutIfNeeded()
+        let cardContentWidth = max(cardView.bounds.width - Self.cardContentHorizontalInset, 1)
         let headerHeight = titleLabel.systemLayoutSizeFitting(
-            CGSize(width: max(bounds.width * 0.88 - 40, 1), height: .greatestFiniteMagnitude),
+            CGSize(width: cardContentWidth, height: .greatestFiniteMagnitude),
             withHorizontalFittingPriority: .required,
             verticalFittingPriority: .fittingSizeLevel
         ).height
         let messageHeight = message == nil ? 0 : messageLabel.systemLayoutSizeFitting(
-            CGSize(width: max(bounds.width * 0.88 - 40, 1), height: .greatestFiniteMagnitude),
+            CGSize(width: cardContentWidth, height: .greatestFiniteMagnitude),
             withHorizontalFittingPriority: .required,
             verticalFittingPriority: .fittingSizeLevel
         ).height + 8
@@ -358,6 +417,13 @@ final class MPVQuickPlayerMenuView: UIView {
     }
 
     private static let optionCellIdentifier = "MPVQuickPlayerActionSheetOption"
+
+    private static func makeBackgroundEffect() -> UIVisualEffect {
+        if #available(iOS 26.0, *) {
+            return UIGlassEffect(style: .regular)
+        }
+        return UIBlurEffect(style: .systemMaterial)
+    }
 }
 
 extension MPVQuickPlayerMenuView: UITableViewDataSource, UITableViewDelegate {

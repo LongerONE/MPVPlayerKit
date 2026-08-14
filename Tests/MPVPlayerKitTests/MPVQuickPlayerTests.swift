@@ -103,6 +103,53 @@ final class MPVQuickPlayerTests: XCTestCase {
     }
 
     @MainActor
+    func testMenuWidthFollowsContentLengthInLandscape() {
+        let host = UIView(frame: CGRect(x: 0, y: 0, width: 1024, height: 768))
+        let shortMenu = MPVQuickPlayerMenuView(
+            title: "设置",
+            message: nil,
+            options: [MPVQuickPlayerActionSheetOption(title: "字幕", action: {})],
+            cancelTitle: "取消"
+        )
+        let longMenu = MPVQuickPlayerMenuView(
+            title: "播放设置",
+            message: "调整播放器的显示和播放行为",
+            options: [
+                MPVQuickPlayerActionSheetOption(
+                    title: "自动选择最佳视频质量和字幕轨道",
+                    action: {}
+                ),
+            ],
+            cancelTitle: "取消"
+        )
+        host.addSubview(shortMenu)
+        host.addSubview(longMenu)
+        for menu in [shortMenu, longMenu] {
+            NSLayoutConstraint.activate([
+                menu.leadingAnchor.constraint(equalTo: host.leadingAnchor),
+                menu.trailingAnchor.constraint(equalTo: host.trailingAnchor),
+                menu.topAnchor.constraint(equalTo: host.topAnchor),
+                menu.bottomAnchor.constraint(equalTo: host.bottomAnchor),
+            ])
+            menu.updatePlayerSafeAreaInsets(UIEdgeInsets(top: 24, left: 24, bottom: 24, right: 24))
+        }
+        host.layoutIfNeeded()
+
+        let shortCard = shortMenu.subviews.first {
+            $0.accessibilityIdentifier == "MPVQuickPlayer.menu.card"
+        }
+        let longCard = longMenu.subviews.first {
+            $0.accessibilityIdentifier == "MPVQuickPlayer.menu.card"
+        }
+
+        XCTAssertNotNil(shortCard)
+        XCTAssertNotNil(longCard)
+        XCTAssertLessThan(shortCard?.frame.width ?? .greatestFiniteMagnitude, 400)
+        XCTAssertGreaterThan(longCard?.frame.width ?? 0, shortCard?.frame.width ?? 0)
+        XCTAssertLessThanOrEqual(longCard?.frame.maxX ?? .greatestFiniteMagnitude, 984)
+    }
+
+    @MainActor
     func testQuickPlayerCanForceLandscapeWhenHostOnlySupportsPortrait() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false, forceLandscape: true)
