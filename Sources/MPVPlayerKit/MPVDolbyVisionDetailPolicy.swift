@@ -13,24 +13,22 @@ enum MPVDolbyVisionFrameObservation: Equatable, Sendable {
     case unavailable
 }
 
-/// Pure Dolby Vision detection and shadow-detail policy for bundled mpv 0.41.
+/// Pure Dolby Vision detection and frame-property policy for bundled mpv 0.41.
 struct MPVDolbyVisionDetailPolicy {
     static let colorMatrixProperty = "video-params/colormatrix"
     static let dolbyVisionColorMatrix = "dolbyvision"
 
-    static let enhancedCommands = [
-        MPVDolbyVisionDetailCommand(property: "gamma", value: "7"),
-        MPVDolbyVisionDetailCommand(property: "contrast", value: "-7"),
-        MPVDolbyVisionDetailCommand(property: "hdr-contrast-recovery", value: "0.30"),
-        MPVDolbyVisionDetailCommand(property: "hdr-contrast-smoothness", value: "3.5"),
-    ]
-
-    static let standardCommands = [
+    /// Keep Dolby Vision on mpv/libplacebo's metadata-driven color pipeline.
+    /// These explicit neutral values also reset a reused handle when the
+    /// decoded stream changes between Dolby Vision and ordinary HDR/SDR.
+    static let dolbyVisionCommands = [
         MPVDolbyVisionDetailCommand(property: "gamma", value: "0"),
         MPVDolbyVisionDetailCommand(property: "contrast", value: "0"),
         MPVDolbyVisionDetailCommand(property: "hdr-contrast-recovery", value: "0"),
         MPVDolbyVisionDetailCommand(property: "hdr-contrast-smoothness", value: "3.5"),
     ]
+
+    static let standardCommands = dolbyVisionCommands
 
     static func observation(colorMatrix: String?) -> MPVDolbyVisionFrameObservation {
         guard let normalizedColorMatrix = colorMatrix?
@@ -44,7 +42,7 @@ struct MPVDolbyVisionDetailPolicy {
     }
 
     static func commands(isDolbyVision: Bool) -> [MPVDolbyVisionDetailCommand] {
-        isDolbyVision ? enhancedCommands : standardCommands
+        isDolbyVision ? dolbyVisionCommands : standardCommands
     }
 }
 

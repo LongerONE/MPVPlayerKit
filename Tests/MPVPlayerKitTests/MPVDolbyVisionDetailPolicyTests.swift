@@ -51,25 +51,26 @@ final class MPVDolbyVisionDetailPolicyTests: XCTestCase {
         XCTAssertEqual(state.desiredEnhancement(for: .nonDolbyVision), false)
     }
 
-    func testEnhancedAndStandardCommandsHaveExpectedValues() {
-        let enhanced = commandMap(
+    func testDolbyVisionAndStandardCommandsUseNeutralValues() {
+        let dolbyVision = commandMap(
             MPVDolbyVisionDetailPolicy.commands(isDolbyVision: true)
         )
         let standard = commandMap(
             MPVDolbyVisionDetailPolicy.commands(isDolbyVision: false)
         )
 
-        XCTAssertEqual(enhanced["gamma"], "7")
-        XCTAssertEqual(enhanced["contrast"], "-7")
-        XCTAssertEqual(enhanced["hdr-contrast-recovery"], "0.30")
-        XCTAssertEqual(enhanced["hdr-contrast-smoothness"], "3.5")
+        XCTAssertEqual(dolbyVision, standard)
+        XCTAssertEqual(dolbyVision["gamma"], "0")
+        XCTAssertEqual(dolbyVision["contrast"], "0")
+        XCTAssertEqual(dolbyVision["hdr-contrast-recovery"], "0")
+        XCTAssertEqual(dolbyVision["hdr-contrast-smoothness"], "3.5")
         XCTAssertEqual(standard["gamma"], "0")
         XCTAssertEqual(standard["contrast"], "0")
         XCTAssertEqual(standard["hdr-contrast-recovery"], "0")
         XCTAssertEqual(standard["hdr-contrast-smoothness"], "3.5")
-        XCTAssertNil(enhanced["tone-mapping"])
-        XCTAssertNil(enhanced["gamut-mapping-mode"])
-        XCTAssertNil(enhanced["hdr-compute-peak"])
+        XCTAssertNil(dolbyVision["tone-mapping"])
+        XCTAssertNil(dolbyVision["gamut-mapping-mode"])
+        XCTAssertNil(dolbyVision["hdr-compute-peak"])
     }
 
     func testPartialSuccessRetriesOnlyFailedProperties() throws {
@@ -105,30 +106,6 @@ final class MPVDolbyVisionDetailPolicyTests: XCTestCase {
         XCTAssertEqual(state.commands(to: false).count, 4)
     }
 
-    func testEnhancedCurveLiftsShadowsAndSoftensWhite() {
-        let oldCurve: (Double) -> Double = {
-            self.modeledEqualizerOutput(input: $0, gamma: 3, contrast: 0)
-        }
-        let enhancedCurve: (Double) -> Double = {
-            self.modeledEqualizerOutput(input: $0, gamma: 7, contrast: -7)
-        }
-        let black = enhancedCurve(0)
-        let white = enhancedCurve(1)
-
-        XCTAssertEqual(black, 0, accuracy: 0.000_001)
-        XCTAssertEqual(
-            white,
-            modeledEqualizerOutput(input: 1, gamma: 7, contrast: -7),
-            accuracy: 0.000_001
-        )
-        XCTAssertEqual(white, 0.9392, accuracy: 0.000_1)
-        XCTAssertGreaterThan(enhancedCurve(0.10), oldCurve(0.10))
-        XCTAssertGreaterThan(enhancedCurve(0.30), oldCurve(0.30))
-        XCTAssertLessThan(enhancedCurve(0.50), oldCurve(0.50))
-        XCTAssertLessThan(enhancedCurve(0.75), oldCurve(0.75) - 0.02)
-        XCTAssertLessThan(white, oldCurve(1) - 0.05)
-    }
-
     private func commandMap(
         _ commands: [MPVDolbyVisionDetailCommand]
     ) -> [String: String] {
@@ -138,14 +115,4 @@ final class MPVDolbyVisionDetailPolicyTests: XCTestCase {
         )
     }
 
-    /// Models mpv's normalized equalizer transfer for endpoint/regression checks.
-    private func modeledEqualizerOutput(
-        input: Double,
-        gamma: Double,
-        contrast: Double
-    ) -> Double {
-        let contrasted = max(0, input * (1 + contrast / 100))
-        let gammaExponent = 1 / pow(8, gamma / 100)
-        return pow(contrasted, gammaExponent)
-    }
 }
