@@ -76,7 +76,6 @@ extension MPVPlayerView {
                     self.mpvDebugLog(
                         "event file-loaded profile=\(self.activeProfileDescription)"
                     )
-                    self.refreshDolbyVisionDetailMapping(reason: "file-loaded")
                     self.refreshMediaTracksCache()
                     self.refreshPictureInPictureVideoDisplaySize()
                 case MPV_EVENT_PLAYBACK_RESTART:
@@ -97,7 +96,6 @@ extension MPVPlayerView {
                     self.refreshPictureInPictureVideoDisplaySize()
                     self.mpvDebugLog("event playback-restart stage=end")
                 case MPV_EVENT_VIDEO_RECONFIG:
-                    self.refreshDolbyVisionDetailMapping(reason: "video-reconfig")
                     self.refreshPictureInPictureVideoDisplaySize()
                 case MPV_EVENT_END_FILE:
                     self.mpvDebugLog("event end-file stage=begin")

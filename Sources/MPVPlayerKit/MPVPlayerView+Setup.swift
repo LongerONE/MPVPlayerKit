@@ -198,9 +198,6 @@ extension MPVPlayerView {
             "setupMPV profile options name=\(profile.name) count=\(profile.options.count)"
         )
         performOnMPVQueueSync {
-            dolbyVisionDetailRuntimeState.resetForNewHandle(
-                hostHint: configuredDolbyVisionHintSnapshot()
-            )
             lastMPVTimeSnapshot = nil
             currentSubtitleUsesOriginalStyle = false
             loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)

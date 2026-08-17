@@ -106,6 +106,11 @@ struct MPVColorMappingPolicy {
     static let extendedDynamicRangeOutputOptions =
         commonRendererOptions + automaticColorMappingOptions + [
             ("fbo-format", "rgba16f"),
+            // MPV's target must match the Metal layer's extendedLinearSRGB
+            // colorspace. Leaving these as auto can fall back to source HDR
+            // metadata when the display target is unavailable to gpu-next.
+            ("target-trc", "linear"),
+            ("target-prim", "bt.709"),
             ("target-colorspace-hint", "yes"),
             ("target-colorspace-hint-mode", "target"),
         ]

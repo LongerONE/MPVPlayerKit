@@ -62,6 +62,8 @@ final class MPVColorMappingPolicyTests: XCTestCase {
         )
 
         XCTAssertEqual(options["vo"], "gpu-next")
+        XCTAssertEqual(options["target-trc"], "linear")
+        XCTAssertEqual(options["target-prim"], "bt.709")
         XCTAssertEqual(options["target-colorspace-hint"], "yes")
         XCTAssertEqual(options["target-colorspace-hint-mode"], "target")
         XCTAssertEqual(options["hdr-compute-peak"], "auto")

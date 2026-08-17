@@ -242,10 +242,6 @@ public final class MPVPlayerView: UIView {
     /// Host metadata hint retained for diagnostics. Frame metadata and display
     /// capability, not this value, control color mapping.
     var isDolbyVisionPlayback = false
-    nonisolated let dolbyVisionConfigurationLock = NSLock()
-    nonisolated(unsafe) var configuredDolbyVisionHint = false
-    nonisolated(unsafe) var dolbyVisionDetailRuntimeState =
-        MPVDolbyVisionDetailRuntimeState()
     nonisolated(unsafe) var currentSubtitleUsesOriginalStyle = false
     // Runtime playback updates are serialized on `queue`, not the UIView's
     // main-actor executor. Keep these snapshots available to those queue-bound
@@ -466,7 +462,6 @@ public final class MPVPlayerView: UIView {
         userAgent = configuration["userAgent"] as? String
         forceSoftwareDecode = boolValue(configuration["forceSoftwareDecode"])
         isDolbyVisionPlayback = boolValue(configuration["isDolbyVisionPlayback"])
-        storeConfiguredDolbyVisionHint(isDolbyVisionPlayback)
         let qualityRawValue = (configuration["videoQuality"] as? NSNumber)?.intValue
         videoQualityPreset = qualityRawValue.flatMap(MPVVideoQualityPreset.init(rawValue:)) ?? .balanced
         debandEnabled = boolValue(configuration["debandEnabled"])
