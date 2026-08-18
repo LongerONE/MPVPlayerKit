@@ -140,23 +140,6 @@ player.useClientSubtitleRenderer(AppSubtitleRenderer())
 `player`, so its external SRT/VTT picker works without application-side subtitle
 layers.
 
-## Frame interpolation
-
-Choose one of the built-in interpolation profiles when creating the player:
-
-```swift
-let configuration = MPVPlayerConfiguration(
-    url: videoURL,
-    interpolationOptions: .smooth
-)
-```
-
-The profiles use mpv's temporal scaling filters: `.standard` uses `oversample`, `.smooth` uses `linear`, and `.highQuality` uses `mitchell` with antiring. Advanced callers can construct `MPVInterpolationOptions` to select a different `MPVTemporalScaler` and tune `threshold`, `blur`, `clamp`, `radius`, or `antiring`. This is mpv frame mixing/resampling rather than motion-compensated AI frame generation.
-
-Apply a new profile during playback with `player.updateVideoRenderOptions(debandEnabled:interpolationOptions:)`.
-
-The legacy `smoothPlaybackEnabled` configuration remains supported and maps to the standard profile.
-
 ## Quick player interface
 
 For apps that do not need custom controls:
@@ -169,7 +152,7 @@ let playerViewController = MPVQuickPlayerViewController(
 present(playerViewController, animated: true)
 ```
 
-The quick interface provides play/pause, seeking, time display, a Picture in Picture button that enters and leaves the window, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, frame interpolation, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
+The quick interface provides play/pause, seeking, time display, a Picture in Picture button that enters and leaves the window, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
 
 Landscape lock can also be changed while the player is visible:
 
@@ -183,7 +166,7 @@ It also supports full-screen pan gestures: horizontal seeking, brightness on the
 playerViewController.gestureOptions = [.seeking, .volume]
 ```
 
-Settings can also be changed programmatically through `setPlaybackRate`, `setVideoQuality`, `setDebandEnabled`, `setInterpolationOptions`, `setSubtitleDelay`, and `setSubtitleStyle`. The underlying `player` remains public for direct access to every `MPVPlayer` operation.
+Settings can also be changed programmatically through `setPlaybackRate`, `setVideoQuality`, `setDebandEnabled`, `setSubtitleDelay`, and `setSubtitleStyle`. The underlying `player` remains public for direct access to every `MPVPlayer` operation.
 
 It is optional; `MPVPlayer` does not depend on it at runtime.
 

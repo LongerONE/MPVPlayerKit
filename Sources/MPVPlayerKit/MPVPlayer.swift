@@ -116,16 +116,10 @@ public final class MPVPlayer: NSObject {
         playbackView.updateVideoQuality(NSNumber(value: quality.rawValue))
     }
 
-    public func updateVideoRenderOptions(
-        debandEnabled: Bool,
-        interpolationOptions: MPVInterpolationOptions
-    ) {
-        var values: [String: Any] = [
+    public func updateVideoRenderOptions(debandEnabled: Bool) {
+        playbackView.updateVideoRenderOptions([
             "debandEnabled": NSNumber(value: debandEnabled),
-            "smoothPlaybackEnabled": NSNumber(value: interpolationOptions.quality != .off),
-        ]
-        values.merge(interpolationOptions.bridgeValues) { _, new in new }
-        playbackView.updateVideoRenderOptions(values as NSDictionary)
+        ] as NSDictionary)
     }
 
     public func tracks(ofType type: MPVMediaTrackType) -> [MPVMediaTrack] {

@@ -26,8 +26,6 @@
 "settings.playback_speed.value" = "Playback Speed · %@";
 "settings.video_quality" = "Video Quality";
 "settings.video_quality.value" = "Video Quality · %@";
-"settings.frame_interpolation" = "Frame Interpolation";
-"settings.frame_interpolation.value" = "Frame Interpolation · %@";
 "settings.enable_debanding" = "Enable Debanding";
 "settings.disable_debanding" = "Disable Debanding";
 "settings.fit_video" = "Fit Video";
@@ -36,10 +34,6 @@
 "quality.power_saver" = "Power Saver";
 "quality.balanced" = "Balanced";
 "quality.high" = "High Quality";
-"interpolation.off" = "Off";
-"interpolation.standard" = "Standard";
-"interpolation.smooth" = "Smooth";
-"interpolation.high" = "High Quality";
 
 "subtitle.delay" = "Subtitle Delay";
 "subtitle.delay.value" = "Subtitle Delay · %@";

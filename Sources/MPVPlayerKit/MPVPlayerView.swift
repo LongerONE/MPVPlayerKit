@@ -248,7 +248,6 @@ public final class MPVPlayerView: UIView {
     // helpers; configuration writes happen before the MPV handle is started.
     nonisolated(unsafe) var videoQualityPreset = MPVVideoQualityPreset.balanced
     nonisolated(unsafe) var debandEnabled = false
-    nonisolated(unsafe) var interpolationOptions = MPVInterpolationOptions.off
     nonisolated(unsafe) var subtitleDelayValue = 0.0
     let clientSubtitleController = MPVSubtitlePresentationController()
     nonisolated(unsafe) var subtitleStyleValues: [String: String] = [
@@ -465,7 +464,6 @@ public final class MPVPlayerView: UIView {
         let qualityRawValue = (configuration["videoQuality"] as? NSNumber)?.intValue
         videoQualityPreset = qualityRawValue.flatMap(MPVVideoQualityPreset.init(rawValue:)) ?? .balanced
         debandEnabled = boolValue(configuration["debandEnabled"])
-        interpolationOptions = MPVInterpolationOptions(bridgeDictionary: configuration)
         setDecoderMode(.initializing)
         setStopped(false)
         setSetupFailed(false)

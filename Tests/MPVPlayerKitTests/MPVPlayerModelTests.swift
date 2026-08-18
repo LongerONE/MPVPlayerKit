@@ -56,8 +56,7 @@ final class MPVPlayerModelTests: XCTestCase {
             forceSoftwareDecode: true,
             isDolbyVisionPlayback: true,
             videoQuality: .highQuality,
-            debandEnabled: true,
-            smoothPlaybackEnabled: true
+            debandEnabled: true
         )
 
         let values = configuration.bridgeDictionary
@@ -69,12 +68,6 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual((values["isDolbyVisionPlayback"] as? NSNumber)?.boolValue, true)
         XCTAssertEqual((values["videoQuality"] as? NSNumber)?.intValue, MPVVideoQuality.highQuality.rawValue)
         XCTAssertEqual((values["debandEnabled"] as? NSNumber)?.boolValue, true)
-        XCTAssertEqual((values["smoothPlaybackEnabled"] as? NSNumber)?.boolValue, true)
-        XCTAssertEqual((values["interpolationQuality"] as? NSNumber)?.intValue, MPVInterpolationQuality.standard.rawValue)
-        XCTAssertEqual(values["temporalScaler"] as? String, MPVTemporalScaler.oversample.rawValue)
-        XCTAssertEqual((values["interpolationThreshold"] as? NSNumber)?.doubleValue, 0.01)
-        XCTAssertEqual((values["tscaleClamp"] as? NSNumber)?.doubleValue, 1.0)
-        XCTAssertEqual((values["tscaleAntiring"] as? NSNumber)?.doubleValue, 0.0)
     }
 
     func testVideoQualityPresetsUseCompleteTieredRendererOptions() {
@@ -105,47 +98,6 @@ final class MPVPlayerModelTests: XCTestCase {
 
         XCTAssertEqual(Set(powerSaving.keys), Set(balanced.keys))
         XCTAssertEqual(Set(balanced.keys), Set(highQuality.keys))
-    }
-
-    func testHighQualityInterpolationPresetAndAdvancedValues() throws {
-        let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
-        let options = MPVInterpolationOptions(
-            quality: .highQuality,
-            threshold: -1,
-            blur: 0.8,
-            clamp: 0.75,
-            radius: 4,
-            antiring: 0.7
-        )
-        let values = MPVPlayerConfiguration(
-            url: url,
-            interpolationOptions: options
-        ).bridgeDictionary
-
-        XCTAssertEqual(values["temporalScaler"] as? String, "mitchell")
-        XCTAssertEqual((values["interpolationThreshold"] as? NSNumber)?.doubleValue, -1)
-        XCTAssertEqual((values["tscaleBlur"] as? NSNumber)?.doubleValue, 0.8)
-        XCTAssertEqual((values["tscaleClamp"] as? NSNumber)?.doubleValue, 0.75)
-        XCTAssertEqual((values["tscaleRadius"] as? NSNumber)?.doubleValue, 4)
-        XCTAssertEqual((values["tscaleAntiring"] as? NSNumber)?.doubleValue, 0.7)
-    }
-
-    func testInterpolationOptionsClampInvalidAdvancedValues() {
-        let options = MPVInterpolationOptions(
-            quality: .smooth,
-            threshold: 5,
-            blur: 0.1,
-            clamp: -2,
-            radius: 100,
-            antiring: 4
-        )
-
-        XCTAssertEqual(options.temporalScaler, .linear)
-        XCTAssertEqual(options.threshold, 1)
-        XCTAssertEqual(options.blur, 0.5)
-        XCTAssertEqual(options.clamp, 0)
-        XCTAssertEqual(options.radius, 16)
-        XCTAssertEqual(options.antiring, 1)
     }
 
     func testMediaTrackParsesBridgeDictionary() throws {
@@ -236,15 +188,13 @@ final class MPVPlayerModelTests: XCTestCase {
             configuration: MPVPlayerConfiguration(
                 url: url,
                 videoQuality: .highQuality,
-                debandEnabled: true,
-                interpolationOptions: .smooth
+                debandEnabled: true
             ),
             autoplay: false
         )
 
         XCTAssertEqual(controller.videoQuality, .highQuality)
         XCTAssertTrue(controller.debandEnabled)
-        XCTAssertEqual(controller.interpolationOptions, .smooth)
         XCTAssertTrue(controller.prefersStatusBarHidden)
         XCTAssertEqual(controller.preferredStatusBarUpdateAnimation, .fade)
         XCTAssertTrue(controller.modalPresentationCapturesStatusBarAppearance)
@@ -252,14 +202,12 @@ final class MPVPlayerModelTests: XCTestCase {
         controller.setPlaybackRate(1.5)
         controller.setVideoQuality(.powerSaving)
         controller.setDebandEnabled(false)
-        controller.setInterpolationOptions(.highQuality)
         controller.setSubtitleDelay(90)
         controller.setSubtitleStyle(.highContrast)
 
         XCTAssertEqual(controller.playbackRate, 1.5)
         XCTAssertEqual(controller.videoQuality, .powerSaving)
         XCTAssertFalse(controller.debandEnabled)
-        XCTAssertEqual(controller.interpolationOptions, .highQuality)
         XCTAssertEqual(controller.subtitleDelay, 60)
         XCTAssertEqual(controller.subtitleStyle, .highContrast)
     }
@@ -382,10 +330,6 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(
             MPVQuickPlayerViewController.videoQualityTitle(.balanced, localization: "zh-Hans"),
             "均衡"
-        )
-        XCTAssertEqual(
-            MPVQuickPlayerViewController.interpolationTitle(.highQuality, localization: "en"),
-            "High Quality"
         )
         XCTAssertEqual(
             MPVQuickPlayerViewController.delayTitle(-0.5, localization: "en"),

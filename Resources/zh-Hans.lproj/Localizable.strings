@@ -26,8 +26,6 @@
 "settings.playback_speed.value" = "播放速度 · %@";
 "settings.video_quality" = "视频质量";
 "settings.video_quality.value" = "视频质量 · %@";
-"settings.frame_interpolation" = "帧插值";
-"settings.frame_interpolation.value" = "帧插值 · %@";
 "settings.enable_debanding" = "启用色带抑制";
 "settings.disable_debanding" = "关闭色带抑制";
 "settings.fit_video" = "适应画面";
@@ -36,10 +34,6 @@
 "quality.power_saver" = "节能";
 "quality.balanced" = "均衡";
 "quality.high" = "高质量";
-"interpolation.off" = "关闭";
-"interpolation.standard" = "标准";
-"interpolation.smooth" = "流畅";
-"interpolation.high" = "高质量";
 
 "subtitle.delay" = "字幕延迟";
 "subtitle.delay.value" = "字幕延迟 · %@";

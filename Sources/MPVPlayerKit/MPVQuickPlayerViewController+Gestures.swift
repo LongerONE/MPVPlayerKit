@@ -168,19 +168,6 @@ extension MPVQuickPlayerViewController {
         return localizedTitle(key, localization: localization)
     }
 
-    static func interpolationTitle(
-        _ quality: MPVInterpolationQuality,
-        localization: String? = nil
-    ) -> String {
-        let key = switch quality {
-        case .off: "interpolation.off"
-        case .standard: "interpolation.standard"
-        case .smooth: "interpolation.smooth"
-        case .highQuality: "interpolation.high"
-        }
-        return localizedTitle(key, localization: localization)
-    }
-
     static func delayTitle(
         _ delay: TimeInterval,
         localization: String? = nil

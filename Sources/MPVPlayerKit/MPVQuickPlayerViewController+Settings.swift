@@ -11,9 +11,6 @@ extension MPVQuickPlayerViewController {
             .init(title: mpvLocalized("settings.video_quality.value", Self.videoQualityTitle(videoQuality))) {
                 [weak self] in self?.presentAfterCurrentSheet { $0.showVideoQualityPicker() }
             },
-            .init(title: mpvLocalized("settings.frame_interpolation.value", Self.interpolationTitle(interpolationOptions.quality))) {
-                [weak self] in self?.presentAfterCurrentSheet { $0.showInterpolationPicker() }
-            },
         ]
         let debandTitle = mpvLocalized(
             debandEnabled ? "settings.disable_debanding" : "settings.enable_debanding"
@@ -57,18 +54,7 @@ extension MPVQuickPlayerViewController {
 
     public func setDebandEnabled(_ enabled: Bool) {
         debandEnabled = enabled
-        player.updateVideoRenderOptions(
-            debandEnabled: enabled,
-            interpolationOptions: interpolationOptions
-        )
-    }
-
-    public func setInterpolationOptions(_ options: MPVInterpolationOptions) {
-        interpolationOptions = options
-        player.updateVideoRenderOptions(
-            debandEnabled: debandEnabled,
-            interpolationOptions: options
-        )
+        player.updateVideoRenderOptions(debandEnabled: enabled)
     }
 
     public func setSubtitleDelay(_ delay: TimeInterval) {
@@ -108,25 +94,6 @@ extension MPVQuickPlayerViewController {
         }
         presentActionSheet(
             title: mpvLocalized("settings.video_quality"),
-            sourceView: settingsButton,
-            options: options,
-            cancelTitle: mpvLocalized("common.cancel")
-        )
-    }
-
-    func showInterpolationPicker() {
-        let options = MPVInterpolationQuality.allCases.map { quality in
-            let marker = quality == interpolationOptions.quality ? "✓ " : ""
-            return MPVQuickPlayerActionSheetOption(
-                title: marker + Self.interpolationTitle(quality),
-                action: { [weak self] in
-                guard let self else { return }
-                setInterpolationOptions(MPVInterpolationOptions(quality: quality))
-                }
-            )
-        }
-        presentActionSheet(
-            title: mpvLocalized("settings.frame_interpolation"),
             sourceView: settingsButton,
             options: options,
             cancelTitle: mpvLocalized("common.cancel")

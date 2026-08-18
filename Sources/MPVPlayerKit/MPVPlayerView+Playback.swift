@@ -190,11 +190,9 @@ extension MPVPlayerView {
 
     @objc public func updateVideoRenderOptions(_ options: NSDictionary) {
         let debandEnabled = boolValue(options["debandEnabled"])
-        let interpolationOptions = MPVInterpolationOptions(bridgeDictionary: options)
         queue.async { [weak self] in
             guard let self else { return }
             self.debandEnabled = debandEnabled
-            self.interpolationOptions = interpolationOptions
             guard self.mpv != nil else { return }
             self.applyVideoRenderProperties()
         }

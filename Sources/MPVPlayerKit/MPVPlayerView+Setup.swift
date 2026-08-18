@@ -130,31 +130,14 @@ extension MPVPlayerView {
     }
 
     nonisolated var videoRenderOptions: [(String, String)] {
-        var options = [
-            ("deband", debandEnabled ? "yes" : "no"),
-            ("interpolation", interpolationOptions.quality == .off ? "no" : "yes"),
-            ("video-sync", interpolationOptions.quality == .off ? "audio" : "display-resample"),
-            ("tscale", interpolationOptions.temporalScaler.rawValue),
-            ("interpolation-threshold", String(interpolationOptions.threshold)),
-            ("tscale-clamp", String(interpolationOptions.clamp)),
-            ("tscale-antiring", String(interpolationOptions.antiring)),
-        ]
-        if let blur = interpolationOptions.blur {
-            options.append(("tscale-blur", String(blur)))
-        }
-        if let radius = interpolationOptions.radius {
-            options.append(("tscale-radius", String(radius)))
-        }
-        return options
+        [("deband", debandEnabled ? "yes" : "no")]
     }
 
     nonisolated func applyVideoRenderProperties() {
         videoRenderOptions.forEach { option in
             _ = command("set", args: [option.0, option.1], checkForErrors: false)
         }
-        mpvDebugLog(
-            "video render options updated deband=\(debandEnabled) interpolationQuality=\(interpolationOptions.quality) tscale=\(interpolationOptions.temporalScaler.rawValue)"
-        )
+        mpvDebugLog("video render options updated deband=\(debandEnabled)")
         logEffectiveVideoSettings(reason: "render-runtime")
     }
 
@@ -174,21 +157,13 @@ extension MPVPlayerView {
             "hdr-compute-peak",
             "allow-delayed-peak-detect",
             "deband",
-            "interpolation",
-            "video-sync",
-            "tscale",
-            "interpolation-threshold",
-            "tscale-blur",
-            "tscale-clamp",
-            "tscale-radius",
-            "tscale-antiring",
         ]
         let properties = propertyNames.map { name in
             "\(name)=\(getString(name) ?? "<unavailable>")"
         }
         .joined(separator: " ")
         mpvDebugLog(
-            "video settings effective reason=\(reason) requestedQuality=\(videoQualityPreset) requestedDeband=\(debandEnabled) requestedInterpolationQuality=\(interpolationOptions.quality) properties=[\(properties)]"
+            "video settings effective reason=\(reason) requestedQuality=\(videoQualityPreset) requestedDeband=\(debandEnabled) properties=[\(properties)]"
         )
     }
 

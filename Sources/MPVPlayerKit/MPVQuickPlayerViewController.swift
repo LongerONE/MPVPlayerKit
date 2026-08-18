@@ -26,7 +26,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public internal(set) var playbackRate = 1.0
     public internal(set) var videoQuality: MPVVideoQuality
     public internal(set) var debandEnabled: Bool
-    public internal(set) var interpolationOptions: MPVInterpolationOptions
     public internal(set) var subtitleDelay: TimeInterval = 0
     public internal(set) var subtitleStyle = MPVSubtitleStyle.defaultStyle
 
@@ -100,7 +99,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
         isUsingManualLandscape = forceLandscape && Self.applicationSupportsLandscape == false
         videoQuality = configuration.videoQuality
         debandEnabled = configuration.debandEnabled
-        interpolationOptions = configuration.interpolationOptions
         super.init(nibName: nil, bundle: nil)
         modalPresentationCapturesStatusBarAppearance = true
         player.delegate = self
