@@ -81,8 +81,10 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(powerSaving["scaler-resizes-only"], "yes")
         XCTAssertEqual(powerSaving["linear-downscaling"], "no")
         XCTAssertEqual(powerSaving["dither"], "no")
-        XCTAssertEqual(powerSaving["hdr-compute-peak"], "no")
         XCTAssertEqual(powerSaving["interpolation"], "no")
+        XCTAssertEqual(powerSaving["allow-delayed-peak-detect"], "no")
+        XCTAssertEqual(powerSaving["sigmoid-upscaling"], "no")
+        XCTAssertEqual(powerSaving["hdr-compute-peak"], "no")
 
         XCTAssertEqual(balanced["scale"], "lanczos")
         XCTAssertEqual(balanced["cscale"], "bilinear")
@@ -91,7 +93,8 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(balanced["correct-downscaling"], "no")
         XCTAssertEqual(balanced["linear-downscaling"], "no")
         XCTAssertEqual(balanced["hdr-compute-peak"], "no")
-        XCTAssertEqual(balanced["allow-delayed-peak-detect"], "yes")
+        XCTAssertEqual(balanced["allow-delayed-peak-detect"], "no")
+        XCTAssertEqual(balanced["sigmoid-upscaling"], "no")
         XCTAssertEqual(balanced["interpolation"], "no")
 
         XCTAssertEqual(highQuality["scale"], "ewa_lanczossharp")
@@ -100,8 +103,9 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(highQuality["scale-antiring"], "0.6")
         XCTAssertEqual(highQuality["cscale-antiring"], "0.6")
         XCTAssertEqual(highQuality["dscale-antiring"], "0.0")
-        XCTAssertEqual(highQuality["hdr-compute-peak"], "auto")
-        XCTAssertEqual(highQuality["allow-delayed-peak-detect"], "yes")
+        XCTAssertEqual(highQuality["hdr-compute-peak"], "no")
+        XCTAssertEqual(highQuality["allow-delayed-peak-detect"], "no")
+        XCTAssertEqual(highQuality["linear-downscaling"], "no")
         XCTAssertEqual(highQuality["interpolation"], "no")
 
         XCTAssertEqual(Set(powerSaving.keys), Set(balanced.keys))

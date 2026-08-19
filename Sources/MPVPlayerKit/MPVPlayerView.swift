@@ -121,7 +121,7 @@ enum MPVVideoQualityPreset: Int {
                 ("dither", "no"),
                 ("dither-depth", "no"),
                 ("hdr-compute-peak", "no"),
-                ("allow-delayed-peak-detect", "yes"),
+                ("allow-delayed-peak-detect", "no"),
                 ("interpolation", "no"),
             ]
         case .balanced:
@@ -139,7 +139,7 @@ enum MPVVideoQualityPreset: Int {
                 ("dither", "no"),
                 ("dither-depth", "auto"),
                 ("hdr-compute-peak", "no"),
-                ("allow-delayed-peak-detect", "yes"),
+                ("allow-delayed-peak-detect", "no"),
                 ("interpolation", "no"),
             ]
         case .highQuality:
@@ -156,12 +156,12 @@ enum MPVVideoQualityPreset: Int {
                 ("cscale-antiring", "0.6"),
                 ("dscale-antiring", "0.0"),
                 ("correct-downscaling", "yes"),
-                ("linear-downscaling", "yes"),
+                ("linear-downscaling", "no"),
                 ("sigmoid-upscaling", "yes"),
                 ("dither", "fruit"),
                 ("dither-depth", "auto"),
-                ("hdr-compute-peak", "auto"),
-                ("allow-delayed-peak-detect", "yes"),
+                ("hdr-compute-peak", "no"),
+                ("allow-delayed-peak-detect", "no"),
                 ("interpolation", "no"),
             ]
         }
