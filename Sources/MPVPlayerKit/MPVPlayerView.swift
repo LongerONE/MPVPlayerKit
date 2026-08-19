@@ -160,7 +160,7 @@ enum MPVVideoQualityPreset: Int {
                 ("sigmoid-upscaling", "yes"),
                 ("dither", "fruit"),
                 ("dither-depth", "auto"),
-                ("hdr-compute-peak", "no"),
+                ("hdr-compute-peak", "yes"),
                 ("allow-delayed-peak-detect", "no"),
                 ("interpolation", "no"),
             ]

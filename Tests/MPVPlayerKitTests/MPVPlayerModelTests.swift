@@ -103,7 +103,7 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(highQuality["scale-antiring"], "0.6")
         XCTAssertEqual(highQuality["cscale-antiring"], "0.6")
         XCTAssertEqual(highQuality["dscale-antiring"], "0.0")
-        XCTAssertEqual(highQuality["hdr-compute-peak"], "no")
+        XCTAssertEqual(highQuality["hdr-compute-peak"], "yes")
         XCTAssertEqual(highQuality["allow-delayed-peak-detect"], "no")
         XCTAssertEqual(highQuality["linear-downscaling"], "no")
         XCTAssertEqual(highQuality["interpolation"], "no")

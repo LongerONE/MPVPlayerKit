@@ -475,8 +475,27 @@ final class MPVPictureInPictureTests: XCTestCase {
     func testPictureInPictureRendererInvariantSnapshotSelectsSDREDRAndDolbyVisionProfiles() {
         let playerView = MPVPlayerView(frame: .zero)
 
+        playerView.videoQualityPreset = .highQuality
+        for usesExtendedDynamicRangeOutput in [false, true] {
+            playerView.usesExtendedDynamicRangeOutput = usesExtendedDynamicRangeOutput
+            let highQualityProfileOptions = playerView.makeSetupProfiles().map {
+                MPVPictureInPictureRendererInvariantSnapshot.optionMap($0.options)
+            }
+            XCTAssertFalse(highQualityProfileOptions.isEmpty)
+            XCTAssertTrue(highQualityProfileOptions.allSatisfy {
+                $0["hdr-compute-peak"] == "yes"
+            })
+        }
+
+        playerView.videoQualityPreset = .balanced
         playerView.usesExtendedDynamicRangeOutput = false
         playerView.isDolbyVisionPlayback = false
+        let balancedProfileOptions = playerView.makeSetupProfiles().map {
+            MPVPictureInPictureRendererInvariantSnapshot.optionMap($0.options)
+        }
+        XCTAssertTrue(balancedProfileOptions.allSatisfy {
+            $0["hdr-compute-peak"] == "no"
+        })
         XCTAssertRendererOptionsAndProfiles(
             playerView: playerView,
             expectedColorOptions: MPVPlayerView.sdrMetalVideoOutputOptions,
