@@ -16,17 +16,23 @@ func mpvPlayerWakeupCallback(_ context: UnsafeMutableRawPointer?) {
 }
 
 extension MPVPlayerView {
-    nonisolated static let deviceHardwareDecodeMethod = "videotoolbox-copy"
+    /// Keep decoded VideoToolbox surfaces on the GPU path first. The copy
+    /// profile remains available because some libmpv/MoltenVK combinations
+    /// cannot safely import the decoder surface for every HEVC/Dolby Vision
+    /// stream.
+    nonisolated static let deviceHardwareDecodeMethod = "videotoolbox"
+    nonisolated static let deviceCopyHardwareDecodeMethod = "videotoolbox-copy"
 
     nonisolated static func safeDecodeOptions(
         hardwareDecodeMethod: String
     ) -> [(String, String)] {
-        [
+        let directRendering = hardwareDecodeMethod == deviceHardwareDecodeMethod ? "auto" : "no"
+        return [
             ("hwdec", hardwareDecodeMethod),
-            // Vulkan enables decoder direct rendering by default. Keeping decoded
-            // frames in ordinary system memory prevents MoltenVK from observing a
-            // VideoToolbox/staging buffer deallocation before its command completes.
-            ("vd-lavc-dr", "no"),
+            // Direct VideoToolbox decoding avoids a 4K frame copy. The copy
+            // fallback explicitly disables direct rendering to keep the
+            // staging-buffer lifetime safe on older devices/builds.
+            ("vd-lavc-dr", directRendering),
         ]
     }
 
@@ -96,13 +102,22 @@ extension MPVPlayerView {
             return [softwareProfile]
         }
 
+        let directHardwareProfile = MPVSetupProfile(
+            name: "metal-videotoolbox",
+            options: metalVideoOutputOptions + Self.safeDecodeOptions(
+                hardwareDecodeMethod: hardwareDecode
+            )
+        )
+        let copyHardwareProfile = MPVSetupProfile(
+            name: "metal-videotoolbox-copy",
+            options: metalVideoOutputOptions + Self.safeDecodeOptions(
+                hardwareDecodeMethod: Self.deviceCopyHardwareDecodeMethod
+            )
+        )
+
         return [
-            MPVSetupProfile(
-                name: "metal-videotoolbox",
-                options: metalVideoOutputOptions + Self.safeDecodeOptions(
-                    hardwareDecodeMethod: hardwareDecode
-                )
-            ),
+            directHardwareProfile,
+            copyHardwareProfile,
             softwareProfile,
         ]
     }
@@ -146,6 +161,7 @@ extension MPVPlayerView {
             "scale",
             "cscale",
             "dscale",
+            "scaler-resizes-only",
             "scale-antiring",
             "cscale-antiring",
             "dscale-antiring",
@@ -156,6 +172,7 @@ extension MPVPlayerView {
             "dither-depth",
             "hdr-compute-peak",
             "allow-delayed-peak-detect",
+            "interpolation",
             "deband",
         ]
         let properties = propertyNames.map { name in

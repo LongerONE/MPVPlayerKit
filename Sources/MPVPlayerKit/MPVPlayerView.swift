@@ -111,6 +111,7 @@ enum MPVVideoQualityPreset: Int {
                 ("scale", "bilinear"),
                 ("cscale", "bilinear"),
                 ("dscale", "bilinear"),
+                ("scaler-resizes-only", "yes"),
                 ("scale-antiring", "0.0"),
                 ("cscale-antiring", "0.0"),
                 ("dscale-antiring", "0.0"),
@@ -121,14 +122,38 @@ enum MPVVideoQualityPreset: Int {
                 ("dither-depth", "no"),
                 ("hdr-compute-peak", "no"),
                 ("allow-delayed-peak-detect", "yes"),
+                ("interpolation", "no"),
             ]
         case .balanced:
             return [
                 ("scale", "lanczos"),
-                ("cscale", "lanczos"),
+                ("cscale", "bilinear"),
                 ("dscale", "mitchell"),
-                ("scale-antiring", "0.3"),
-                ("cscale-antiring", "0.3"),
+                ("scaler-resizes-only", "yes"),
+                ("scale-antiring", "0.0"),
+                ("cscale-antiring", "0.0"),
+                ("dscale-antiring", "0.0"),
+                ("correct-downscaling", "no"),
+                ("linear-downscaling", "no"),
+                ("sigmoid-upscaling", "no"),
+                ("dither", "no"),
+                ("dither-depth", "auto"),
+                ("hdr-compute-peak", "no"),
+                ("allow-delayed-peak-detect", "yes"),
+                ("interpolation", "no"),
+            ]
+        case .highQuality:
+            return [
+                ("scale", "ewa_lanczossharp"),
+                ("cscale", "ewa_lanczos"),
+                // 4K Dolby Vision is normally downscaled to the phone's
+                // display. Keep the high-quality EWA path for upscaling, but
+                // use Lanczos for downscaling so the costly path does not
+                // consume the frame budget on every frame.
+                ("dscale", "lanczos"),
+                ("scaler-resizes-only", "yes"),
+                ("scale-antiring", "0.6"),
+                ("cscale-antiring", "0.6"),
                 ("dscale-antiring", "0.0"),
                 ("correct-downscaling", "yes"),
                 ("linear-downscaling", "yes"),
@@ -136,23 +161,8 @@ enum MPVVideoQualityPreset: Int {
                 ("dither", "fruit"),
                 ("dither-depth", "auto"),
                 ("hdr-compute-peak", "auto"),
-                ("allow-delayed-peak-detect", "no"),
-            ]
-        case .highQuality:
-            return [
-                ("scale", "ewa_lanczossharp"),
-                ("cscale", "ewa_lanczos"),
-                ("dscale", "ewa_lanczos"),
-                ("scale-antiring", "0.6"),
-                ("cscale-antiring", "0.6"),
-                ("dscale-antiring", "0.6"),
-                ("correct-downscaling", "yes"),
-                ("linear-downscaling", "yes"),
-                ("sigmoid-upscaling", "yes"),
-                ("dither", "fruit"),
-                ("dither-depth", "auto"),
-                ("hdr-compute-peak", "auto"),
-                ("allow-delayed-peak-detect", "no"),
+                ("allow-delayed-peak-detect", "yes"),
+                ("interpolation", "no"),
             ]
         }
     }

@@ -78,23 +78,31 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(powerSaving["scale"], "bilinear")
         XCTAssertEqual(powerSaving["cscale"], "bilinear")
         XCTAssertEqual(powerSaving["dscale"], "bilinear")
+        XCTAssertEqual(powerSaving["scaler-resizes-only"], "yes")
         XCTAssertEqual(powerSaving["linear-downscaling"], "no")
         XCTAssertEqual(powerSaving["dither"], "no")
         XCTAssertEqual(powerSaving["hdr-compute-peak"], "no")
+        XCTAssertEqual(powerSaving["interpolation"], "no")
 
         XCTAssertEqual(balanced["scale"], "lanczos")
-        XCTAssertEqual(balanced["cscale"], "lanczos")
+        XCTAssertEqual(balanced["cscale"], "bilinear")
         XCTAssertEqual(balanced["dscale"], "mitchell")
-        XCTAssertEqual(balanced["scale-antiring"], "0.3")
-        XCTAssertEqual(balanced["linear-downscaling"], "yes")
-        XCTAssertEqual(balanced["dither-depth"], "auto")
+        XCTAssertEqual(balanced["scale-antiring"], "0.0")
+        XCTAssertEqual(balanced["correct-downscaling"], "no")
+        XCTAssertEqual(balanced["linear-downscaling"], "no")
+        XCTAssertEqual(balanced["hdr-compute-peak"], "no")
+        XCTAssertEqual(balanced["allow-delayed-peak-detect"], "yes")
+        XCTAssertEqual(balanced["interpolation"], "no")
 
         XCTAssertEqual(highQuality["scale"], "ewa_lanczossharp")
         XCTAssertEqual(highQuality["cscale"], "ewa_lanczos")
-        XCTAssertEqual(highQuality["dscale"], "ewa_lanczos")
+        XCTAssertEqual(highQuality["dscale"], "lanczos")
         XCTAssertEqual(highQuality["scale-antiring"], "0.6")
         XCTAssertEqual(highQuality["cscale-antiring"], "0.6")
-        XCTAssertEqual(highQuality["dscale-antiring"], "0.6")
+        XCTAssertEqual(highQuality["dscale-antiring"], "0.0")
+        XCTAssertEqual(highQuality["hdr-compute-peak"], "auto")
+        XCTAssertEqual(highQuality["allow-delayed-peak-detect"], "yes")
+        XCTAssertEqual(highQuality["interpolation"], "no")
 
         XCTAssertEqual(Set(powerSaving.keys), Set(balanced.keys))
         XCTAssertEqual(Set(balanced.keys), Set(highQuality.keys))
@@ -212,15 +220,32 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(controller.subtitleStyle, .highContrast)
     }
 
-    func testDeviceDecodeOwnsFramesUntilMoltenVKFinishesUsingThem() {
+    @MainActor
+    func testDeviceDecodePrefersDirectFramesAndKeepsCopyFallback() {
         let options = Dictionary(
             uniqueKeysWithValues: MPVPlayerView.safeDecodeOptions(
                 hardwareDecodeMethod: MPVPlayerView.deviceHardwareDecodeMethod
             )
         )
 
-        XCTAssertEqual(options["hwdec"], "videotoolbox-copy")
-        XCTAssertEqual(options["vd-lavc-dr"], "no")
+        XCTAssertEqual(options["hwdec"], "videotoolbox")
+        XCTAssertEqual(options["vd-lavc-dr"], "auto")
+
+        let playerView = MPVPlayerView(frame: .zero)
+        let profiles = playerView.makeSetupProfiles()
+        #if targetEnvironment(simulator)
+        XCTAssertEqual(profiles.map(\.name), ["metal-software"])
+        #else
+        XCTAssertEqual(profiles.map(\.name), [
+            "metal-videotoolbox",
+            "metal-videotoolbox-copy",
+            "metal-software",
+        ])
+        XCTAssertEqual(
+            Dictionary(uniqueKeysWithValues: profiles[1].options)["vd-lavc-dr"],
+            "no"
+        )
+        #endif
     }
 
     func testSubtitleStyleClampsNumericValuesAndBuildsBridgeDictionary() {
