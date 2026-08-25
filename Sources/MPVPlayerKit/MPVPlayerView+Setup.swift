@@ -126,16 +126,7 @@ extension MPVPlayerView {
         let outputMode = MPVColorMappingPolicy.outputMode(
             usesExtendedDynamicRangeOutput: usesExtendedDynamicRangeOutput
         )
-        var colorOptions = MPVColorMappingPolicy.options(for: outputMode)
-        if outputMode == .extendedDynamicRange,
-           let targetPeakNits = currentEDRTargetPeakNits() {
-            colorOptions.append(
-                (
-                    "target-peak",
-                    MPVColorMappingPolicy.targetPeakOptionValue(targetPeakNits)
-                )
-            )
-        }
+        let colorOptions = MPVColorMappingPolicy.options(for: outputMode)
         #if targetEnvironment(simulator)
         return colorOptions + [
             ("gpu-dumb-mode", "yes"),
