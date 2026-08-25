@@ -523,8 +523,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
         guard player.isPictureInPictureSupported else { return false }
         do {
             try activateAudioSession()
-            // PiP is deliberately started only from the explicit control below.
-            player.allowsAutomaticPictureInPictureFromInline = false
+            // The player view keeps automatic PiP disabled by default. Do not
+            // set it again here: changing this property tears down an inactive
+            // controller that may already have been prepared by the view's
+            // window lifecycle, so the explicit start can become a no-op.
             return true
         } catch {
             return false
