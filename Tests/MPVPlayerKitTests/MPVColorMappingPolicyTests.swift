@@ -18,6 +18,20 @@ final class MPVColorMappingPolicyTests: XCTestCase {
         )
     }
 
+    func testEDRHeadroomMapsToMPVTargetPeakUsingAppleReferenceWhite() {
+        XCTAssertEqual(
+            MPVColorMappingPolicy.targetPeakNits(forEDRHeadroom: 2.0),
+            200.0
+        )
+        XCTAssertNil(
+            MPVColorMappingPolicy.targetPeakNits(forEDRHeadroom: 1.0)
+        )
+        XCTAssertEqual(
+            MPVColorMappingPolicy.targetPeakOptionValue(267.0),
+            "267"
+        )
+    }
+
     func testDeferredActiveRendererModeIsAppliedByNextSetup() {
         var state = MPVColorOutputState(currentMode: .sdr)
 
@@ -64,8 +78,8 @@ final class MPVColorMappingPolicyTests: XCTestCase {
         XCTAssertEqual(options["vo"], "gpu-next")
         XCTAssertEqual(options["target-trc"], "linear")
         XCTAssertEqual(options["target-prim"], "bt.709")
-        XCTAssertEqual(options["target-colorspace-hint"], "yes")
-        XCTAssertEqual(options["target-colorspace-hint-mode"], "target")
+        XCTAssertNil(options["target-colorspace-hint"])
+        XCTAssertNil(options["target-colorspace-hint-mode"])
         XCTAssertEqual(options["hdr-compute-peak"], "auto")
         XCTAssertEqual(options["gamut-mapping-mode"], "auto")
         XCTAssertNil(options["tone-mapping"])

@@ -432,8 +432,8 @@ final class MPVPictureInPictureTests: XCTestCase {
             snapshot.metalLayerSuperlayerIdentifier,
             playerView.metalLayer.superlayer.map(ObjectIdentifier.init)
         )
-        XCTAssertEqual(edrOptions["target-colorspace-hint"], "yes")
-        XCTAssertEqual(edrOptions["target-colorspace-hint-mode"], "target")
+        XCTAssertNil(edrOptions["target-colorspace-hint"])
+        XCTAssertNil(edrOptions["target-colorspace-hint-mode"])
         XCTAssertEqual(edrOptions["target-trc"], "linear")
         XCTAssertEqual(edrOptions["target-prim"], "bt.709")
         XCTAssertEqual(edrOptions["sub-hdr-peak"], "100")
@@ -507,7 +507,7 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertRendererOptionsAndProfiles(
             playerView: playerView,
             expectedColorOptions: MPVPlayerView.edrMetalVideoOutputOptions,
-            expectedHintMode: "target"
+            expectedHintMode: nil
         )
 
         let regularEDROptions = playerView.metalVideoOutputOptions
@@ -515,7 +515,7 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertRendererOptionsAndProfiles(
             playerView: playerView,
             expectedColorOptions: MPVPlayerView.dolbyVisionEDRMetalVideoOutputOptions,
-            expectedHintMode: "target"
+            expectedHintMode: nil
         )
         XCTAssertEqual(
             MPVPictureInPictureRendererInvariantSnapshot.optionMap(
@@ -536,6 +536,8 @@ final class MPVPictureInPictureTests: XCTestCase {
         let snapshot = playerView.pictureInPictureRendererInvariantSnapshot()
         let expectedOptions = MPVPictureInPictureRendererInvariantSnapshot.optionMap(
             expectedColorOptions
+                + playerView.videoQualityPreset.options
+                + playerView.videoRenderOptions
         )
         let setupProfileOptionMaps = playerView.makeSetupProfiles().map {
             MPVPictureInPictureRendererInvariantSnapshot.optionMap($0.options)

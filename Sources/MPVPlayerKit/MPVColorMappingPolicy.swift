@@ -68,10 +68,28 @@ enum MPVContentColorHint: String, Sendable {
 /// not compose a Profile 7 FEL enhancement layer; this policy must not be read
 /// as adding FEL decoding support.
 struct MPVColorMappingPolicy {
+    /// Apple documents EDR headroom as a ratio over SDR white and uses a
+    /// 100-nit SDR reference white for its EDR reference-mode model. mpv's
+    /// target peak is expressed in absolute nits, so this is the bridge
+    /// between the two APIs for the linear EDR target used by this package.
+    static let edrReferenceWhiteNits = 100.0
+
     /// A headroom of exactly 1.0 is the SDR reference range. Only a finite
     /// value above it means the target display can present EDR content.
     static func supportsExtendedDynamicRange(potentialHeadroom: CGFloat) -> Bool {
         potentialHeadroom.isFinite && potentialHeadroom > 1.0
+    }
+
+    static func targetPeakNits(forEDRHeadroom headroom: CGFloat) -> Double? {
+        guard headroom.isFinite, headroom > 1.0 else { return nil }
+        return min(
+            max(Double(headroom) * edrReferenceWhiteNits, edrReferenceWhiteNits),
+            1_000_000.0
+        )
+    }
+
+    static func targetPeakOptionValue(_ targetPeakNits: Double) -> String {
+        String(Int(targetPeakNits.rounded()))
     }
 
     /// Renderer options that are independent of the display dynamic range.
@@ -87,8 +105,6 @@ struct MPVColorMappingPolicy {
     ]
 
     /// Keep libplacebo's automatic mapping and peak-detection behavior.
-    /// Target peak and contrast are intentionally omitted so the render target
-    /// and its defaults determine them.
     static let automaticColorMappingOptions: [(String, String)] = [
         ("hdr-compute-peak", "auto"),
         ("gamut-mapping-mode", "auto"),
@@ -100,19 +116,14 @@ struct MPVColorMappingPolicy {
             ("target-prim", "bt.709"),
         ]
 
-    /// Advertise the mapped render target rather than copying source metadata
-    /// to the swapchain. This lets gpu-next reshape every original HDR source,
-    /// including Dolby Vision, for the current EDR display target.
+    /// Match the Metal layer's extendedLinearSRGB target. The MoltenVK
+    /// context does not support mpv's swapchain colorspace hint option, so
+    /// color-space negotiation is intentionally left to CAMetalLayer.
     static let extendedDynamicRangeOutputOptions =
         commonRendererOptions + automaticColorMappingOptions + [
             ("fbo-format", "rgba16f"),
-            // MPV's target must match the Metal layer's extendedLinearSRGB
-            // colorspace. Leaving these as auto can fall back to source HDR
-            // metadata when the display target is unavailable to gpu-next.
             ("target-trc", "linear"),
             ("target-prim", "bt.709"),
-            ("target-colorspace-hint", "yes"),
-            ("target-colorspace-hint-mode", "target"),
         ]
 
     /// Dolby Vision deliberately shares the adaptive EDR policy. The named

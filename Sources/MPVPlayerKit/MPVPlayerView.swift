@@ -219,6 +219,7 @@ public final class MPVPlayerView: UIView {
     /// Shapes the Picture in Picture window, which hosts this view.
     var pictureInPictureVideoDisplaySize: CGSize = .zero
     var usesExtendedDynamicRangeOutput = false
+    nonisolated(unsafe) var edrTargetPeakNits: Double?
     let colorOutputStateLock = NSLock()
     nonisolated(unsafe) var colorOutputState = MPVColorOutputState()
     var url: URL?
@@ -343,6 +344,7 @@ public final class MPVPlayerView: UIView {
         super.init(frame: frame)
         queue.setSpecific(key: queueSpecificKey, value: ())
         setupLayer()
+        installColorOutputScreenObserver()
         clientSubtitleController.install(in: self)
     }
 
@@ -378,13 +380,51 @@ public final class MPVPlayerView: UIView {
         layer.addSublayer(metalLayer)
     }
 
+    private func installColorOutputScreenObserver() {
+        #if os(iOS) && !targetEnvironment(simulator)
+        if #available(iOS 16.0, *) {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(colorOutputScreenDidChange),
+                name: UIScreen.referenceDisplayModeStatusDidChangeNotification,
+                object: nil
+            )
+        }
+        #endif
+    }
+
+    @objc private func colorOutputScreenDidChange() {
+        if Thread.isMainThread {
+            refreshColorOutputForTargetScreen(
+                reason: "reference-display-mode-changed"
+            )
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.refreshColorOutputForTargetScreen(
+                    reason: "reference-display-mode-changed"
+                )
+            }
+        }
+    }
+
     func refreshColorOutputForTargetScreen(reason: String) {
         let desiredMode: MPVColorOutputMode
+        var targetPeakNits: Double?
         #if os(iOS) && !targetEnvironment(simulator)
         if #available(iOS 16.0, *), let targetScreen = window?.windowScene?.screen {
+            let potentialHeadroom = targetScreen.potentialEDRHeadroom
             desiredMode = MPVColorMappingPolicy.supportsExtendedDynamicRange(
-                potentialHeadroom: targetScreen.potentialEDRHeadroom
+                potentialHeadroom: potentialHeadroom
             ) ? .extendedDynamicRange : .sdr
+            if desiredMode == .extendedDynamicRange {
+                let currentHeadroom = targetScreen.currentEDRHeadroom
+                let effectiveHeadroom = currentHeadroom.isFinite && currentHeadroom > 1.0
+                    ? currentHeadroom
+                    : potentialHeadroom
+                targetPeakNits = MPVColorMappingPolicy.targetPeakNits(
+                    forEDRHeadroom: effectiveHeadroom
+                )
+            }
         } else {
             desiredMode = .sdr
         }
@@ -393,9 +433,26 @@ public final class MPVPlayerView: UIView {
         #endif
 
         colorOutputStateLock.lock()
+        let previousTargetPeakNits = edrTargetPeakNits
+        edrTargetPeakNits = targetPeakNits
         let modeToApply = colorOutputState.request(desiredMode)
         let pendingMode = colorOutputState.pendingMode
+        let shouldUpdateActiveTargetPeak = targetPeakNits != nil
+            && targetPeakNits != previousTargetPeakNits
+            && desiredMode == .extendedDynamicRange
+            && colorOutputState.currentMode == .extendedDynamicRange
+            && colorOutputState.rendererIsReserved
         colorOutputStateLock.unlock()
+
+        if shouldUpdateActiveTargetPeak, let targetPeakNits {
+            queue.async { [weak self] in
+                guard let self, self.mpv != nil else { return }
+                self.setDouble("target-peak", targetPeakNits)
+                mpvDebugLog(
+                    "color output target peak updated nits=\(targetPeakNits) reason=\(reason)"
+                )
+            }
+        }
 
         if let modeToApply {
             applyColorOutputMode(modeToApply, reason: reason)
@@ -434,6 +491,12 @@ public final class MPVPlayerView: UIView {
         colorOutputStateLock.unlock()
     }
 
+    nonisolated func currentEDRTargetPeakNits() -> Double? {
+        colorOutputStateLock.lock()
+        defer { colorOutputStateLock.unlock() }
+        return edrTargetPeakNits
+    }
+
     private func applyColorOutputMode(_ outputMode: MPVColorOutputMode, reason: String) {
         usesExtendedDynamicRangeOutput = outputMode == .extendedDynamicRange
         switch outputMode {
@@ -457,6 +520,7 @@ public final class MPVPlayerView: UIView {
     }
 
     deinit {
+        NotificationCenter.default.removeObserver(self)
         stop()
     }
 
