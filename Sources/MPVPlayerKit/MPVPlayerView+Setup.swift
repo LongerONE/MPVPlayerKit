@@ -340,26 +340,27 @@ extension MPVPlayerView {
     }
 
     func configureSystemSubtitleFont(for handle: OpaquePointer) {
-        guard let fontDirectory = systemSubtitleFontDirectory else {
-            mpvDebugLog("bundled subtitle font missing")
-            return
+        if let fontDirectory = systemSubtitleFontDirectory {
+            checkError(
+                mpv_set_option_string(handle, MPVProperty.subtitleFontProvider, "auto"),
+                operation: "set_option sub-font-provider=auto",
+                notifyOnFailure: false
+            )
+            checkError(
+                mpv_set_option_string(handle, "sub-fonts-dir", fontDirectory),
+                operation: "set_option sub-fonts-dir",
+                notifyOnFailure: false
+            )
+        } else {
+            mpvDebugLog("bundled subtitle font directory missing")
         }
+        let fontName = subtitleFontName(isBold: false)
         checkError(
-            mpv_set_option_string(handle, MPVProperty.subtitleFontProvider, "auto"),
-            operation: "set_option sub-font-provider=auto",
+            mpv_set_option_string(handle, MPVProperty.subtitleFont, fontName),
+            operation: "set_option sub-font=\(fontName)",
             notifyOnFailure: false
         )
-        checkError(
-            mpv_set_option_string(handle, "sub-fonts-dir", fontDirectory),
-            operation: "set_option sub-fonts-dir",
-            notifyOnFailure: false
-        )
-        checkError(
-            mpv_set_option_string(handle, MPVProperty.subtitleFont, MPVSubtitleFont.regular),
-            operation: "set_option sub-font=\(MPVSubtitleFont.regular)",
-            notifyOnFailure: false
-        )
-        mpvDebugLog("bundled subtitle fonts configured default=\(MPVSubtitleFont.regular)")
+        mpvDebugLog("subtitle font configured default=\(fontName)")
     }
 
     func ensureMPVReady() -> Bool {

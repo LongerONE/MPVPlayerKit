@@ -182,6 +182,7 @@ public final class MPVPlayerView: UIView {
     @objc public internal(set) var isPlaying = false
     @objc public internal(set) var duration: TimeInterval = 0.0
     @objc public internal(set) var currentTime: TimeInterval = 0.0
+    public internal(set) var currentSubtitleFontCapability: MPVSubtitleFontCapability = .noSubtitle
     /// Playback speed reported to the system playback controls and to the
     /// Picture in Picture timebase, so both advance at the rate of the video.
     @objc public internal(set) var playbackSpeed: Double = 1.0
@@ -233,6 +234,7 @@ public final class MPVPlayerView: UIView {
     // thread. `setupMPV` runs on `queue`; querying Bundle from there can trip
     // Swift's executor assertion in a Swift package build.
     nonisolated let systemSubtitleFontDirectory: String?
+    nonisolated(unsafe) var customSubtitleFontName: String?
     let contentModeSnapshotLock = NSLock()
     var contentModeSnapshot: MPVContentModeSnapshot = .fit
     nonisolated let mediaTracksCacheLock = NSLock()
@@ -497,6 +499,7 @@ public final class MPVPlayerView: UIView {
         currentTime = 0.0
         duration = 0.0
         isPlaying = false
+        currentSubtitleFontCapability = .noSubtitle
         playbackSpeed = 1.0
         let colorHint = MPVColorMappingPolicy.contentHint(
             isDolbyVisionPlayback: isDolbyVisionPlayback

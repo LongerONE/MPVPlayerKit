@@ -136,6 +136,33 @@ final class AppSubtitleRenderer: MPVSubtitleRenderer {
 player.useClientSubtitleRenderer(AppSubtitleRenderer())
 ```
 
+## Subtitle fonts
+
+Noto remains the default subtitle font bundled by MPVPlayerKit. Applications can
+register a local font file for the current player instance; the font is not
+added to the package:
+
+```swift
+try player.setSubtitleFont(from: fontFileURL)
+
+switch player.currentSubtitleFontCapability {
+case .noSubtitle:
+    break
+case .unsupported:
+    // Image subtitles such as SUP/PGS/VobSub cannot use a font.
+    break
+case .supported:
+    break
+}
+
+player.resetSubtitleFont()
+```
+
+`setSubtitleFont(from:)` throws `MPVSubtitleFontError` when the URL is not a
+local font file or registration fails. The same API and capability property are
+available through `MPVQuickPlayerViewController`; custom subtitle renderers can
+read `MPVSubtitleStyle.fontName` from their presentation.
+
 `MPVQuickPlayerViewController` uses the same pipeline through its public
 `player`, so its external SRT/VTT picker works without application-side subtitle
 layers.

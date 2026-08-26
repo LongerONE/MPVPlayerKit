@@ -485,6 +485,7 @@ extension MPVPlayerView {
         }
         return codec.contains("pgs")
             || codec.contains("hdmv")
+            || codec.contains("sup")
             || codec.contains("dvd_subtitle")
             || codec.contains("dvb_subtitle")
             || codec.contains("xsub")

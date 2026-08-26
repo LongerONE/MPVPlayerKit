@@ -41,6 +41,9 @@ public final class MPVPlayer: NSObject {
     public var isPictureInPictureActive: Bool {
         playbackView.isPictureInPictureActive
     }
+    public var currentSubtitleFontCapability: MPVSubtitleFontCapability {
+        playbackView.currentSubtitleFontCapability
+    }
     public var allowsAutomaticPictureInPictureFromInline: Bool {
         get { playbackView.allowsAutomaticPictureInPictureFromInline }
         set { playbackView.allowsAutomaticPictureInPictureFromInline = newValue }
@@ -131,6 +134,9 @@ public final class MPVPlayer: NSObject {
     }
 
     public func select(track: MPVMediaTrack) {
+        if track.type == .subtitle {
+            playbackView.currentSubtitleFontCapability = track.subtitleFontCapability
+        }
         playbackView.selectTrack([
             "trackID": NSNumber(value: track.id),
             "mediaType": track.type.rawValue,
@@ -223,6 +229,14 @@ public final class MPVPlayer: NSObject {
 
     public func updateSubtitleStyle(_ style: MPVSubtitleStyle) {
         playbackView.updateSubtitleStyle(style.bridgeDictionary)
+    }
+
+    public func setSubtitleFont(from url: URL) throws {
+        try playbackView.setSubtitleFont(from: url)
+    }
+
+    public func resetSubtitleFont() {
+        playbackView.resetSubtitleFont()
     }
 
     public func currentSubtitleText() -> String? {

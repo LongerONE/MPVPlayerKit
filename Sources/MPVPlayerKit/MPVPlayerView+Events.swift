@@ -150,6 +150,9 @@ extension MPVPlayerView {
                 preferringIDsNotIn: pending.trackIDsBeforeLoad
             )
             : nil
+        if subtitleID != nil {
+            refreshMediaTracksCache()
+        }
         let success = subtitleID.map { subtitleID in
             performSubtitleSelectionTransaction(
                 previous: pending.previousSelection,
@@ -160,6 +163,7 @@ extension MPVPlayerView {
         } ?? false
         if success, let subtitleID {
             loadedExternalSubtitleIDs[pending.url] = subtitleID
+            publishSubtitleFontCapability(for: subtitleID)
             activeExternalSubtitleActivation = ExternalSubtitleActivation(
                 selectionEpoch: pending.selectionEpoch,
                 subtitleID: subtitleID,

@@ -29,6 +29,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public internal(set) var subtitleDelay: TimeInterval = 0
     public internal(set) var subtitleStyle = MPVSubtitleStyle.defaultStyle
 
+    public var currentSubtitleFontCapability: MPVSubtitleFontCapability {
+        player.currentSubtitleFontCapability
+    }
+
     let contentView = UIView()
     let topBar = UIView()
     let closeButton = UIButton(type: .system)
@@ -114,6 +118,14 @@ public final class MPVQuickPlayerViewController: UIViewController {
             autoplay: autoplay,
             forceLandscape: forceLandscape
         )
+    }
+
+    public func setSubtitleFont(from url: URL) throws {
+        try player.setSubtitleFont(from: url)
+    }
+
+    public func resetSubtitleFont() {
+        player.resetSubtitleFont()
     }
 
     @available(*, unavailable)

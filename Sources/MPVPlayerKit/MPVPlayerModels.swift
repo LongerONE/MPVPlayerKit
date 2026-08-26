@@ -24,6 +24,7 @@ public enum MPVVideoQuality: Int, Sendable {
 
 public struct MPVSubtitleStyle: Equatable, Sendable {
     public var fontSize: Double
+    public var fontName: String?
     public var bold: Bool
     public var textColor: String
     public var outlineSize: Double
@@ -35,6 +36,7 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
 
     public init(
         fontSize: Double = 38,
+        fontName: String? = nil,
         bold: Bool = false,
         textColor: String = "#FFFFFFFF",
         outlineSize: Double = 0,
@@ -45,6 +47,7 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
         shadowColor: String = "#FF000000"
     ) {
         self.fontSize = fontSize.isFinite ? min(max(fontSize, 8), 120) : 38
+        self.fontName = fontName
         self.bold = bold
         self.textColor = textColor
         self.outlineSize = outlineSize.isFinite ? min(max(outlineSize, 0), 10) : 0
@@ -67,7 +70,7 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
     )
 
     var bridgeDictionary: NSDictionary {
-        [
+        var values: [String: Any] = [
             "fontSize": NSNumber(value: fontSize),
             "bold": NSNumber(value: bold),
             "textColor": textColor,
@@ -77,7 +80,11 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
             "backgroundColor": backgroundColor,
             "bottomOffset": NSNumber(value: bottomOffset),
             "shadowColor": shadowColor,
-        ] as NSDictionary
+        ]
+        if let fontName {
+            values["fontName"] = fontName
+        }
+        return values as NSDictionary
     }
 }
 
@@ -139,6 +146,11 @@ public struct MPVMediaTrack: Identifiable, Equatable, Sendable {
     public let bitRate: Int64
     public let isSelected: Bool
     public let isImageSubtitle: Bool
+
+    public var subtitleFontCapability: MPVSubtitleFontCapability {
+        guard type == .subtitle else { return .noSubtitle }
+        return isImageSubtitle ? .unsupported : .supported
+    }
 
     init?(dictionary: NSDictionary) {
         guard let id = (dictionary["trackID"] as? NSNumber)?.int32Value,

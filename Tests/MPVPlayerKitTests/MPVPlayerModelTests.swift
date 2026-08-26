@@ -143,6 +143,48 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertNil(track)
     }
 
+    func testSubtitleTrackExposesFontCapability() throws {
+        let textTrack = try XCTUnwrap(MPVMediaTrack(dictionary: [
+            "trackID": NSNumber(value: 2),
+            "mpvType": "sub",
+            "codec": "subrip",
+            "isImageSubtitle": NSNumber(value: false),
+        ] as NSDictionary))
+        let imageTrack = try XCTUnwrap(MPVMediaTrack(dictionary: [
+            "trackID": NSNumber(value: 3),
+            "mpvType": "sub",
+            "codec": "hdmv_pgs_subtitle",
+            "isImageSubtitle": NSNumber(value: true),
+        ] as NSDictionary))
+        let audioTrack = try XCTUnwrap(MPVMediaTrack(dictionary: [
+            "trackID": NSNumber(value: 4),
+            "mpvType": "audio",
+            "codec": "aac",
+            "isImageSubtitle": NSNumber(value: false),
+        ] as NSDictionary))
+
+        XCTAssertEqual(textTrack.subtitleFontCapability, .supported)
+        XCTAssertTrue(textTrack.subtitleFontCapability.canCustomize)
+        XCTAssertEqual(imageTrack.subtitleFontCapability, .unsupported)
+        XCTAssertFalse(imageTrack.subtitleFontCapability.canCustomize)
+        XCTAssertEqual(audioTrack.subtitleFontCapability, .noSubtitle)
+    }
+
+    func testSubtitleFontRegistrationRejectsNonFileURLAndMissingFile() {
+        XCTAssertThrowsError(
+            try MPVSubtitleFontRegistry.registerFont(from: URL(string: "https://example.com/font.ttf")!)
+        ) { error in
+            XCTAssertEqual(error as? MPVSubtitleFontError, .fileURLRequired)
+        }
+        XCTAssertThrowsError(
+            try MPVSubtitleFontRegistry.registerFont(
+                from: URL(fileURLWithPath: "/tmp/mpv-player-kit-missing-font.ttf")
+            )
+        ) { error in
+            XCTAssertEqual(error as? MPVSubtitleFontError, .fileNotFound)
+        }
+    }
+
     func testQuickPlayerSeekGestureUsesStableDurationRelativeSensitivity() {
         XCTAssertEqual(
             MPVQuickPlayerViewController.seekTimeDelta(

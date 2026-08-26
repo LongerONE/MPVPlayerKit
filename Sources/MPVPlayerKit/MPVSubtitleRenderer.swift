@@ -55,9 +55,7 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
         let hostBounds = view.superview?.bounds ?? view.bounds
         let widthScale = max(hostBounds.width, 320) / 1080
         let fontSize = max(8, CGFloat(style.fontSize) * widthScale)
-        let font = style.bold
-            ? UIFont.systemFont(ofSize: fontSize, weight: .heavy)
-            : UIFont.systemFont(ofSize: fontSize)
+        let font = subtitleFont(named: style.fontName, size: fontSize, bold: style.bold)
         let outlineSize = max(0, CGFloat(style.outlineSize) * widthScale)
         let strokeWidth = outlineSize > 0 ? -(outlineSize / fontSize * 100) : 0
         label.attributedText = NSAttributedString(string: text, attributes: [
@@ -87,6 +85,19 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
 
     private func updateBottomOffset(_ offset: Double) {
         bottomConstraint.constant = -CGFloat(offset)
+    }
+
+    private func subtitleFont(named name: String?, size: CGFloat, bold: Bool) -> UIFont {
+        guard let name, let baseFont = UIFont(name: name, size: size) else {
+            return bold
+                ? UIFont.systemFont(ofSize: size, weight: .heavy)
+                : UIFont.systemFont(ofSize: size)
+        }
+        guard bold,
+              let descriptor = baseFont.fontDescriptor.withSymbolicTraits(.traitBold) else {
+            return baseFont
+        }
+        return UIFont(descriptor: descriptor, size: size)
     }
 }
 

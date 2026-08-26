@@ -9,6 +9,18 @@ final class MPVSubtitleStyleTests: XCTestCase {
         XCTAssertEqual(MPVSubtitleFont.bold, "NotoSansCJKjp-Bold")
     }
 
+    func testImageSubtitleCodecRecognizesSUP() {
+        XCTAssertTrue(MPVPlayerView.isImageSubtitleCodec("sup"))
+        XCTAssertTrue(MPVPlayerView.isImageSubtitleCodec("hdmv_pgs_subtitle"))
+        XCTAssertFalse(MPVPlayerView.isImageSubtitleCodec("subrip"))
+    }
+
+    func testSubtitleStyleCarriesCustomFontName() {
+        let style = MPVSubtitleStyle(fontName: "Example-Regular")
+        XCTAssertEqual(style.fontName, "Example-Regular")
+        XCTAssertEqual(style.bridgeDictionary["fontName"] as? String, "Example-Regular")
+    }
+
     func testSubtitleStyleResolvesShadowColorForCurrentAndLegacyDictionaries() {
         XCTAssertEqual(
             MPVPlayerView.subtitleShadowColor(

@@ -12,6 +12,7 @@ extension MPVPlayerView {
     public func selectClientSubtitle(_ document: MPVSubtitleDocument?) {
         clientSubtitleController.select(document)
         clientSubtitleController.update(at: currentTime, force: true)
+        currentSubtitleFontCapability = document == nil ? .noSubtitle : .supported
         guard document != nil else { return }
         queue.async { [weak self] in
             guard let self, self.mpv != nil else { return }

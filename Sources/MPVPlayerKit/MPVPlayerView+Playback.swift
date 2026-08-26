@@ -355,8 +355,10 @@ extension MPVPlayerView {
         let shadowOffset = (options["shadowOffset"] as? NSNumber)?.doubleValue ?? 0
         let shadowColor = Self.subtitleShadowColor(from: options, shadowOffset: shadowOffset)
         let isBold = boolValue(options["bold"])
+        let fontName = options["fontName"] as? String ?? subtitleFontName(isBold: isBold)
         applyClientSubtitleStyle(MPVSubtitleStyle(
             fontSize: (options["fontSize"] as? NSNumber)?.doubleValue ?? 38,
+            fontName: fontName,
             bold: isBold,
             textColor: options["textColor"] as? String ?? "#FFFFFFFF",
             outlineSize: (options["outlineSize"] as? NSNumber)?.doubleValue ?? 0,
@@ -367,7 +369,7 @@ extension MPVPlayerView {
             shadowColor: shadowColor
         ))
         let values = [
-            MPVProperty.subtitleFont: MPVSubtitleFont.name(isBold: isBold),
+            MPVProperty.subtitleFont: fontName,
             MPVProperty.subtitleFontSize: decimalString(options["fontSize"], fallback: 38),
             MPVProperty.subtitleBold: isBold ? "yes" : "no",
             MPVProperty.subtitleColor: options["textColor"] as? String ?? "#FFFFFFFF",
