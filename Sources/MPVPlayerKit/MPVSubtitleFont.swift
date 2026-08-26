@@ -71,9 +71,30 @@ extension MPVPlayerView {
         applySubtitleFontConfiguration()
     }
 
+    /// Objective-C bridge used by hosts that embed `MPVPlayerView` directly.
+    /// The Swift API above remains the throwing public interface.
+    @objc public func setSubtitleFontFromURL(_ options: NSDictionary) -> NSString? {
+        guard let urlString = options["url"] as? String,
+              let url = URL(string: urlString) else {
+            return nil
+        }
+
+        do {
+            try setSubtitleFont(from: url)
+            return customSubtitleFontName as NSString?
+        } catch {
+            mpvDebugLog("subtitle font bridge registration failed error=\(error.localizedDescription)")
+            return nil
+        }
+    }
+
     public func resetSubtitleFont() {
         customSubtitleFontName = nil
         applySubtitleFontConfiguration()
+    }
+
+    @objc public func resetSubtitleFontFromBridge() {
+        resetSubtitleFont()
     }
 
     nonisolated func selectedSubtitleFontCapability(for trackID: Int64?) -> MPVSubtitleFontCapability {
