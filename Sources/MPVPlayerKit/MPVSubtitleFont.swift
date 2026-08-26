@@ -48,6 +48,12 @@ enum MPVSubtitleFontRegistry {
               postScriptName.isEmpty == false else {
             throw MPVSubtitleFontError.invalidFontFile
         }
+        let font = CTFontCreateWithFontDescriptor(descriptor, 12, nil)
+        // libass resolves mpv's sub-font as a family; keep PostScript only for UIKit validation.
+        let familyName = CTFontCopyFamilyName(font) as String
+        guard familyName.isEmpty == false else {
+            throw MPVSubtitleFontError.invalidFontFile
+        }
 
         var registrationError: Unmanaged<CFError>?
         let registered = CTFontManagerRegisterFontsForURL(
@@ -56,11 +62,13 @@ enum MPVSubtitleFontRegistry {
             &registrationError
         )
         let registrationReason = registrationError?.takeRetainedValue().localizedDescription
-        if registered == false, UIFont(name: postScriptName, size: 12) == nil {
+        if registered == false,
+           UIFont(name: postScriptName, size: 12) == nil,
+           UIFont(name: familyName, size: 12) == nil {
             let reason = registrationReason ?? "The font is not available after registration."
             throw MPVSubtitleFontError.registrationFailed(reason)
         }
-        return postScriptName
+        return familyName
     }
 }
 
