@@ -25,9 +25,9 @@ public enum MPVVideoQuality: Int, Sendable {
 /// Runtime cache settings shared by the MPV player and quick-player UI.
 public struct MPVCacheConfiguration: Equatable, Sendable {
     /// Supported cache durations in seconds.
-    public static let availableDurations: [TimeInterval] = [10, 30, 60, 300, 1800]
+    public static let availableDurations: [TimeInterval] = [10, 30, 60, 120]
     /// The default cache duration in seconds.
-    public static let defaultDuration: TimeInterval = 60
+    public static let defaultDuration: TimeInterval = 30
 
     public var isEnabled: Bool
     public var duration: TimeInterval {

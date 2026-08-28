@@ -195,7 +195,7 @@ It also supports full-screen pan gestures: horizontal seeking, brightness on the
 playerViewController.gestureOptions = [.seeking, .volume]
 ```
 
-Settings can also be changed programmatically through `setPlaybackRate`, `setVideoQuality`, `setDebandEnabled`, `setCacheConfiguration`, `setSubtitleDelay`, and `setSubtitleStyle`. `MPVCacheConfiguration` supports 10, 30, 60, 300, and 1800 second cache durations; disk cache uses `Documents/.videoCache`. The quick player's cache settings are persisted as app-local global preferences. The underlying `player` remains public for direct access to every `MPVPlayer` operation.
+Settings can also be changed programmatically through `setPlaybackRate`, `setVideoQuality`, `setDebandEnabled`, `setCacheConfiguration`, `setSubtitleDelay`, and `setSubtitleStyle`. `MPVCacheConfiguration` supports 10, 30, 60, and 120 second cache durations; disk cache uses `Documents/.videoCache`. The quick player's cache settings are persisted as app-local global preferences. The underlying `player` remains public for direct access to every `MPVPlayer` operation.
 
 It is optional; `MPVPlayer` does not depend on it at runtime.
 

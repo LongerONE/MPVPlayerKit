@@ -265,8 +265,8 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
         case 10: return mpvLocalized("cache.duration.10")
         case 30: return mpvLocalized("cache.duration.30")
         case 60: return mpvLocalized("cache.duration.60")
-        case 300: return mpvLocalized("cache.duration.300")
-        default: return mpvLocalized("cache.duration.1800")
+        case 120: return mpvLocalized("cache.duration.120")
+        default: return mpvLocalized("cache.duration.30")
         }
     }
 

@@ -71,6 +71,9 @@ final class MPVPlayerModelTests: XCTestCase {
     }
 
     func testCacheConfigurationNormalizesSupportedDurationsAndBridgeValues() {
+        XCTAssertEqual(MPVCacheConfiguration.availableDurations, [10, 30, 60, 120])
+        XCTAssertEqual(MPVCacheConfiguration().duration, 30)
+
         var cache = MPVCacheConfiguration(
             isEnabled: false,
             duration: 70,
@@ -79,14 +82,14 @@ final class MPVPlayerModelTests: XCTestCase {
 
         XCTAssertEqual(cache.duration, 60)
         cache.duration = 1_000
-        XCTAssertEqual(cache.duration, 1_800)
+        XCTAssertEqual(cache.duration, 120)
         XCTAssertEqual(
             cache.bridgeDictionary["cacheEnabled"] as? NSNumber,
             NSNumber(value: false)
         )
         XCTAssertEqual(
             cache.bridgeDictionary["cacheDuration"] as? NSNumber,
-            NSNumber(value: 1_800)
+            NSNumber(value: 120)
         )
         XCTAssertEqual(
             cache.bridgeDictionary["cacheOnDisk"] as? NSNumber,
