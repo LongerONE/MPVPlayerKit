@@ -10,8 +10,7 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
     private let contentStack = UIStackView()
     private let cacheSwitch = UISwitch()
     private let diskSwitch = UISwitch()
-    private let durationStack = UIStackView()
-    private let directoryLabel = UILabel()
+    private let durationButton = UIButton(type: .system)
     private let cancelButton = UIButton(type: .system)
     private let safeAreaGuide = UILayoutGuide()
     private var safeAreaLeadingConstraint: NSLayoutConstraint!
@@ -20,12 +19,12 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
     private var safeAreaBottomConstraint: NSLayoutConstraint!
     private var cardHeightConstraint: NSLayoutConstraint!
     private var configuration: MPVCacheConfiguration
-    private var durationButtons: [UIButton] = []
 
     private static let cardWidth: CGFloat = 320
-    private static let cardHeight: CGFloat = 430
+    private static let cardHeight: CGFloat = 300
 
     var onChange: ((MPVCacheConfiguration) -> Void)?
+    var onDurationTap: ((UIView) -> Void)?
     var onDismiss: (() -> Void)?
 
     init(configuration: MPVCacheConfiguration) {
@@ -68,18 +67,11 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
         cacheSwitch.isOn = configuration.isEnabled
         diskSwitch.isOn = configuration.isDiskCacheEnabled
         let isEnabled = configuration.isEnabled
-        durationStack.isUserInteractionEnabled = isEnabled
-        durationStack.alpha = isEnabled ? 1 : 0.45
+        durationButton.isEnabled = isEnabled
+        durationButton.alpha = isEnabled ? 1 : 0.45
+        durationButton.setTitle(Self.durationTitle(for: configuration.duration), for: .normal)
+        durationButton.accessibilityValue = Self.durationTitle(for: configuration.duration)
         diskSwitch.isEnabled = isEnabled
-        directoryLabel.alpha = isEnabled && configuration.isDiskCacheEnabled ? 1 : 0.45
-        durationButtons.forEach { button in
-            let duration = button.tag == 0 ? 10.0 : button.tag == 1 ? 30.0 : button.tag == 2 ? 60.0 : button.tag == 3 ? 300.0 : 1800.0
-            button.isEnabled = isEnabled
-            let image = abs(duration - configuration.duration) < 0.001
-                ? UIImage(systemName: "checkmark")
-                : nil
-            button.setImage(image, for: .normal)
-        }
     }
 
     func dismiss(animated: Bool) {
@@ -140,47 +132,21 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
 
         configureSwitch(cacheSwitch, title: "cache.enabled")
         configureSwitch(diskSwitch, title: "cache.disk")
-        directoryLabel.text = mpvLocalized("cache.directory")
-        directoryLabel.font = .preferredFont(forTextStyle: .caption1)
-        directoryLabel.adjustsFontForContentSizeCategory = true
-        directoryLabel.textColor = .secondaryLabel
-        directoryLabel.numberOfLines = 0
-
-        let durationHeading = UILabel()
-        durationHeading.text = mpvLocalized("cache.duration")
-        durationHeading.font = .preferredFont(forTextStyle: .body)
-        durationHeading.adjustsFontForContentSizeCategory = true
-        durationHeading.textColor = .label
-
-        durationStack.axis = .vertical
-        durationStack.spacing = 2
-        durationStack.alignment = .fill
-        MPVCacheConfiguration.availableDurations.enumerated().forEach { index, duration in
-            let button = UIButton(type: .system)
-            button.tag = index
-            button.contentHorizontalAlignment = .left
-            button.contentEdgeInsets = UIEdgeInsets(top: 8, left: 12, bottom: 8, right: 12)
-            button.titleLabel?.font = .preferredFont(forTextStyle: .body)
-            button.titleLabel?.adjustsFontForContentSizeCategory = true
-            button.setTitle(self.durationTitle(for: duration), for: .normal)
-            button.setTitleColor(.label, for: .normal)
-            button.tintColor = .label
-            button.accessibilityIdentifier = "MPVQuickPlayer.cacheDuration.\(Int(duration))"
-            button.addTarget(self, action: #selector(durationChanged(_:)), for: .touchUpInside)
-            durationStack.addArrangedSubview(button)
-            durationButtons.append(button)
-        }
+        durationButton.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        durationButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        durationButton.setTitleColor(.label, for: .normal)
+        durationButton.tintColor = .label
+        durationButton.accessibilityIdentifier = "MPVQuickPlayer.cacheDuration"
+        durationButton.addTarget(self, action: #selector(durationTapped(_:)), for: .touchUpInside)
 
         contentStack.axis = .vertical
         contentStack.spacing = 14
         contentStack.alignment = .fill
         contentStack.addArrangedSubview(makeSwitchRow(title: mpvLocalized("cache.enabled"), switchView: cacheSwitch))
-        contentStack.addArrangedSubview(durationHeading)
-        contentStack.addArrangedSubview(durationStack)
+        contentStack.addArrangedSubview(makeDurationRow())
         contentStack.addArrangedSubview(makeSwitchRow(title: mpvLocalized("cache.disk"), switchView: diskSwitch))
-        contentStack.addArrangedSubview(directoryLabel)
 
-        scrollView.showsVerticalScrollIndicator = true
+        scrollView.showsVerticalScrollIndicator = false
         scrollView.alwaysBounceVertical = false
         scrollView.contentInsetAdjustmentBehavior = .never
         effectView.contentView.addSubview(scrollView)
@@ -271,7 +237,30 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
         return row
     }
 
-    private func durationTitle(for duration: TimeInterval) -> String {
+    private func makeDurationRow() -> UIView {
+        let row = UIView()
+        let label = UILabel()
+        label.text = mpvLocalized("cache.duration")
+        label.font = .preferredFont(forTextStyle: .body)
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = .label
+        row.addSubview(label)
+        row.addSubview(durationButton)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        durationButton.translatesAutoresizingMaskIntoConstraints = false
+        durationButton.contentHorizontalAlignment = .right
+        NSLayoutConstraint.activate([
+            row.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            label.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+            label.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            durationButton.leadingAnchor.constraint(greaterThanOrEqualTo: label.trailingAnchor, constant: 12),
+            durationButton.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            durationButton.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+        ])
+        return row
+    }
+
+    static func durationTitle(for duration: TimeInterval) -> String {
         switch duration {
         case 10: return mpvLocalized("cache.duration.10")
         case 30: return mpvLocalized("cache.duration.30")
@@ -293,11 +282,8 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
         onChange?(updated)
     }
 
-    @objc private func durationChanged(_ sender: UIButton) {
-        guard MPVCacheConfiguration.availableDurations.indices.contains(sender.tag) else { return }
-        var updated = configuration
-        updated.duration = MPVCacheConfiguration.availableDurations[sender.tag]
-        onChange?(updated)
+    @objc private func durationTapped(_ sender: UIButton) {
+        onDurationTap?(sender)
     }
 
     @objc private func cancel() {

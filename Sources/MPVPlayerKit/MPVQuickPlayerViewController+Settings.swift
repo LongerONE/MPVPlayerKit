@@ -75,11 +75,38 @@ extension MPVQuickPlayerViewController {
             self?.setCacheConfiguration(configuration)
             settingsView?.update(configuration: configuration)
         }
+        settingsView.onDurationTap = { [weak self, weak settingsView] sourceView in
+            self?.showCacheDurationPicker(from: sourceView, settingsView: settingsView)
+        }
         settingsView.onDismiss = { [weak self, weak settingsView] in
             guard let self, cacheSettingsOverlay === settingsView else { return }
             cacheSettingsOverlay = nil
         }
         presentCacheSettingsOverlay(settingsView)
+    }
+
+    private func showCacheDurationPicker(
+        from sourceView: UIView,
+        settingsView: MPVQuickPlayerCacheSettingsView?
+    ) {
+        let options = MPVCacheConfiguration.availableDurations.map { duration in
+            MPVQuickPlayerActionSheetOption(
+                title: MPVQuickPlayerCacheSettingsView.durationTitle(for: duration),
+                isSelected: abs(duration - cacheConfiguration.duration) < 0.001
+            ) { [weak self, weak settingsView] in
+                guard let self else { return }
+                var configuration = cacheConfiguration
+                configuration.duration = duration
+                setCacheConfiguration(configuration)
+                settingsView?.update(configuration: configuration)
+            }
+        }
+        presentActionSheet(
+            title: mpvLocalized("cache.duration"),
+            sourceView: sourceView,
+            options: options,
+            cancelTitle: mpvLocalized("common.cancel")
+        )
     }
 
     public func setSubtitleDelay(_ delay: TimeInterval) {

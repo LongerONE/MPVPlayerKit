@@ -209,7 +209,7 @@ final class MPVQuickPlayerMenuView: UIView {
 
         tableView.backgroundColor = .clear
         tableView.alwaysBounceVertical = false
-        tableView.showsVerticalScrollIndicator = true
+        tableView.showsVerticalScrollIndicator = false
         tableView.contentInsetAdjustmentBehavior = .never
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
         tableView.estimatedRowHeight = 54
