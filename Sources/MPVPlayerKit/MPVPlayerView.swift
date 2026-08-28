@@ -270,6 +270,7 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var videoQualityPreset = MPVVideoQualityPreset.balanced
     nonisolated(unsafe) var debandEnabled = false
     nonisolated(unsafe) var cacheConfiguration = MPVCacheConfiguration.default
+    nonisolated(unsafe) var persistentCacheContext: MPVPersistentVideoCacheContext?
     nonisolated(unsafe) var subtitleDelayValue = 0.0
     let clientSubtitleController = MPVSubtitlePresentationController()
     nonisolated(unsafe) var subtitleStyleValues: [String: String] = [
