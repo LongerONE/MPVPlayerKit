@@ -57,7 +57,7 @@ final class MPVPersistentVideoCacheContext: @unchecked Sendable {
         stateLock.unlock()
     }
 
-    private static func makeCacheKey(
+    static func makeCacheKey(
         sourceURL: URL,
         headers: [String: String],
         userAgent: String?
