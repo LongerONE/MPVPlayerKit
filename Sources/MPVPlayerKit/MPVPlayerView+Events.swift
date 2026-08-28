@@ -50,6 +50,7 @@ extension MPVPlayerView {
 
     nonisolated func publishTime() {
         guard let snapshot = readMPVTimeSnapshot() else { return }
+        logCacheRuntimeStateIfNeeded(currentTime: snapshot.currentTime)
         notifyOnMain {
             guard self.mpv != nil else { return }
             self.applyMPVTimeSnapshot(snapshot)

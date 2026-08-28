@@ -22,6 +22,13 @@ extension MPVPlayerView {
     /// stream.
     nonisolated static let deviceHardwareDecodeMethod = "videotoolbox"
     nonisolated static let deviceCopyHardwareDecodeMethod = "videotoolbox-copy"
+    /// A hard safety cap for demuxer packet metadata. `cache-secs` is a time
+    /// target and can still represent a large byte range for high-bitrate
+    /// media, so keep a bounded memory budget as well.
+    nonisolated static let demuxerMaxBytes = "64MiB"
+    /// Do not retain an additional unbounded-looking past range while the
+    /// player is already using a forward cache.
+    nonisolated static let demuxerMaxBackBytes = "0"
 
     nonisolated static func safeDecodeOptions(
         hardwareDecodeMethod: String
@@ -165,6 +172,8 @@ extension MPVPlayerView {
             ),
             (MPVProperty.cacheOnDisk, cacheConfiguration.isDiskCacheEnabled ? "yes" : "no"),
             (MPVProperty.demuxerCacheDirectory, Self.videoCacheDirectoryURL.path),
+            ("demuxer-max-bytes", Self.demuxerMaxBytes),
+            ("demuxer-max-back-bytes", Self.demuxerMaxBackBytes),
         ]
     }
 

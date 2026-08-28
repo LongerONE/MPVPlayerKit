@@ -172,29 +172,6 @@ private final class MPVPersistentVideoCacheStore: @unchecked Sendable {
     }
 }
 
-private final class MPVHTTPResponseBox: @unchecked Sendable {
-    let semaphore = DispatchSemaphore(value: 0)
-    private let lock = NSLock()
-    private var storedData: Data?
-    private var storedResponse: URLResponse?
-    private var storedError: Error?
-
-    func complete(data: Data?, response: URLResponse?, error: Error?) {
-        lock.lock()
-        storedData = data
-        storedResponse = response
-        storedError = error
-        lock.unlock()
-        semaphore.signal()
-    }
-
-    func result() -> (Data?, URLResponse?, Error?) {
-        lock.lock()
-        defer { lock.unlock() }
-        return (storedData, storedResponse, storedError)
-    }
-}
-
 final class MPVPersistentVideoCacheStream: @unchecked Sendable {
     private let context: MPVPersistentVideoCacheContext
     private let sourceURL: URL
@@ -317,17 +294,28 @@ final class MPVPersistentVideoCacheStream: @unchecked Sendable {
         }
         let requestedEnd = start + MPVPersistentVideoCacheStore.chunkSize - 1
         var request = URLRequest(url: sourceURL)
-        request.setValue("bytes=\(start)-\(requestedEnd)", forHTTPHeaderField: "Range")
         headers.forEach { key, value in request.setValue(value, forHTTPHeaderField: key) }
         if let userAgent,
            headers.keys.contains(where: { $0.caseInsensitiveCompare("User-Agent") == .orderedSame }) == false {
             request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         }
+        request.setValue("bytes=\(start)-\(requestedEnd)", forHTTPHeaderField: "Range")
+        request.cachePolicy = .reloadIgnoringLocalCacheData
 
-        let box = MPVHTTPResponseBox()
-        let task = URLSession.shared.dataTask(with: request) { data, response, error in
-            box.complete(data: data, response: response, error: error)
-        }
+        // Do not use URLSession.dataTask's completion-handler form here. It
+        // aggregates the complete response into Data before returning. A
+        // server that ignores Range could otherwise make a 55 GB media file
+        // an immediate in-memory allocation.
+        let collector = MPVHTTPRangeResponseCollector(
+            maximumBodyBytes: Int(MPVPersistentVideoCacheStore.chunkSize)
+        )
+        let session = URLSession(
+            configuration: .ephemeral,
+            delegate: collector,
+            delegateQueue: nil
+        )
+        let task = session.dataTask(with: request)
+        defer { session.invalidateAndCancel() }
         stateLock.lock()
         if isCancelled {
             stateLock.unlock()
@@ -338,7 +326,7 @@ final class MPVPersistentVideoCacheStream: @unchecked Sendable {
         stateLock.unlock()
         task.resume()
 
-        while box.semaphore.wait(timeout: .now() + 0.25) == .timedOut {
+        while collector.semaphore.wait(timeout: .now() + 0.25) == .timedOut {
             if cancelled() {
                 task.cancel()
                 clearActiveTask(task)
@@ -347,14 +335,23 @@ final class MPVPersistentVideoCacheStream: @unchecked Sendable {
         }
         clearActiveTask(task)
 
-        let (data, response, error) = box.result()
-        if let error {
-            mpvPersistentCacheLog("http error index=\(index) error=\(error.localizedDescription)")
+        let result = collector.result()
+        guard cancelled() == false else { return nil }
+        guard let httpResponse = result.response else {
+            mpvPersistentCacheLog(
+                "http invalid response index=\(index) received=\(result.data.count) "
+                    + "error=\(result.error?.localizedDescription ?? "unknown")"
+            )
             return nil
         }
-        guard let httpResponse = response as? HTTPURLResponse,
-              let data else {
-            mpvPersistentCacheLog("http invalid response index=\(index)")
+        let data = result.data
+        mpvPersistentCacheLog(
+            "http response index=\(index) range=\(start)-\(requestedEnd) "
+                + "status=\(httpResponse.statusCode) expected=\(httpResponse.expectedContentLength) "
+                + "received=\(data.count) bodyLimitExceeded=\(result.bodyLimitExceeded)"
+        )
+        if let error = result.error, result.bodyLimitExceeded == false {
+            mpvPersistentCacheLog("http error index=\(index) error=\(error.localizedDescription)")
             return nil
         }
 
@@ -382,6 +379,19 @@ final class MPVPersistentVideoCacheStream: @unchecked Sendable {
                 )
                 return nil
             }
+        }
+
+        if result.bodyLimitExceeded {
+            guard httpResponse.statusCode == 200, start == 0, totalSize != nil else {
+                mpvPersistentCacheLog(
+                    "http response rejected oversized range index=\(index) status=\(httpResponse.statusCode) "
+                        + "start=\(start) total=\(totalSize.map(String.init) ?? "unknown")"
+                )
+                return nil
+            }
+            mpvPersistentCacheLog(
+                "http range ignored at offset zero; keeping only first chunk total=\(totalSize.map(String.init) ?? "unknown")"
+            )
         }
 
         let expectedLength = totalSize.map {

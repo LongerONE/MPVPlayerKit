@@ -270,6 +270,7 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var videoQualityPreset = MPVVideoQualityPreset.balanced
     nonisolated(unsafe) var debandEnabled = false
     nonisolated(unsafe) var cacheConfiguration = MPVCacheConfiguration.default
+    nonisolated(unsafe) var lastCacheDiagnosticsLogTime: CFTimeInterval = 0
     nonisolated(unsafe) var persistentCacheContext: MPVPersistentVideoCacheContext?
     nonisolated(unsafe) var subtitleDelayValue = 0.0
     let clientSubtitleController = MPVSubtitlePresentationController()
@@ -492,6 +493,7 @@ public final class MPVPlayerView: UIView {
             duration: (configuration["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration,
             isDiskCacheEnabled: boolValue(configuration["cacheOnDisk"])
         )
+        lastCacheDiagnosticsLogTime = 0
         setDecoderMode(.initializing)
         setStopped(false)
         setSetupFailed(false)
