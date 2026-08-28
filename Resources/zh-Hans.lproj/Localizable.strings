@@ -22,6 +22,7 @@
 "playback.error.message" = "无法播放此视频。";
 
 "settings.title" = "播放设置";
+"settings.cache" = "缓存设置";
 "settings.playback_speed" = "播放速度";
 "settings.playback_speed.value" = "播放速度 · %@";
 "settings.video_quality" = "视频质量";
@@ -30,6 +31,17 @@
 "settings.disable_debanding" = "关闭色带抑制";
 "settings.fit_video" = "适应画面";
 "settings.fill_screen" = "填满屏幕";
+
+"cache.title" = "缓存设置";
+"cache.enabled" = "启用缓存";
+"cache.duration" = "缓存时长";
+"cache.disk" = "缓存到磁盘";
+"cache.directory" = "目录：Documents/.videoCache";
+"cache.duration.10" = "10 秒";
+"cache.duration.30" = "30 秒";
+"cache.duration.60" = "60 秒";
+"cache.duration.300" = "5 分钟";
+"cache.duration.1800" = "30 分钟";
 
 "quality.power_saver" = "节能";
 "quality.balanced" = "均衡";

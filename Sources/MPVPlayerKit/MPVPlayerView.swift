@@ -52,6 +52,10 @@ enum MPVPlayerKitNotificationKey {
 
 enum MPVProperty {
     static let pause = "pause"
+    static let cache = "cache"
+    static let cacheSeconds = "cache-secs"
+    static let cacheOnDisk = "cache-on-disk"
+    static let demuxerCacheDirectory = "demuxer-cache-dir"
     static let pausedForCache = "paused-for-cache"
     static let demuxerCacheState = "demuxer-cache-state"
     static let demuxerCacheTime = "demuxer-cache-time"
@@ -265,6 +269,7 @@ public final class MPVPlayerView: UIView {
     // helpers; configuration writes happen before the MPV handle is started.
     nonisolated(unsafe) var videoQualityPreset = MPVVideoQualityPreset.balanced
     nonisolated(unsafe) var debandEnabled = false
+    nonisolated(unsafe) var cacheConfiguration = MPVCacheConfiguration.default
     nonisolated(unsafe) var subtitleDelayValue = 0.0
     let clientSubtitleController = MPVSubtitlePresentationController()
     nonisolated(unsafe) var subtitleStyleValues: [String: String] = [
@@ -481,6 +486,11 @@ public final class MPVPlayerView: UIView {
         let qualityRawValue = (configuration["videoQuality"] as? NSNumber)?.intValue
         videoQualityPreset = qualityRawValue.flatMap(MPVVideoQualityPreset.init(rawValue:)) ?? .balanced
         debandEnabled = boolValue(configuration["debandEnabled"])
+        cacheConfiguration = MPVCacheConfiguration(
+            isEnabled: boolValue(configuration["cacheEnabled"], default: true),
+            duration: (configuration["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration,
+            isDiskCacheEnabled: boolValue(configuration["cacheOnDisk"])
+        )
         setDecoderMode(.initializing)
         setStopped(false)
         setSetupFailed(false)

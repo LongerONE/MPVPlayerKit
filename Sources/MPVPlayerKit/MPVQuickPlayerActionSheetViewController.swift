@@ -2,17 +2,20 @@ import UIKit
 
 struct MPVQuickPlayerActionSheetOption {
     let title: String
+    let symbol: MPVQuickPlayerSymbol?
     let isSelected: Bool
     let isDestructive: Bool
     let action: () -> Void
 
     init(
         title: String,
+        symbol: MPVQuickPlayerSymbol? = nil,
         isSelected: Bool = false,
         isDestructive: Bool = false,
         action: @escaping () -> Void
     ) {
         self.title = title
+        self.symbol = symbol
         self.isSelected = isSelected
         self.isDestructive = isDestructive
         self.action = action
@@ -445,6 +448,8 @@ extension MPVQuickPlayerMenuView: UITableViewDataSource, UITableViewDelegate {
         )
         var content = UIListContentConfiguration.cell()
         content.text = option.title
+        content.image = option.symbol.flatMap { MPVQuickPlayerSymbol.image($0, pointSize: 16) }
+        content.imageProperties.tintColor = option.isDestructive ? .systemRed : .label
         content.textProperties.font = .preferredFont(forTextStyle: .body)
         content.textProperties.adjustsFontForContentSizeCategory = true
         content.textProperties.numberOfLines = 0

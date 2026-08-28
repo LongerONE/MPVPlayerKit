@@ -12,6 +12,12 @@ extension MPVQuickPlayerViewController {
                 [weak self] in self?.presentAfterCurrentSheet { $0.showVideoQualityPicker() }
             },
         ]
+        options.append(.init(
+            title: mpvLocalized("settings.cache"),
+            symbol: .cache
+        ) { [weak self] in
+            self?.presentAfterCurrentSheet { $0.showCacheSettings() }
+        })
         let debandTitle = mpvLocalized(
             debandEnabled ? "settings.disable_debanding" : "settings.enable_debanding"
         )
@@ -55,6 +61,25 @@ extension MPVQuickPlayerViewController {
     public func setDebandEnabled(_ enabled: Bool) {
         debandEnabled = enabled
         player.updateVideoRenderOptions(debandEnabled: enabled)
+    }
+
+    public func setCacheConfiguration(_ configuration: MPVCacheConfiguration) {
+        cacheConfiguration = configuration
+        MPVCachePreferences.save(configuration)
+        player.setCacheConfiguration(configuration)
+    }
+
+    func showCacheSettings() {
+        let settingsView = MPVQuickPlayerCacheSettingsView(configuration: cacheConfiguration)
+        settingsView.onChange = { [weak self, weak settingsView] configuration in
+            self?.setCacheConfiguration(configuration)
+            settingsView?.update(configuration: configuration)
+        }
+        settingsView.onDismiss = { [weak self, weak settingsView] in
+            guard let self, cacheSettingsOverlay === settingsView else { return }
+            cacheSettingsOverlay = nil
+        }
+        presentCacheSettingsOverlay(settingsView)
     }
 
     public func setSubtitleDelay(_ delay: TimeInterval) {
@@ -194,6 +219,25 @@ extension MPVQuickPlayerViewController {
             menu.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
         ])
         menu.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        contentView.layoutIfNeeded()
+    }
+
+    func presentCacheSettingsOverlay(_ settingsView: MPVQuickPlayerCacheSettingsView) {
+        dismissActionSheet(animated: false)
+        layoutOrientationContentView()
+        updatePlaybackControlSafeAreaInsets()
+        view.layoutIfNeeded()
+        contentView.layoutIfNeeded()
+        cacheSettingsOverlay = settingsView
+        contentView.addSubview(settingsView)
+        settingsView.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            settingsView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
+            settingsView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
+            settingsView.topAnchor.constraint(equalTo: contentView.topAnchor),
+            settingsView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor),
+        ])
+        settingsView.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
         contentView.layoutIfNeeded()
     }
 

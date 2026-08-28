@@ -14,6 +14,7 @@ enum MPVQuickPlayerSymbol: String, CaseIterable {
     case pictureInPictureEnter = "pip.enter"
     case pictureInPictureExit = "pip.exit"
     case settings = "gearshape"
+    case cache = "externaldrive.fill"
     case seekBackward = "gobackward"
     case seekForward = "goforward"
     case brightness = "sun.max"

@@ -26,6 +26,8 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public internal(set) var playbackRate = 1.0
     public internal(set) var videoQuality: MPVVideoQuality
     public internal(set) var debandEnabled: Bool
+    /// The quick player's app-local global cache preference.
+    public internal(set) var cacheConfiguration: MPVCacheConfiguration
     public internal(set) var subtitleDelay: TimeInterval = 0
     public internal(set) var subtitleStyle = MPVSubtitleStyle.defaultStyle
 
@@ -73,6 +75,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var isUsingManualLandscape: Bool
     weak var orientationSynchronizedPresentedViewController: UIViewController?
     weak var actionSheetOverlay: MPVQuickPlayerMenuView?
+    weak var cacheSettingsOverlay: MPVQuickPlayerCacheSettingsView?
     var arePlaybackControlsHidden = false
     var closeButtonLeadingConstraint: NSLayoutConstraint!
     var statusLabelTrailingConstraint: NSLayoutConstraint!
@@ -97,12 +100,16 @@ public final class MPVQuickPlayerViewController: UIViewController {
         autoplay: Bool = true,
         forceLandscape: Bool = false
     ) {
-        player = MPVPlayer(configuration: configuration)
+        let savedCacheConfiguration = MPVCachePreferences.configuration
+        var effectiveConfiguration = configuration
+        effectiveConfiguration.cacheConfiguration = savedCacheConfiguration
+        player = MPVPlayer(configuration: effectiveConfiguration)
         self.autoplay = autoplay
         isLandscapeForced = forceLandscape
         isUsingManualLandscape = forceLandscape && Self.applicationSupportsLandscape == false
         videoQuality = configuration.videoQuality
         debandEnabled = configuration.debandEnabled
+        cacheConfiguration = savedCacheConfiguration
         super.init(nibName: nil, bundle: nil)
         modalPresentationCapturesStatusBarAppearance = true
         player.delegate = self
@@ -178,12 +185,14 @@ public final class MPVQuickPlayerViewController: UIViewController {
         layoutPresentedViewControllerInPlayerOrientation()
         updatePlaybackControlSafeAreaInsets()
         actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
     public override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
         updatePlaybackControlSafeAreaInsets()
         actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
     public override func viewDidDisappear(_ animated: Bool) {
@@ -583,18 +592,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
             to: TimeInterval(progressSlider.value),
             autoPlay: player.isPlaying
         )
-    }
-
-    @objc private func chooseAudioTrack() {
-        presentTrackPicker(type: .audio, sourceView: audioButton)
-    }
-
-    @objc private func chooseVideoTrack() {
-        presentTrackPicker(type: .video, sourceView: videoButton)
-    }
-
-    @objc private func chooseSubtitleTrack() {
-        presentTrackPicker(type: .subtitle, sourceView: subtitleButton)
     }
 
 }

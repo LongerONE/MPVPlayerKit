@@ -22,6 +22,49 @@ public enum MPVVideoQuality: Int, Sendable {
     case highQuality
 }
 
+/// Runtime cache settings shared by the MPV player and quick-player UI.
+public struct MPVCacheConfiguration: Equatable, Sendable {
+    /// Supported cache durations in seconds.
+    public static let availableDurations: [TimeInterval] = [10, 30, 60, 300, 1800]
+    /// The default cache duration in seconds.
+    public static let defaultDuration: TimeInterval = 60
+
+    public var isEnabled: Bool
+    public var duration: TimeInterval {
+        didSet {
+            duration = Self.nearestDuration(duration)
+        }
+    }
+    public var isDiskCacheEnabled: Bool
+
+    public init(
+        isEnabled: Bool = true,
+        duration: TimeInterval = Self.defaultDuration,
+        isDiskCacheEnabled: Bool = false
+    ) {
+        self.isEnabled = isEnabled
+        self.duration = Self.nearestDuration(duration)
+        self.isDiskCacheEnabled = isDiskCacheEnabled
+    }
+
+    public static let `default` = MPVCacheConfiguration()
+
+    public static func nearestDuration(_ duration: TimeInterval) -> TimeInterval {
+        guard duration.isFinite else { return defaultDuration }
+        return availableDurations.min {
+            abs($0 - duration) < abs($1 - duration)
+        } ?? defaultDuration
+    }
+
+    var bridgeDictionary: NSDictionary {
+        [
+            "cacheEnabled": NSNumber(value: isEnabled),
+            "cacheDuration": NSNumber(value: duration),
+            "cacheOnDisk": NSNumber(value: isDiskCacheEnabled),
+        ] as NSDictionary
+    }
+}
+
 public struct MPVSubtitleStyle: Equatable, Sendable {
     public var fontSize: Double
     public var fontName: String?
@@ -102,6 +145,7 @@ public struct MPVPlayerConfiguration: Sendable {
     public var isDolbyVisionPlayback: Bool
     public var videoQuality: MPVVideoQuality
     public var debandEnabled: Bool
+    public var cacheConfiguration: MPVCacheConfiguration
 
     public init(
         url: URL,
@@ -110,7 +154,8 @@ public struct MPVPlayerConfiguration: Sendable {
         forceSoftwareDecode: Bool = false,
         isDolbyVisionPlayback: Bool = false,
         videoQuality: MPVVideoQuality = .balanced,
-        debandEnabled: Bool = false
+        debandEnabled: Bool = false,
+        cacheConfiguration: MPVCacheConfiguration = .default
     ) {
         self.url = url
         self.headers = headers
@@ -119,6 +164,7 @@ public struct MPVPlayerConfiguration: Sendable {
         self.isDolbyVisionPlayback = isDolbyVisionPlayback
         self.videoQuality = videoQuality
         self.debandEnabled = debandEnabled
+        self.cacheConfiguration = cacheConfiguration
     }
 
     var bridgeDictionary: NSDictionary {
@@ -130,6 +176,9 @@ public struct MPVPlayerConfiguration: Sendable {
             "videoQuality": NSNumber(value: videoQuality.rawValue),
             "debandEnabled": NSNumber(value: debandEnabled),
         ]
+        values["cacheEnabled"] = NSNumber(value: cacheConfiguration.isEnabled)
+        values["cacheDuration"] = NSNumber(value: cacheConfiguration.duration)
+        values["cacheOnDisk"] = NSNumber(value: cacheConfiguration.isDiskCacheEnabled)
         if let userAgent, userAgent.isEmpty == false {
             values["userAgent"] = userAgent
         }

@@ -13,6 +13,7 @@ extension MPVQuickPlayerViewController {
             layoutOrientationContentView()
             updatePlaybackControlSafeAreaInsets()
             actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+            cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
             contentView.layoutIfNeeded()
         }
         coordinator.animate(
@@ -132,6 +133,7 @@ extension MPVQuickPlayerViewController {
             contentView.layoutIfNeeded()
         }
         actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
     /// Safe-area insets expressed in the coordinate system of `contentView`.
@@ -283,6 +285,7 @@ extension MPVQuickPlayerViewController {
         layoutOrientationContentView()
         updatePlaybackControlSafeAreaInsets()
         actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
     private func restoreManualLandscape() {
@@ -290,5 +293,6 @@ extension MPVQuickPlayerViewController {
         layoutOrientationContentView()
         updatePlaybackControlSafeAreaInsets()
         actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 }

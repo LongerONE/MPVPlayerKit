@@ -83,6 +83,10 @@ extension MPVPlayerView {
     }
 
     func makeSetupProfiles() -> [MPVSetupProfile] {
+        if cacheConfiguration.isDiskCacheEnabled {
+            ensureVideoCacheDirectory()
+        }
+
         #if targetEnvironment(simulator)
         let hardwareDecode = "no"
         #else
@@ -95,7 +99,7 @@ extension MPVPlayerView {
 
         let softwareProfile = MPVSetupProfile(
             name: "metal-software",
-            options: metalVideoOutputOptions + softwareDecodeOptions
+            options: cacheOptions + metalVideoOutputOptions + softwareDecodeOptions
         )
 
         guard forceSoftwareDecode == false, hardwareDecode != "no" else {
@@ -104,13 +108,13 @@ extension MPVPlayerView {
 
         let directHardwareProfile = MPVSetupProfile(
             name: "metal-videotoolbox",
-            options: metalVideoOutputOptions + Self.safeDecodeOptions(
+            options: cacheOptions + metalVideoOutputOptions + Self.safeDecodeOptions(
                 hardwareDecodeMethod: hardwareDecode
             )
         )
         let copyHardwareProfile = MPVSetupProfile(
             name: "metal-videotoolbox-copy",
-            options: metalVideoOutputOptions + Self.safeDecodeOptions(
+            options: cacheOptions + metalVideoOutputOptions + Self.safeDecodeOptions(
                 hardwareDecodeMethod: Self.deviceCopyHardwareDecodeMethod
             )
         )
@@ -146,6 +150,63 @@ extension MPVPlayerView {
 
     nonisolated var videoRenderOptions: [(String, String)] {
         [("deband", debandEnabled ? "yes" : "no")]
+    }
+
+    nonisolated var cacheOptions: [(String, String)] {
+        [
+            (MPVProperty.cache, cacheConfiguration.isEnabled ? "yes" : "no"),
+            (
+                MPVProperty.cacheSeconds,
+                String(
+                    format: "%.3f",
+                    locale: Locale(identifier: "en_US_POSIX"),
+                    cacheConfiguration.duration
+                )
+            ),
+            (MPVProperty.cacheOnDisk, cacheConfiguration.isDiskCacheEnabled ? "yes" : "no"),
+            (MPVProperty.demuxerCacheDirectory, Self.videoCacheDirectoryURL.path),
+        ]
+    }
+
+    nonisolated func applyCacheConfiguration(_ configuration: MPVCacheConfiguration) {
+        if configuration.isDiskCacheEnabled {
+            ensureVideoCacheDirectory()
+        }
+        let options = [
+            (MPVProperty.cache, configuration.isEnabled ? "yes" : "no"),
+            (
+                MPVProperty.cacheSeconds,
+                String(
+                    format: "%.3f",
+                    locale: Locale(identifier: "en_US_POSIX"),
+                    configuration.duration
+                )
+            ),
+            (MPVProperty.cacheOnDisk, configuration.isDiskCacheEnabled ? "yes" : "no"),
+        ]
+        options.forEach { option in
+            _ = command("set", args: [option.0, option.1], checkForErrors: false)
+        }
+        mpvDebugLog(
+            "cache options updated enabled=\(configuration.isEnabled) seconds=\(configuration.duration) onDisk=\(configuration.isDiskCacheEnabled)"
+        )
+    }
+
+    nonisolated static var videoCacheDirectoryURL: URL {
+        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+            ?? FileManager.default.temporaryDirectory
+        return documentsURL.appendingPathComponent(".videoCache", isDirectory: true)
+    }
+
+    nonisolated func ensureVideoCacheDirectory() {
+        do {
+            try FileManager.default.createDirectory(
+                at: Self.videoCacheDirectoryURL,
+                withIntermediateDirectories: true
+            )
+        } catch {
+            mpvDebugLog("video cache directory create failed error=\(error.localizedDescription)")
+        }
     }
 
     nonisolated func applyVideoRenderProperties() {

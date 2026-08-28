@@ -203,14 +203,14 @@ extension MPVPlayerView {
         return setupProfiles[activeSetupProfileIndex].name
     }
 
-    func boolValue(_ value: Any?) -> Bool {
+    func boolValue(_ value: Any?, default defaultValue: Bool = false) -> Bool {
         if let value = value as? Bool {
             return value
         }
         if let value = value as? NSNumber {
             return value.boolValue
         }
-        return false
+        return defaultValue
     }
 
     nonisolated func mpvDebugLog(_ message: String) {

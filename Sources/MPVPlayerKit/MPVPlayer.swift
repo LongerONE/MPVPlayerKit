@@ -34,6 +34,7 @@ public final class MPVPlayer: NSObject {
     public var duration: TimeInterval { playbackView.duration }
     public var currentTime: TimeInterval { playbackView.currentTime }
     public var bufferedProgress: Int? { playbackView.bufferedProgress?.intValue }
+    public var cacheConfiguration: MPVCacheConfiguration { playbackView.cacheConfiguration }
     public var contentMode: UIView.ContentMode {
         get { playbackView.playerContentMode }
         set { playbackView.playerContentMode = newValue }
@@ -126,6 +127,11 @@ public final class MPVPlayer: NSObject {
         playbackView.updateVideoRenderOptions([
             "debandEnabled": NSNumber(value: debandEnabled),
         ] as NSDictionary)
+    }
+
+    /// Applies cache settings to the current playback instance.
+    public func setCacheConfiguration(_ configuration: MPVCacheConfiguration) {
+        playbackView.updateCacheConfiguration(configuration.bridgeDictionary)
     }
 
     public func tracks(ofType type: MPVMediaTrackType) -> [MPVMediaTrack] {

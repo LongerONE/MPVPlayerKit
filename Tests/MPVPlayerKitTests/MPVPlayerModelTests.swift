@@ -70,6 +70,30 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual((values["debandEnabled"] as? NSNumber)?.boolValue, true)
     }
 
+    func testCacheConfigurationNormalizesSupportedDurationsAndBridgeValues() {
+        var cache = MPVCacheConfiguration(
+            isEnabled: false,
+            duration: 70,
+            isDiskCacheEnabled: true
+        )
+
+        XCTAssertEqual(cache.duration, 60)
+        cache.duration = 1_000
+        XCTAssertEqual(cache.duration, 1_800)
+        XCTAssertEqual(
+            cache.bridgeDictionary["cacheEnabled"] as? NSNumber,
+            NSNumber(value: false)
+        )
+        XCTAssertEqual(
+            cache.bridgeDictionary["cacheDuration"] as? NSNumber,
+            NSNumber(value: 1_800)
+        )
+        XCTAssertEqual(
+            cache.bridgeDictionary["cacheOnDisk"] as? NSNumber,
+            NSNumber(value: true)
+        )
+    }
+
     func testVideoQualityPresetsUseCompleteTieredRendererOptions() {
         let powerSaving = Dictionary(uniqueKeysWithValues: MPVVideoQualityPreset.powerSaving.options)
         let balanced = Dictionary(uniqueKeysWithValues: MPVVideoQualityPreset.balanced.options)

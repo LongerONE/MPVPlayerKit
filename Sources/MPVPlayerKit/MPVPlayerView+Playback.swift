@@ -198,6 +198,20 @@ extension MPVPlayerView {
         }
     }
 
+    @objc public func updateCacheConfiguration(_ options: NSDictionary) {
+        let configuration = MPVCacheConfiguration(
+            isEnabled: boolValue(options["cacheEnabled"], default: true),
+            duration: (options["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration,
+            isDiskCacheEnabled: boolValue(options["cacheOnDisk"])
+        )
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.cacheConfiguration = configuration
+            guard self.mpv != nil else { return }
+            self.applyCacheConfiguration(configuration)
+        }
+    }
+
     @objc public func mediaTracks(_ options: NSDictionary) -> NSArray {
         let requestedType = options["mediaType"] as? String
         let tracks = cachedMediaTracks(mediaType: requestedType)

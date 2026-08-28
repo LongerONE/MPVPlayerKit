@@ -22,6 +22,7 @@
 "playback.error.message" = "The video could not be played.";
 
 "settings.title" = "Playback Settings";
+"settings.cache" = "Cache Settings";
 "settings.playback_speed" = "Playback Speed";
 "settings.playback_speed.value" = "Playback Speed · %@";
 "settings.video_quality" = "Video Quality";
@@ -30,6 +31,17 @@
 "settings.disable_debanding" = "Disable Debanding";
 "settings.fit_video" = "Fit Video";
 "settings.fill_screen" = "Fill Screen";
+
+"cache.title" = "Cache Settings";
+"cache.enabled" = "Enable Cache";
+"cache.duration" = "Cache Duration";
+"cache.disk" = "Cache to Disk";
+"cache.directory" = "Directory: Documents/.videoCache";
+"cache.duration.10" = "10 seconds";
+"cache.duration.30" = "30 seconds";
+"cache.duration.60" = "60 seconds";
+"cache.duration.300" = "5 minutes";
+"cache.duration.1800" = "30 minutes";
 
 "quality.power_saver" = "Power Saver";
 "quality.balanced" = "Balanced";

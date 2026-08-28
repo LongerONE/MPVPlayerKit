@@ -92,4 +92,16 @@ extension MPVQuickPlayerViewController {
         )
         _ = player.seek(to: target, autoPlay: player.isPlaying)
     }
+
+    @objc func chooseAudioTrack() {
+        presentTrackPicker(type: .audio, sourceView: audioButton)
+    }
+
+    @objc func chooseVideoTrack() {
+        presentTrackPicker(type: .video, sourceView: videoButton)
+    }
+
+    @objc func chooseSubtitleTrack() {
+        presentTrackPicker(type: .subtitle, sourceView: subtitleButton)
+    }
 }
