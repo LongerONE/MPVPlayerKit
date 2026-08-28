@@ -28,6 +28,7 @@ enum MPVPlayerKitNotification {
     static let didChangeState = Notification.Name("MPVPlayerViewDidChangeState")
     static let didUpdateTime = Notification.Name("MPVPlayerViewDidUpdateTime")
     static let didUpdateBufferingProgress = Notification.Name("MPVPlayerViewDidUpdateBufferingProgress")
+    static let didUpdateBufferedProgress = Notification.Name("MPVPlayerViewDidUpdateBufferedProgress")
     static let didUpdateDecoderMode = Notification.Name("MPVPlayerViewDidUpdateDecoderMode")
     static let didLoadSubtitle = Notification.Name("MPVPlayerViewDidLoadSubtitle")
     static let didCompleteSeek = Notification.Name("MPVPlayerViewDidCompleteSeek")
@@ -41,6 +42,7 @@ enum MPVPlayerKitNotificationKey {
     static let currentTime = "currentTime"
     static let duration = "duration"
     static let bufferingProgress = "bufferingProgress"
+    static let bufferedProgress = "bufferedProgress"
     static let decoderMode = "decoderMode"
     static let requestID = "requestID"
     static let success = "success"
@@ -51,6 +53,8 @@ enum MPVPlayerKitNotificationKey {
 enum MPVProperty {
     static let pause = "pause"
     static let pausedForCache = "paused-for-cache"
+    static let demuxerCacheState = "demuxer-cache-state"
+    static let demuxerCacheTime = "demuxer-cache-time"
     static let timePosition = "time-pos"
     static let duration = "duration"
     static let panscan = "panscan"
@@ -182,6 +186,7 @@ public final class MPVPlayerView: UIView {
     @objc public internal(set) var isPlaying = false
     @objc public internal(set) var duration: TimeInterval = 0.0
     @objc public internal(set) var currentTime: TimeInterval = 0.0
+    @objc public internal(set) var bufferedProgress: NSNumber?
     public internal(set) var currentSubtitleFontCapability: MPVSubtitleFontCapability = .noSubtitle
     /// Playback speed reported to the system playback controls and to the
     /// Picture in Picture timebase, so both advance at the rate of the video.
@@ -498,6 +503,7 @@ public final class MPVPlayerView: UIView {
         resetGeometryTransitionAnimation()
         currentTime = 0.0
         duration = 0.0
+        bufferedProgress = nil
         isPlaying = false
         currentSubtitleFontCapability = .noSubtitle
         playbackSpeed = 1.0

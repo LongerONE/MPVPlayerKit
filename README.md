@@ -52,8 +52,10 @@ if let subtitle = subtitleTracks.first {
 }
 ```
 
-Set `MPVPlayer.delegate` to receive state, time, buffering, decoder-mode and
-Picture in Picture updates.
+Set `MPVPlayer.delegate` to receive state, time, buffering, buffered progress,
+decoder-mode and Picture in Picture updates. `MPVPlayer.bufferedProgress` and
+`didUpdateBufferedProgress` report a 0...100 percentage when both the media
+duration and mpv cache position are available; otherwise the value is `nil`.
 
 ## Picture in Picture
 

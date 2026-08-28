@@ -270,6 +270,17 @@ extension MPVPlayerView {
         )
     }
 
+    func notifyBufferedProgress(_ bufferedProgress: Int?) {
+        NotificationCenter.default.post(
+            name: MPVPlayerKitNotification.didUpdateBufferedProgress,
+            object: self,
+            userInfo: [
+                MPVPlayerKitNotificationKey.bufferedProgress:
+                    bufferedProgress.map(NSNumber.init(value:)) ?? NSNull()
+            ]
+        )
+    }
+
     nonisolated func notifyOnMain(_ body: @escaping @MainActor @Sendable () -> Void) {
         if Thread.isMainThread {
             MainActor.assumeIsolated {

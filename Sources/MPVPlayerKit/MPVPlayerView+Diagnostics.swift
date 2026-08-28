@@ -141,6 +141,14 @@ extension MPVPlayerView {
         return data
     }
 
+    nonisolated func getDoubleIfAvailable(_ name: String) -> Double? {
+        guard let mpv else { return nil }
+        var data = Double()
+        let status = mpv_get_property(mpv, name, MPV_FORMAT_DOUBLE, &data)
+        guard status >= 0, data.isFinite else { return nil }
+        return data
+    }
+
     nonisolated func getInt64(_ name: String) -> Int64? {
         guard let mpv else { return nil }
         var data = Int64()

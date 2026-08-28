@@ -6,6 +6,7 @@ public protocol MPVPlayerDelegate: AnyObject {
     func player(_ player: MPVPlayer, didChangeState state: MPVPlaybackState)
     func player(_ player: MPVPlayer, didUpdateCurrentTime currentTime: TimeInterval, duration: TimeInterval)
     func player(_ player: MPVPlayer, didUpdateBufferingProgress progress: Int)
+    func player(_ player: MPVPlayer, didUpdateBufferedProgress progress: Int?)
     func player(_ player: MPVPlayer, didUpdateDecoderMode mode: MPVDecoderMode)
     func player(_ player: MPVPlayer, didChangePictureInPictureActive isActive: Bool)
 }
@@ -14,6 +15,7 @@ public extension MPVPlayerDelegate {
     func player(_ player: MPVPlayer, didChangeState state: MPVPlaybackState) {}
     func player(_ player: MPVPlayer, didUpdateCurrentTime currentTime: TimeInterval, duration: TimeInterval) {}
     func player(_ player: MPVPlayer, didUpdateBufferingProgress progress: Int) {}
+    func player(_ player: MPVPlayer, didUpdateBufferedProgress progress: Int?) {}
     func player(_ player: MPVPlayer, didUpdateDecoderMode mode: MPVDecoderMode) {}
     func player(_ player: MPVPlayer, didChangePictureInPictureActive isActive: Bool) {}
 }
@@ -31,6 +33,7 @@ public final class MPVPlayer: NSObject {
     public var isPlaying: Bool { playbackView.isPlaying }
     public var duration: TimeInterval { playbackView.duration }
     public var currentTime: TimeInterval { playbackView.currentTime }
+    public var bufferedProgress: Int? { playbackView.bufferedProgress?.intValue }
     public var contentMode: UIView.ContentMode {
         get { playbackView.playerContentMode }
         set { playbackView.playerContentMode = newValue }
@@ -287,6 +290,19 @@ public final class MPVPlayer: NSObject {
             }
         })
         observers.append(center.addObserver(
+            forName: MPVPlayerKitNotification.didUpdateBufferedProgress,
+            object: playbackView,
+            queue: .main
+        ) { [weak self] notification in
+            let progress = Self.optionalIntValue(
+                notification.userInfo?[MPVPlayerKitNotificationKey.bufferedProgress]
+            )
+            MainActor.assumeIsolated {
+                guard let self else { return }
+                self.delegate?.player(self, didUpdateBufferedProgress: progress)
+            }
+        })
+        observers.append(center.addObserver(
             forName: MPVPlayerKitNotification.didUpdateDecoderMode,
             object: playbackView,
             queue: .main
@@ -340,5 +356,12 @@ public final class MPVPlayer: NSObject {
         if let double = value as? Double { return double }
         if let int = value as? Int { return Double(int) }
         return 0
+    }
+
+    nonisolated private static func optionalIntValue(_ value: Any?) -> Int? {
+        guard let value, value is NSNull == false else { return nil }
+        if let number = value as? NSNumber { return number.intValue }
+        if let int = value as? Int { return int }
+        return nil
     }
 }

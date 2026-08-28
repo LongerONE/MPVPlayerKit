@@ -294,6 +294,11 @@ extension MPVPlayerView {
             notifyOnFailure: false
         )
         checkError(
+            mpv_observe_property(mpv, 0, MPVProperty.demuxerCacheTime, MPV_FORMAT_DOUBLE),
+            operation: "observe demuxer-cache-time",
+            notifyOnFailure: false
+        )
+        checkError(
             mpv_observe_property(mpv, 0, MPVProperty.subtitleText, MPV_FORMAT_STRING),
             operation: "observe sub-text",
             notifyOnFailure: false

@@ -53,6 +53,12 @@ extension MPVPlayerView {
         notifyOnMain {
             guard self.mpv != nil else { return }
             self.applyMPVTimeSnapshot(snapshot)
+            self.applyBufferedProgress(
+                self.readMPVBufferedProgress(
+                    currentTime: snapshot.currentTime,
+                    duration: snapshot.duration
+                )
+            )
 
             if self.hasReportedReadyToPlay == false, self.duration > 0.0 {
                 self.hasReportedReadyToPlay = true
@@ -551,6 +557,8 @@ extension MPVPlayerView {
                 self.notifyBufferingProgress(buffering ? 0 : 100)
                 self.notifyState(buffering ? .buffering : .bufferFinished)
             }
+        case MPVProperty.demuxerCacheTime:
+            publishBufferedProgress()
         case MPVProperty.subtitleText:
             logSubtitleTextChange()
         default:
