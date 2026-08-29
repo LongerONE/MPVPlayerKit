@@ -52,6 +52,7 @@ extension MPVPlayerView {
         mpvDebugLog(
             "cache settings effective reason=\(reason) configuredEnabled=\(cacheConfiguration.isEnabled) "
                 + "configuredSeconds=\(cacheConfiguration.duration) configuredOnDisk=\(cacheConfiguration.isDiskCacheEnabled) "
+                + "configuredDiskLimit=\(cacheConfiguration.diskCacheLimit) "
                 + "properties=[\(properties)] persistentContext=\(persistentCacheContext != nil) "
                 + "directory=\(Self.videoCacheDirectoryURL.path)"
         )

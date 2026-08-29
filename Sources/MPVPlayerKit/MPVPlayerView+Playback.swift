@@ -202,7 +202,11 @@ extension MPVPlayerView {
         let configuration = MPVCacheConfiguration(
             isEnabled: boolValue(options["cacheEnabled"], default: true),
             duration: (options["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration,
-            isDiskCacheEnabled: boolValue(options["cacheOnDisk"])
+            isDiskCacheEnabled: boolValue(options["cacheOnDisk"]),
+            diskCacheLimit: MPVCacheDiskLimit(
+                rawValue: (options["cacheDiskLimit"] as? NSNumber)?.intValue
+                    ?? MPVCacheDiskLimit.defaultLimit.rawValue
+            ) ?? .defaultLimit
         )
         queue.async { [weak self] in
             guard let self else { return }

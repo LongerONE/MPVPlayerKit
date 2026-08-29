@@ -37,6 +37,12 @@
 "cache.duration" = "Cache Duration";
 "cache.disk" = "Cache to Disk";
 "cache.directory" = "Directory: Documents/.videoCache";
+"cache.disk_limit" = "Disk Cache Limit";
+"cache.disk_limit.1gb" = "1 GB";
+"cache.disk_limit.2gb" = "2 GB";
+"cache.disk_limit.5gb" = "5 GB";
+"cache.disk_limit.10gb" = "10 GB";
+"cache.disk_limit.unlimited" = "Unlimited";
 "cache.duration.10" = "10 seconds";
 "cache.duration.30" = "30 seconds";
 "cache.duration.60" = "60 seconds";

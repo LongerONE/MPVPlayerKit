@@ -11,6 +11,7 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
     private let cacheSwitch = UISwitch()
     private let diskSwitch = UISwitch()
     private let durationButton = UIButton(type: .system)
+    private let diskLimitButton = UIButton(type: .system)
     private let cancelButton = UIButton(type: .system)
     private let safeAreaGuide = UILayoutGuide()
     private var safeAreaLeadingConstraint: NSLayoutConstraint!
@@ -21,10 +22,11 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
     private var configuration: MPVCacheConfiguration
 
     private static let cardWidth: CGFloat = 320
-    private static let cardHeight: CGFloat = 300
+    private static let cardHeight: CGFloat = 350
 
     var onChange: ((MPVCacheConfiguration) -> Void)?
     var onDurationTap: ((UIView) -> Void)?
+    var onDiskLimitTap: ((UIView) -> Void)?
     var onDismiss: (() -> Void)?
 
     init(configuration: MPVCacheConfiguration) {
@@ -71,7 +73,15 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
         durationButton.alpha = isEnabled ? 1 : 0.45
         durationButton.setTitle(Self.durationTitle(for: configuration.duration), for: .normal)
         durationButton.accessibilityValue = Self.durationTitle(for: configuration.duration)
+        let diskCacheEnabled = isEnabled && configuration.isDiskCacheEnabled
         diskSwitch.isEnabled = isEnabled
+        diskLimitButton.isEnabled = diskCacheEnabled
+        diskLimitButton.alpha = diskCacheEnabled ? 1 : 0.45
+        diskLimitButton.setTitle(
+            Self.diskCacheLimitTitle(for: configuration.diskCacheLimit),
+            for: .normal
+        )
+        diskLimitButton.accessibilityValue = Self.diskCacheLimitTitle(for: configuration.diskCacheLimit)
     }
 
     func dismiss(animated: Bool) {
@@ -138,6 +148,12 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
         durationButton.tintColor = .label
         durationButton.accessibilityIdentifier = "MPVQuickPlayer.cacheDuration"
         durationButton.addTarget(self, action: #selector(durationTapped(_:)), for: .touchUpInside)
+        diskLimitButton.titleLabel?.font = .preferredFont(forTextStyle: .body)
+        diskLimitButton.titleLabel?.adjustsFontForContentSizeCategory = true
+        diskLimitButton.setTitleColor(.label, for: .normal)
+        diskLimitButton.tintColor = .label
+        diskLimitButton.accessibilityIdentifier = "MPVQuickPlayer.cacheDiskLimit"
+        diskLimitButton.addTarget(self, action: #selector(diskLimitTapped(_:)), for: .touchUpInside)
 
         contentStack.axis = .vertical
         contentStack.spacing = 14
@@ -145,6 +161,7 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
         contentStack.addArrangedSubview(makeSwitchRow(title: mpvLocalized("cache.enabled"), switchView: cacheSwitch))
         contentStack.addArrangedSubview(makeDurationRow())
         contentStack.addArrangedSubview(makeSwitchRow(title: mpvLocalized("cache.disk"), switchView: diskSwitch))
+        contentStack.addArrangedSubview(makeDiskLimitRow())
 
         scrollView.showsVerticalScrollIndicator = false
         scrollView.alwaysBounceVertical = false
@@ -260,6 +277,29 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
         return row
     }
 
+    private func makeDiskLimitRow() -> UIView {
+        let row = UIView()
+        let label = UILabel()
+        label.text = mpvLocalized("cache.disk_limit")
+        label.font = .preferredFont(forTextStyle: .body)
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = .label
+        row.addSubview(label)
+        row.addSubview(diskLimitButton)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        diskLimitButton.translatesAutoresizingMaskIntoConstraints = false
+        diskLimitButton.contentHorizontalAlignment = .right
+        NSLayoutConstraint.activate([
+            row.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
+            label.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+            label.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+            diskLimitButton.leadingAnchor.constraint(greaterThanOrEqualTo: label.trailingAnchor, constant: 12),
+            diskLimitButton.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            diskLimitButton.centerYAnchor.constraint(equalTo: row.centerYAnchor),
+        ])
+        return row
+    }
+
     static func durationTitle(for duration: TimeInterval) -> String {
         switch duration {
         case 10: return mpvLocalized("cache.duration.10")
@@ -267,6 +307,16 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
         case 60: return mpvLocalized("cache.duration.60")
         case 120: return mpvLocalized("cache.duration.120")
         default: return mpvLocalized("cache.duration.30")
+        }
+    }
+
+    static func diskCacheLimitTitle(for limit: MPVCacheDiskLimit) -> String {
+        switch limit {
+        case .oneGB: return mpvLocalized("cache.disk_limit.1gb")
+        case .twoGB: return mpvLocalized("cache.disk_limit.2gb")
+        case .fiveGB: return mpvLocalized("cache.disk_limit.5gb")
+        case .tenGB: return mpvLocalized("cache.disk_limit.10gb")
+        case .unlimited: return mpvLocalized("cache.disk_limit.unlimited")
         }
     }
 
@@ -284,6 +334,10 @@ final class MPVQuickPlayerCacheSettingsView: UIView {
 
     @objc private func durationTapped(_ sender: UIButton) {
         onDurationTap?(sender)
+    }
+
+    @objc private func diskLimitTapped(_ sender: UIButton) {
+        onDiskLimitTap?(sender)
     }
 
     @objc private func cancel() {

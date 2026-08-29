@@ -7,13 +7,15 @@ import Libmpv
 import libmpv
 #endif
 
-private func mpvPersistentCacheLog(_ message: String) {
+func mpvPersistentCacheLog(_ message: String) {
     #if DEBUG
     print("MPVPersistentVideoCache \(message)")
     #endif
 }
 
 final class MPVPersistentVideoCacheContext: @unchecked Sendable {
+    private static let cacheFormatVersion = "v2-4MiB"
+
     let sourceURL: URL
     let headers: [String: String]
     let userAgent: String?
@@ -21,28 +23,33 @@ final class MPVPersistentVideoCacheContext: @unchecked Sendable {
     let cacheKey: String
     private let stateLock = NSLock()
     private var persistenceEnabled = true
+    private var diskCacheLimit: MPVCacheDiskLimit
 
     init(
         sourceURL: URL,
         headers: [String: String],
         userAgent: String?,
-        cacheDirectoryURL: URL
+        cacheDirectoryURL: URL,
+        diskCacheLimit: MPVCacheDiskLimit = .defaultLimit
     ) {
         self.sourceURL = sourceURL
         self.headers = headers
         self.userAgent = userAgent
+        self.diskCacheLimit = diskCacheLimit
         self.cacheDirectoryURL = cacheDirectoryURL
         self.cacheKey = Self.makeCacheKey(
             sourceURL: sourceURL,
             headers: headers,
             userAgent: userAgent
         )
+        MPVPersistentVideoCacheQuotaManager.shared.enforce(
+            rootURL: cacheDirectoryURL,
+            limitBytes: diskCacheLimit.bytes
+        )
     }
 
     func makeStream() -> MPVPersistentVideoCacheStream? {
-        MPVPersistentVideoCacheStream(
-            context: self
-        )
+        MPVPersistentVideoCacheStream(context: self)
     }
 
     var isPersistenceEnabled: Bool {
@@ -55,6 +62,22 @@ final class MPVPersistentVideoCacheContext: @unchecked Sendable {
         stateLock.lock()
         persistenceEnabled = enabled
         stateLock.unlock()
+    }
+
+    var diskCacheLimitBytes: Int64? {
+        stateLock.lock()
+        defer { stateLock.unlock() }
+        return diskCacheLimit.bytes
+    }
+
+    func setDiskCacheLimit(_ limit: MPVCacheDiskLimit) {
+        stateLock.lock()
+        diskCacheLimit = limit
+        stateLock.unlock()
+        MPVPersistentVideoCacheQuotaManager.shared.enforce(
+            rootURL: cacheDirectoryURL,
+            limitBytes: limit.bytes
+        )
     }
 
     static func makeCacheKey(
@@ -82,14 +105,15 @@ final class MPVPersistentVideoCacheContext: @unchecked Sendable {
             .map { "\($0.key)=\($0.value)" }
             .joined(separator: "&")
         let identity = "url=\(urlIdentity)\nheaders=\(headerIdentity)\nuserAgent=\(userAgent ?? "")"
-        return SHA256.hash(data: Data(identity.utf8))
+        let digest = SHA256.hash(data: Data(identity.utf8))
             .map { String(format: "%02x", $0) }
             .joined()
+        return "\(cacheFormatVersion)-\(digest)"
     }
 }
 
 private final class MPVPersistentVideoCacheStore: @unchecked Sendable {
-    static let chunkSize: Int64 = 1024 * 1024
+    static let chunkSize: Int64 = 4 * 1024 * 1024
 
     let entryDirectoryURL: URL
     private let fileManager = FileManager.default
@@ -129,24 +153,45 @@ private final class MPVPersistentVideoCacheStore: @unchecked Sendable {
     }
 
     func readChunk(index: Int64) -> Data? {
-        fileLock.lock()
-        defer { fileLock.unlock() }
         let url = chunkURL(index: index)
-        guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
-              values.isRegularFile == true else {
-            return nil
+        return MPVPersistentVideoCacheQuotaManager.shared.withProtectedChunk(url) {
+            fileLock.lock()
+            defer { fileLock.unlock() }
+            guard let values = try? url.resourceValues(forKeys: [.isRegularFileKey]),
+                  values.isRegularFile == true else {
+                return nil
+            }
+            let data = try? Data(contentsOf: url)
+            if data != nil {
+                try? FileManager.default.setAttributes(
+                    [.modificationDate: Date()],
+                    ofItemAtPath: url.path
+                )
+            }
+            return data
         }
-        return try? Data(contentsOf: url)
     }
 
-    func writeChunk(_ data: Data, index: Int64, totalSize: Int64?) -> Bool {
-        fileLock.lock()
-        defer { fileLock.unlock() }
+    func writeChunk(
+        _ data: Data,
+        index: Int64,
+        totalSize: Int64?,
+        diskCacheLimitBytes: Int64?
+    ) -> Bool {
+        let url = chunkURL(index: index)
         do {
-            try data.write(to: chunkURL(index: index), options: .atomic)
-            if let totalSize, totalSize >= 0 {
-                setTotalSize(totalSize)
+            try MPVPersistentVideoCacheQuotaManager.shared.withProtectedChunk(url) {
+                fileLock.lock()
+                defer { fileLock.unlock() }
+                try data.write(to: url, options: .atomic)
+                if let totalSize, totalSize >= 0 {
+                    setTotalSize(totalSize)
+                }
             }
+            MPVPersistentVideoCacheQuotaManager.shared.enforce(
+                rootURL: entryDirectoryURL.deletingLastPathComponent(),
+                limitBytes: diskCacheLimitBytes
+            )
             return true
         } catch {
             mpvPersistentCacheLog(
@@ -358,7 +403,12 @@ final class MPVPersistentVideoCacheStream: @unchecked Sendable {
         let contentRange = Self.parseContentRange(httpResponse.value(forHTTPHeaderField: "Content-Range"))
         if httpResponse.statusCode == 416, let totalSize = contentRange?.total {
             if shouldStore {
-                _ = store.writeChunk(Data(), index: index, totalSize: totalSize)
+                _ = store.writeChunk(
+                    Data(),
+                    index: index,
+                    totalSize: totalSize,
+                    diskCacheLimitBytes: context.diskCacheLimitBytes
+                )
             }
             return Data()
         }
@@ -417,7 +467,12 @@ final class MPVPersistentVideoCacheStream: @unchecked Sendable {
             return nil
         }
         if shouldStore {
-            guard store.writeChunk(Data(chunkData), index: index, totalSize: resolvedTotalSize) else {
+            guard store.writeChunk(
+                Data(chunkData),
+                index: index,
+                totalSize: resolvedTotalSize,
+                diskCacheLimitBytes: context.diskCacheLimitBytes
+            ) else {
                 return nil
             }
         }

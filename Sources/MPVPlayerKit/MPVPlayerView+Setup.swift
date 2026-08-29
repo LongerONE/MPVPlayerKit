@@ -25,7 +25,7 @@ extension MPVPlayerView {
     /// A hard safety cap for demuxer packet metadata. `cache-secs` is a time
     /// target and can still represent a large byte range for high-bitrate
     /// media, so keep a bounded memory budget as well.
-    nonisolated static let demuxerMaxBytes = "64MiB"
+    nonisolated static let demuxerMaxBytes = "256MiB"
     /// Do not retain an additional unbounded-looking past range while the
     /// player is already using a forward cache.
     nonisolated static let demuxerMaxBackBytes = "0"
@@ -184,6 +184,7 @@ extension MPVPlayerView {
         persistentCacheContext?.setPersistenceEnabled(
             configuration.isEnabled && configuration.isDiskCacheEnabled
         )
+        persistentCacheContext?.setDiskCacheLimit(configuration.diskCacheLimit)
         let options = [
             (MPVProperty.cache, configuration.isEnabled ? "yes" : "no"),
             (
@@ -295,7 +296,8 @@ extension MPVPlayerView {
                 sourceURL: url,
                 headers: headers,
                 userAgent: userAgent,
-                cacheDirectoryURL: Self.videoCacheDirectoryURL
+                cacheDirectoryURL: Self.videoCacheDirectoryURL,
+                diskCacheLimit: cacheConfiguration.diskCacheLimit
             )
             let registrationStatus = mpv_stream_cb_add_ro(
                 mpv,

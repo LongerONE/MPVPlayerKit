@@ -491,7 +491,11 @@ public final class MPVPlayerView: UIView {
         cacheConfiguration = MPVCacheConfiguration(
             isEnabled: boolValue(configuration["cacheEnabled"], default: true),
             duration: (configuration["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration,
-            isDiskCacheEnabled: boolValue(configuration["cacheOnDisk"])
+            isDiskCacheEnabled: boolValue(configuration["cacheOnDisk"]),
+            diskCacheLimit: MPVCacheDiskLimit(
+                rawValue: (configuration["cacheDiskLimit"] as? NSNumber)?.intValue
+                    ?? MPVCacheDiskLimit.defaultLimit.rawValue
+            ) ?? .defaultLimit
         )
         lastCacheDiagnosticsLogTime = 0
         setDecoderMode(.initializing)
