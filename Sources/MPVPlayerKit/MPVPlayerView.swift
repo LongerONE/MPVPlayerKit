@@ -54,8 +54,6 @@ enum MPVProperty {
     static let pause = "pause"
     static let cache = "cache"
     static let cacheSeconds = "cache-secs"
-    static let cacheOnDisk = "cache-on-disk"
-    static let demuxerCacheDirectory = "demuxer-cache-dir"
     static let pausedForCache = "paused-for-cache"
     static let demuxerCacheState = "demuxer-cache-state"
     static let demuxerCacheTime = "demuxer-cache-time"
@@ -271,7 +269,6 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var debandEnabled = false
     nonisolated(unsafe) var cacheConfiguration = MPVCacheConfiguration.default
     nonisolated(unsafe) var lastCacheDiagnosticsLogTime: CFTimeInterval = 0
-    nonisolated(unsafe) var persistentCacheContext: MPVPersistentVideoCacheContext?
     nonisolated(unsafe) var subtitleDelayValue = 0.0
     let clientSubtitleController = MPVSubtitlePresentationController()
     nonisolated(unsafe) var subtitleStyleValues: [String: String] = [
@@ -490,12 +487,7 @@ public final class MPVPlayerView: UIView {
         debandEnabled = boolValue(configuration["debandEnabled"])
         cacheConfiguration = MPVCacheConfiguration(
             isEnabled: boolValue(configuration["cacheEnabled"], default: true),
-            duration: (configuration["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration,
-            isDiskCacheEnabled: boolValue(configuration["cacheOnDisk"]),
-            diskCacheLimit: MPVCacheDiskLimit(
-                rawValue: (configuration["cacheDiskLimit"] as? NSNumber)?.intValue
-                    ?? MPVCacheDiskLimit.defaultLimit.rawValue
-            ) ?? .defaultLimit
+            duration: (configuration["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration
         )
         lastCacheDiagnosticsLogTime = 0
         setDecoderMode(.initializing)

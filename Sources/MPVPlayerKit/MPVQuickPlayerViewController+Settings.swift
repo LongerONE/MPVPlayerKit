@@ -78,9 +78,6 @@ extension MPVQuickPlayerViewController {
         settingsView.onDurationTap = { [weak self, weak settingsView] sourceView in
             self?.showCacheDurationPicker(from: sourceView, settingsView: settingsView)
         }
-        settingsView.onDiskLimitTap = { [weak self, weak settingsView] sourceView in
-            self?.showCacheDiskLimitPicker(from: sourceView, settingsView: settingsView)
-        }
         settingsView.onDismiss = { [weak self, weak settingsView] in
             guard let self, cacheSettingsOverlay === settingsView else { return }
             cacheSettingsOverlay = nil
@@ -106,30 +103,6 @@ extension MPVQuickPlayerViewController {
         }
         presentActionSheet(
             title: mpvLocalized("cache.duration"),
-            sourceView: sourceView,
-            options: options,
-            cancelTitle: mpvLocalized("common.cancel")
-        )
-    }
-
-    private func showCacheDiskLimitPicker(
-        from sourceView: UIView,
-        settingsView: MPVQuickPlayerCacheSettingsView?
-    ) {
-        let options = MPVCacheDiskLimit.allCases.map { limit in
-            MPVQuickPlayerActionSheetOption(
-                title: MPVQuickPlayerCacheSettingsView.diskCacheLimitTitle(for: limit),
-                isSelected: limit == cacheConfiguration.diskCacheLimit
-            ) { [weak self, weak settingsView] in
-                guard let self else { return }
-                var configuration = cacheConfiguration
-                configuration.diskCacheLimit = limit
-                setCacheConfiguration(configuration)
-                settingsView?.update(configuration: configuration)
-            }
-        }
-        presentActionSheet(
-            title: mpvLocalized("cache.disk_limit"),
             sourceView: sourceView,
             options: options,
             cancelTitle: mpvLocalized("common.cancel")

@@ -76,8 +76,7 @@ final class MPVPlayerModelTests: XCTestCase {
 
         var cache = MPVCacheConfiguration(
             isEnabled: false,
-            duration: 70,
-            isDiskCacheEnabled: true
+            duration: 70
         )
 
         XCTAssertEqual(cache.duration, 60)
@@ -91,10 +90,8 @@ final class MPVPlayerModelTests: XCTestCase {
             cache.bridgeDictionary["cacheDuration"] as? NSNumber,
             NSNumber(value: 120)
         )
-        XCTAssertEqual(
-            cache.bridgeDictionary["cacheOnDisk"] as? NSNumber,
-            NSNumber(value: true)
-        )
+        XCTAssertNil(cache.bridgeDictionary["cacheOnDisk"])
+        XCTAssertNil(cache.bridgeDictionary["cacheDiskLimit"])
     }
 
     func testVideoQualityPresetsUseCompleteTieredRendererOptions() {

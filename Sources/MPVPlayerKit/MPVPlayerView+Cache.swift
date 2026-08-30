@@ -7,43 +7,10 @@ import libmpv
 #endif
 
 extension MPVPlayerView {
-    /// Removes only the persistent byte-range cache for the configured video.
-    @objc public func clearPersistentVideoCache() -> Bool {
-        guard let sourceURL = url, sourceURL.isFileURL == false else {
-            mpvDebugLog("persistent cache clear skipped missing remote source")
-            return false
-        }
-
-        persistentCacheContext?.setPersistenceEnabled(false)
-        let cacheKey = persistentCacheContext?.cacheKey
-            ?? MPVPersistentVideoCacheContext.makeCacheKey(
-                sourceURL: sourceURL,
-                headers: headers,
-                userAgent: userAgent
-            )
-        let directoryURL = persistentCacheContext?.cacheDirectoryURL ?? Self.videoCacheDirectoryURL
-        let entryURL = directoryURL.appendingPathComponent(cacheKey, isDirectory: true)
-        do {
-            try FileManager.default.removeItem(at: entryURL)
-            mpvDebugLog("persistent cache cleared key=\(cacheKey)")
-            return true
-        } catch CocoaError.fileNoSuchFile {
-            mpvDebugLog("persistent cache clear skipped entry-missing key=\(cacheKey)")
-            return true
-        } catch {
-            mpvDebugLog(
-                "persistent cache clear failed key=\(cacheKey) error=\(error.localizedDescription)"
-            )
-            return false
-        }
-    }
-
     nonisolated func logEffectiveCacheSettings(reason: String) {
         let propertyNames = [
             MPVProperty.cache,
             MPVProperty.cacheSeconds,
-            MPVProperty.cacheOnDisk,
-            MPVProperty.demuxerCacheDirectory,
             MPVProperty.demuxerCacheTime,
         ]
         let properties = propertyNames.map { name in
@@ -51,15 +18,13 @@ extension MPVPlayerView {
         }.joined(separator: " ")
         mpvDebugLog(
             "cache settings effective reason=\(reason) configuredEnabled=\(cacheConfiguration.isEnabled) "
-                + "configuredSeconds=\(cacheConfiguration.duration) configuredOnDisk=\(cacheConfiguration.isDiskCacheEnabled) "
-                + "configuredDiskLimit=\(cacheConfiguration.diskCacheLimit) "
-                + "properties=[\(properties)] persistentContext=\(persistentCacheContext != nil) "
-                + "directory=\(Self.videoCacheDirectoryURL.path)"
+                + "configuredSeconds=\(cacheConfiguration.duration) "
+                + "properties=[\(properties)]"
         )
     }
 
     /// Logs bounded cache counters periodically so a memory report can be
-    /// correlated with mpv's forward queue, back buffer and file cache.
+    /// correlated with mpv's forward queue and back buffer.
     nonisolated func logCacheRuntimeStateIfNeeded(currentTime: TimeInterval) {
         #if DEBUG
         guard cacheConfiguration.isEnabled else { return }
@@ -84,11 +49,9 @@ extension MPVPlayerView {
         if stateStatus >= 0 {
             defer { mpv_free_node_contents(&state) }
             let forwardBytes = cacheNodeInt64(named: "fw-bytes", in: state)
-            let fileBytes = cacheNodeInt64(named: "file-cache-bytes", in: state)
             let cacheEnd = cacheNodeDouble(named: "cache-end", in: state)
             let rawRate = cacheNodeInt64(named: "raw-input-rate", in: state)
             stateDescription = "status=0 fwBytes=\(forwardBytes.map(String.init) ?? "unknown") "
-                + "fileCacheBytes=\(fileBytes.map(String.init) ?? "unknown") "
                 + "cacheEnd=\(cacheEnd.map { String(format: "%.3f", $0) } ?? "unknown") "
                 + "rawInputRate=\(rawRate.map(String.init) ?? "unknown")"
         }

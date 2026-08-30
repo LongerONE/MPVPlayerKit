@@ -181,7 +181,7 @@ let playerViewController = MPVQuickPlayerViewController(
 present(playerViewController, animated: true)
 ```
 
-The quick interface provides play/pause, seeking, time display, a Picture in Picture button that enters and leaves the window, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, cache settings, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
+The quick interface provides play/pause, seeking, time display, a Picture in Picture button that enters and leaves the window, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, memory buffer settings, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
 
 Landscape lock can also be changed while the player is visible:
 
@@ -195,7 +195,7 @@ It also supports full-screen pan gestures: horizontal seeking, brightness on the
 playerViewController.gestureOptions = [.seeking, .volume]
 ```
 
-Settings can also be changed programmatically through `setPlaybackRate`, `setVideoQuality`, `setDebandEnabled`, `setCacheConfiguration`, `setSubtitleDelay`, and `setSubtitleStyle`. `MPVCacheConfiguration` supports 10, 30, 60, and 120 second cache durations; disk cache uses `Documents/.videoCache`. The quick player's cache settings are persisted as app-local global preferences. The underlying `player` remains public for direct access to every `MPVPlayer` operation.
+Settings can also be changed programmatically through `setPlaybackRate`, `setVideoQuality`, `setDebandEnabled`, `setCacheConfiguration`, `setSubtitleDelay`, and `setSubtitleStyle`. `MPVCacheConfiguration` supports 10, 30, 60, and 120 second memory buffer durations. The quick player's cache settings are persisted as app-local global preferences. The underlying `player` remains public for direct access to every `MPVPlayer` operation.
 
 It is optional; `MPVPlayer` does not depend on it at runtime.
 

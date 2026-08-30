@@ -90,10 +90,6 @@ extension MPVPlayerView {
     }
 
     func makeSetupProfiles() -> [MPVSetupProfile] {
-        if cacheConfiguration.isDiskCacheEnabled {
-            ensureVideoCacheDirectory()
-        }
-
         #if targetEnvironment(simulator)
         let hardwareDecode = "no"
         #else
@@ -170,21 +166,13 @@ extension MPVPlayerView {
                     cacheConfiguration.duration
                 )
             ),
-            (MPVProperty.cacheOnDisk, cacheConfiguration.isDiskCacheEnabled ? "yes" : "no"),
-            (MPVProperty.demuxerCacheDirectory, Self.videoCacheDirectoryURL.path),
+            ("cache-on-disk", "no"),
             ("demuxer-max-bytes", Self.demuxerMaxBytes),
             ("demuxer-max-back-bytes", Self.demuxerMaxBackBytes),
         ]
     }
 
     nonisolated func applyCacheConfiguration(_ configuration: MPVCacheConfiguration) {
-        if configuration.isDiskCacheEnabled {
-            ensureVideoCacheDirectory()
-        }
-        persistentCacheContext?.setPersistenceEnabled(
-            configuration.isEnabled && configuration.isDiskCacheEnabled
-        )
-        persistentCacheContext?.setDiskCacheLimit(configuration.diskCacheLimit)
         let options = [
             (MPVProperty.cache, configuration.isEnabled ? "yes" : "no"),
             (
@@ -195,34 +183,16 @@ extension MPVPlayerView {
                     configuration.duration
                 )
             ),
-            (MPVProperty.cacheOnDisk, configuration.isDiskCacheEnabled ? "yes" : "no"),
-            (MPVProperty.demuxerCacheDirectory, Self.videoCacheDirectoryURL.path),
+            ("cache-on-disk", "no"),
         ]
         options.forEach { option in
             let status = command("set", args: [option.0, option.1], checkForErrors: false)
             mpvDebugLog("cache option updated name=\(option.0) status=\(status)")
         }
         mpvDebugLog(
-            "cache options updated enabled=\(configuration.isEnabled) seconds=\(configuration.duration) onDisk=\(configuration.isDiskCacheEnabled)"
+            "cache options updated enabled=\(configuration.isEnabled) seconds=\(configuration.duration)"
         )
         logEffectiveCacheSettings(reason: "runtime")
-    }
-
-    nonisolated static var videoCacheDirectoryURL: URL {
-        let documentsURL = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
-            ?? FileManager.default.temporaryDirectory
-        return documentsURL.appendingPathComponent(".videoCache", isDirectory: true)
-    }
-
-    nonisolated func ensureVideoCacheDirectory() {
-        do {
-            try FileManager.default.createDirectory(
-                at: Self.videoCacheDirectoryURL,
-                withIntermediateDirectories: true
-            )
-        } catch {
-            mpvDebugLog("video cache directory create failed error=\(error.localizedDescription)")
-        }
     }
 
     nonisolated func applyVideoRenderProperties() {
@@ -288,37 +258,7 @@ extension MPVPlayerView {
         }
         mpvDebugLog("setupMPV created handle=\(mpv)")
 
-        var loadURL = url.absoluteString
-        if cacheConfiguration.isEnabled,
-           cacheConfiguration.isDiskCacheEnabled,
-           url.isFileURL == false {
-            let context = MPVPersistentVideoCacheContext(
-                sourceURL: url,
-                headers: headers,
-                userAgent: userAgent,
-                cacheDirectoryURL: Self.videoCacheDirectoryURL,
-                diskCacheLimit: cacheConfiguration.diskCacheLimit
-            )
-            let registrationStatus = mpv_stream_cb_add_ro(
-                mpv,
-                "mpvkit-cache",
-                Unmanaged.passUnretained(context).toOpaque(),
-                mpvPersistentVideoCacheOpen
-            )
-            mpvDebugLog(
-                "persistent cache registration status=\(registrationStatus) key=\(context.cacheKey)"
-            )
-            if registrationStatus >= 0 {
-                persistentCacheContext = context
-                let fileExtension = url.pathExtension.isEmpty ? "media" : url.pathExtension
-                loadURL = "mpvkit-cache://\(context.cacheKey)/stream.\(fileExtension)"
-            }
-        } else {
-            mpvDebugLog(
-                "persistent cache skipped cacheEnabled=\(cacheConfiguration.isEnabled) "
-                    + "diskEnabled=\(cacheConfiguration.isDiskCacheEnabled) fileURL=\(url.isFileURL)"
-            )
-        }
+        let loadURL = url.absoluteString
 
         #if DEBUG
         checkError(mpv_request_log_messages(mpv, "v"), operation: "request_log_messages", notifyOnFailure: false)
@@ -567,7 +507,6 @@ extension MPVPlayerView {
             pendingRequestIDs.forEach { notifySubtitleLoad(requestID: $0, success: false) }
             guard let mpv else {
                 lastMPVTimeSnapshot = nil
-                persistentCacheContext = nil
                 markColorOutputRendererStopped()
                 mpvDebugLog("destroyMPVHandle skipped reason=\(reason) handle=nil")
                 return
@@ -585,7 +524,6 @@ extension MPVPlayerView {
             mpv_terminate_destroy(mpv)
             markColorOutputRendererStopped()
             mpvDebugLog("destroyMPVHandle stage=terminate-end reason=\(reason)")
-            persistentCacheContext = nil
             lastMPVTimeSnapshot = nil
         }
     }

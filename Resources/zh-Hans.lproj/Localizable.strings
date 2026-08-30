@@ -35,14 +35,6 @@
 "cache.title" = "缓存设置";
 "cache.enabled" = "启用缓存";
 "cache.duration" = "缓存时长";
-"cache.disk" = "缓存到磁盘";
-"cache.directory" = "目录：Documents/.videoCache";
-"cache.disk_limit" = "磁盘缓存上限";
-"cache.disk_limit.1gb" = "1GB";
-"cache.disk_limit.2gb" = "2GB";
-"cache.disk_limit.5gb" = "5GB";
-"cache.disk_limit.10gb" = "10GB";
-"cache.disk_limit.unlimited" = "不限制";
 "cache.duration.10" = "10 秒";
 "cache.duration.30" = "30 秒";
 "cache.duration.60" = "60 秒";

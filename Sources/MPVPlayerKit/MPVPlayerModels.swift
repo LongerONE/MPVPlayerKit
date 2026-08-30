@@ -22,31 +22,6 @@ public enum MPVVideoQuality: Int, Sendable {
     case highQuality
 }
 
-public enum MPVCacheDiskLimit: Int, CaseIterable, Sendable {
-    case oneGB
-    case twoGB
-    case fiveGB
-    case tenGB
-    case unlimited
-
-    public static let defaultLimit: Self = .fiveGB
-
-    var bytes: Int64? {
-        switch self {
-        case .oneGB:
-            1 * 1024 * 1024 * 1024
-        case .twoGB:
-            2 * 1024 * 1024 * 1024
-        case .fiveGB:
-            5 * 1024 * 1024 * 1024
-        case .tenGB:
-            10 * 1024 * 1024 * 1024
-        case .unlimited:
-            nil
-        }
-    }
-}
-
 /// Runtime cache settings shared by the MPV player and quick-player UI.
 public struct MPVCacheConfiguration: Equatable, Sendable {
     /// Supported cache durations in seconds.
@@ -60,19 +35,12 @@ public struct MPVCacheConfiguration: Equatable, Sendable {
             duration = Self.nearestDuration(duration)
         }
     }
-    public var isDiskCacheEnabled: Bool
-    public var diskCacheLimit: MPVCacheDiskLimit
-
     public init(
         isEnabled: Bool = true,
-        duration: TimeInterval = Self.defaultDuration,
-        isDiskCacheEnabled: Bool = false,
-        diskCacheLimit: MPVCacheDiskLimit = .defaultLimit
+        duration: TimeInterval = Self.defaultDuration
     ) {
         self.isEnabled = isEnabled
         self.duration = Self.nearestDuration(duration)
-        self.isDiskCacheEnabled = isDiskCacheEnabled
-        self.diskCacheLimit = diskCacheLimit
     }
 
     public static let `default` = MPVCacheConfiguration()
@@ -88,8 +56,6 @@ public struct MPVCacheConfiguration: Equatable, Sendable {
         [
             "cacheEnabled": NSNumber(value: isEnabled),
             "cacheDuration": NSNumber(value: duration),
-            "cacheOnDisk": NSNumber(value: isDiskCacheEnabled),
-            "cacheDiskLimit": NSNumber(value: diskCacheLimit.rawValue),
         ] as NSDictionary
     }
 }
@@ -207,8 +173,6 @@ public struct MPVPlayerConfiguration: Sendable {
         ]
         values["cacheEnabled"] = NSNumber(value: cacheConfiguration.isEnabled)
         values["cacheDuration"] = NSNumber(value: cacheConfiguration.duration)
-        values["cacheOnDisk"] = NSNumber(value: cacheConfiguration.isDiskCacheEnabled)
-        values["cacheDiskLimit"] = NSNumber(value: cacheConfiguration.diskCacheLimit.rawValue)
         if let userAgent, userAgent.isEmpty == false {
             values["userAgent"] = userAgent
         }
