@@ -194,6 +194,16 @@ public final class MPVPlayerView: UIView {
     /// Picture in Picture timebase, so both advance at the rate of the video.
     @objc public internal(set) var playbackSpeed: Double = 1.0
 
+    /// Hosts with their own remote command coordinator can disable MPV's
+    /// built-in system playback controls to avoid duplicate command handlers.
+    @objc public var systemPlaybackControlsEnabled = true {
+        didSet {
+            guard oldValue != systemPlaybackControlsEnabled,
+                  systemPlaybackControlsEnabled == false else { return }
+            MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
+        }
+    }
+
     public var playerContentMode: UIView.ContentMode {
         get {
             contentMode

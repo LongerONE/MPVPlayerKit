@@ -26,13 +26,15 @@ final class MPVSystemPlaybackCoordinator {
     private init() {}
 
     func activate(playerView: MPVPlayerView) {
+        guard playerView.systemPlaybackControlsEnabled else { return }
         installCommandTargetsIfNeeded()
         activePlayerView = playerView
         publish(playerView: playerView)
     }
 
     func publish(playerView: MPVPlayerView) {
-        guard activePlayerView === playerView else { return }
+        guard playerView.systemPlaybackControlsEnabled,
+              activePlayerView === playerView else { return }
 
         let speed = playerView.playbackSpeed.isFinite && playerView.playbackSpeed > 0
             ? playerView.playbackSpeed
