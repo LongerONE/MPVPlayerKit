@@ -54,7 +54,7 @@ final class MPVPictureInPictureTests: XCTestCase {
     }
 
     @MainActor
-    func testQuickPlayerExposesPictureInPictureControl() throws {
+    func testQuickPlayerExposesPictureInPictureControl() async throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false)
         controller.loadViewIfNeeded()
@@ -63,7 +63,8 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertEqual(controller.pictureInPictureButton.accessibilityIdentifier, "MPVQuickPlayer.pictureInPictureButton")
         XCTAssertEqual(controller.pictureInPictureButton.isEnabled, controller.player.isPictureInPictureSupported)
         if controller.player.isPictureInPictureSupported {
-            XCTAssertTrue(controller.preparePictureInPicturePlayback(activateAudioSession: {}))
+            let prepared = await controller.preparePictureInPicturePlayback(activateAudioSession: {})
+            XCTAssertTrue(prepared)
             XCTAssertFalse(controller.player.allowsAutomaticPictureInPictureFromInline)
         }
     }

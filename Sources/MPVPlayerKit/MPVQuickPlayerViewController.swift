@@ -517,51 +517,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
         }
     }
 
-    @objc private func startPictureInPicture() {
-        guard player.isPictureInPictureActive == false else {
-            player.stopPictureInPicture()
-            return
-        }
-        guard preparePictureInPicturePlayback() else { return }
-        player.startPictureInPicture()
-    }
-
-    func updatePictureInPictureButton(isActive: Bool) {
-        pictureInPictureButton.setImage(
-            MPVQuickPlayerSymbol.image(
-                isActive ? .pictureInPictureExit : .pictureInPictureEnter,
-                pointSize: 17
-            ),
-            for: .normal
-        )
-    }
-
-    @discardableResult
-    func preparePictureInPicturePlayback(
-        activateAudioSession: @MainActor () throws -> Void = MPVQuickPlayerViewController
-            .activateMoviePlaybackAudioSession
-    ) -> Bool {
-        guard player.isPictureInPictureSupported else { return false }
-        do {
-            try activateAudioSession()
-            // The player view keeps automatic PiP disabled by default. Do not
-            // set it again here: changing this property tears down an inactive
-            // controller that may already have been prepared by the view's
-            // window lifecycle, so the explicit start can become a no-op.
-            return true
-        } catch {
-            return false
-        }
-    }
-
-    static func activateMoviePlaybackAudioSession() throws {
-        let audioSession = AVAudioSession.sharedInstance()
-        if audioSession.category != .playback || audioSession.mode != .moviePlayback {
-            try audioSession.setCategory(.playback, mode: .moviePlayback)
-        }
-        try audioSession.setActive(true)
-    }
-
     @objc private func closePlayer() {
         player.stop()
         if isLandscapeForced {
