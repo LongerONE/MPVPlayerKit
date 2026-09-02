@@ -47,10 +47,16 @@ extension MPVPlayerView {
         return CGSize(width: width, height: height)
     }
 
-    func updateMetalLayerGeometryIfNeeded(animated: Bool = true) {
+    func updateMetalLayerGeometryIfNeeded(
+        animated: Bool = true,
+        reconfigureVideoOutput: Bool = true
+    ) {
         if Thread.isMainThread == false {
             DispatchQueue.main.async { [weak self] in
-                self?.updateMetalLayerGeometryIfNeeded(animated: animated)
+                self?.updateMetalLayerGeometryIfNeeded(
+                    animated: animated,
+                    reconfigureVideoOutput: reconfigureVideoOutput
+                )
             }
             return
         }
@@ -59,7 +65,8 @@ extension MPVPlayerView {
             for: CGRect(origin: .zero, size: bounds.size),
             scale: UIScreen.main.nativeScale,
             transitionReason: "layout",
-            animated: animated
+            animated: animated,
+            reconfigureVideoOutput: reconfigureVideoOutput
         )
     }
 
@@ -86,7 +93,13 @@ extension MPVPlayerView {
             "display geometry transition ended bounds=\(bounds) "
                 + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
         )
-        updateMetalLayerGeometryIfNeeded(animated: false)
+        // UIKit has completed the display rotation. Update only the
+        // presentation layer here; toggling `vid` would tear down and rebuild
+        // the active video output and report a false cache wait to clients.
+        updateMetalLayerGeometryIfNeeded(
+            animated: false,
+            reconfigureVideoOutput: false
+        )
     }
 
     /// Re-sizes the renderer to the view after it changed window hierarchy.
@@ -192,7 +205,8 @@ extension MPVPlayerView {
         for targetBounds: CGRect,
         scale: CGFloat,
         transitionReason: String,
-        animated: Bool
+        animated: Bool,
+        reconfigureVideoOutput: Bool = true
     ) {
         let geometry = MPVMetalLayerGeometry(
             layerBounds: CGRect(origin: .zero, size: targetBounds.size),
@@ -211,6 +225,18 @@ extension MPVPlayerView {
 
         guard mpv != nil else {
             applyMetalLayerGeometry(geometry)
+            return
+        }
+
+        if reconfigureVideoOutput == false {
+            pendingMetalLayerGeometry = nil
+            resetGeometryTransitionAnimation(reason: "display-transition")
+            applyMetalLayerGeometry(geometry)
+            mpvDebugLog(
+                "metal geometry applied without video output reconfiguration "
+                    + "bounds=\(geometry.layerBounds) drawable=\(geometry.drawableSize) "
+                    + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
+            )
             return
         }
 
