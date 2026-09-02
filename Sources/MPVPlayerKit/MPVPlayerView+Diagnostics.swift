@@ -235,10 +235,11 @@ extension MPVPlayerView {
         .joined(separator: " ")
     }
 
-    nonisolated func setDouble(_ name: String, _ value: Double) {
-        guard let mpv else { return }
+    @discardableResult
+    nonisolated func setDouble(_ name: String, _ value: Double) -> Int32 {
+        guard let mpv else { return -1 }
         var data = value
-        mpv_set_property(mpv, name, MPV_FORMAT_DOUBLE, &data)
+        return mpv_set_property(mpv, name, MPV_FORMAT_DOUBLE, &data)
     }
 
     func setFlag(_ name: String, _ flag: Bool) {

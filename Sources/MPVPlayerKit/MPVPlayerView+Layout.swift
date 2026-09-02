@@ -232,6 +232,7 @@ extension MPVPlayerView {
             pendingMetalLayerGeometry = nil
             resetGeometryTransitionAnimation(reason: "display-transition")
             applyMetalLayerGeometry(geometry)
+            refreshVideoGeometryWithoutOutputReconfiguration()
             mpvDebugLog(
                 "metal geometry applied without video output reconfiguration "
                     + "bounds=\(geometry.layerBounds) drawable=\(geometry.drawableSize) "
@@ -241,10 +242,10 @@ extension MPVPlayerView {
         }
 
         if isDisplayGeometryTransitionDeferred {
-        mpvDebugLog(
-            "metal geometry deferred during display transition geometry=\(geometry) "
-                + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
-        )
+            mpvDebugLog(
+                "metal geometry deferred during display transition geometry=\(geometry) "
+                    + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
+            )
             return
         }
 
@@ -259,6 +260,45 @@ extension MPVPlayerView {
             resetGeometryTransitionAnimation(reason: transitionReason)
         }
         beginMetalGeometryTransition()
+    }
+
+    /// Refreshes MPV's destination rectangle after UIKit changes the
+    /// CAMetalLayer size. Changing the layer alone updates MoltenVK's
+    /// swapchain, but `vo_gpu_next` can retain the previous destination
+    /// rectangle. A tiny panscan pulse reaches MPV's resize-only path without
+    /// toggling `vid`, so the active decoder and network cache stay intact.
+    private func refreshVideoGeometryWithoutOutputReconfiguration() {
+        guard mpv != nil else { return }
+
+        let currentContentMode = currentContentModeSnapshot()
+        let finalPanscan: Double = currentContentMode == .fill ? 1.0 : 0.0
+        let temporaryPanscan = currentContentMode == .fill ? 0.999 : 0.001
+        let targetDrawableSize = metalLayer.drawableSize
+
+        queue.async { [weak self] in
+            guard let self, self.mpv != nil, self.isStopped() == false else { return }
+
+            let status = self.setDouble(MPVProperty.panscan, temporaryPanscan)
+            self.mpvDebugLog(
+                "video geometry resize-only refresh requested "
+                    + "panscan=\(temporaryPanscan) target=\(targetDrawableSize) status=\(status)"
+            )
+
+            // Keep the pulse long enough for MPV to process the first option
+            // update. Read the mode again so a user change during rotation is
+            // not overwritten by the delayed restore.
+            self.queue.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+                guard let self, self.mpv != nil, self.isStopped() == false else { return }
+                let latestContentMode = self.currentContentModeSnapshot()
+                let restoredPanscan = latestContentMode == .fill ? finalPanscan : 0.0
+                let restoreStatus = self.setDouble(MPVProperty.panscan, restoredPanscan)
+                self.mpvDebugLog(
+                    "video geometry resize-only refresh restored "
+                        + "panscan=\(restoredPanscan) target=\(targetDrawableSize) "
+                        + "status=\(restoreStatus)"
+                )
+            }
+        }
     }
 
     private func applyMetalLayerGeometry(_ geometry: MPVMetalLayerGeometry) {
