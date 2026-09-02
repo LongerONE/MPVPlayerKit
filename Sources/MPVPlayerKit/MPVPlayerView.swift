@@ -55,6 +55,11 @@ enum MPVProperty {
     static let cache = "cache"
     static let cacheSeconds = "cache-secs"
     static let pausedForCache = "paused-for-cache"
+    static let cacheBufferingState = "cache-buffering-state"
+    static let coreIdle = "core-idle"
+    static let idleActive = "idle-active"
+    static let eofReached = "eof-reached"
+    static let seeking = "seeking"
     static let demuxerCacheState = "demuxer-cache-state"
     static let demuxerCacheTime = "demuxer-cache-time"
     static let timePosition = "time-pos"
@@ -281,6 +286,16 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var debandEnabled = false
     nonisolated(unsafe) var cacheConfiguration = MPVCacheConfiguration.default
     nonisolated(unsafe) var lastCacheDiagnosticsLogTime: CFTimeInterval = 0
+    // Buffering state is reduced on the MPV queue. The work item is kept
+    // queue-bound as well, so an obsolete core-idle fallback cannot publish
+    // after a new playback intent or handle teardown.
+    nonisolated(unsafe) var bufferingStateMachine = MPVBufferingStateMachine()
+    nonisolated(unsafe) var bufferingFallbackWorkItem: DispatchWorkItem?
+    nonisolated(unsafe) var bufferingFallbackGeneration: UInt64 = 0
+    // Guarded by playbackStateLock because configure runs on MainActor while
+    // teardown and buffering decisions run on the MPV queue.
+    nonisolated(unsafe) var bufferingSessionGeneration: UInt64 = 0
+    nonisolated(unsafe) var bufferingActiveSeekCount = 0
     nonisolated(unsafe) var subtitleDelayValue = 0.0
     let clientSubtitleController = MPVSubtitlePresentationController()
     nonisolated(unsafe) var subtitleStyleValues: [String: String] = [
@@ -522,6 +537,11 @@ public final class MPVPlayerView: UIView {
         isPlaying = false
         currentSubtitleFontCapability = .noSubtitle
         playbackSpeed = 1.0
+        _ = nextPlaybackIntentGeneration()
+        _ = nextBufferingSessionGeneration()
+        queue.async { [weak self] in
+            self?.resetBufferingStateOnMPVQueue(reason: "configure")
+        }
         let colorHint = MPVColorMappingPolicy.contentHint(
             isDolbyVisionPlayback: isDolbyVisionPlayback
         )

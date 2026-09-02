@@ -63,6 +63,7 @@ extension MPVPlayerView {
                 return
             }
 
+            self.updateBufferingPlaybackIntent(.playing)
             self.setFlag(MPVProperty.pause, false)
             self.startTimeTimer()
             let state: MPVPlayerState = self.hasReportedReadyToPlay ? .bufferFinished : .buffering
@@ -87,6 +88,8 @@ extension MPVPlayerView {
             else {
                 return
             }
+            self.updateBufferingPlaybackIntent(.userPaused)
+            self.updateBufferingPropertyOnQueue(name: MPVProperty.pause, value: true)
             self.setFlag(MPVProperty.pause, true)
             self.stopTimeTimer()
             self.notifyOnMain {
@@ -135,6 +138,7 @@ extension MPVPlayerView {
             "seek accepted request=\(request.requestID) time=\(request.targetTime) autoPlay=\(autoPlay)"
         )
         queue.async { [weak self] in
+            self?.markBufferingSeekStarted()
             self?.enqueueSeekOnMPVQueue(request)
         }
         return true

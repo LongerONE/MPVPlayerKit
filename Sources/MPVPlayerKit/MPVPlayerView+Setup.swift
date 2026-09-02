@@ -240,6 +240,7 @@ extension MPVPlayerView {
             "setupMPV profile options name=\(profile.name) count=\(profile.options.count)"
         )
         performOnMPVQueueSync {
+            resetBufferingStateOnMPVQueue(reason: "setup")
             lastMPVTimeSnapshot = nil
             currentSubtitleUsesOriginalStyle = false
             loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)
@@ -344,6 +345,36 @@ extension MPVPlayerView {
         checkError(
             mpv_observe_property(mpv, 0, MPVProperty.pausedForCache, MPV_FORMAT_FLAG),
             operation: "observe paused-for-cache",
+            notifyOnFailure: false
+        )
+        checkError(
+            mpv_observe_property(mpv, 0, MPVProperty.cacheBufferingState, MPV_FORMAT_DOUBLE),
+            operation: "observe cache-buffering-state",
+            notifyOnFailure: false
+        )
+        checkError(
+            mpv_observe_property(mpv, 0, MPVProperty.coreIdle, MPV_FORMAT_FLAG),
+            operation: "observe core-idle",
+            notifyOnFailure: false
+        )
+        checkError(
+            mpv_observe_property(mpv, 0, MPVProperty.pause, MPV_FORMAT_FLAG),
+            operation: "observe pause",
+            notifyOnFailure: false
+        )
+        checkError(
+            mpv_observe_property(mpv, 0, MPVProperty.idleActive, MPV_FORMAT_FLAG),
+            operation: "observe idle-active",
+            notifyOnFailure: false
+        )
+        checkError(
+            mpv_observe_property(mpv, 0, MPVProperty.eofReached, MPV_FORMAT_FLAG),
+            operation: "observe eof-reached",
+            notifyOnFailure: false
+        )
+        checkError(
+            mpv_observe_property(mpv, 0, MPVProperty.seeking, MPV_FORMAT_FLAG),
+            operation: "observe seeking",
             notifyOnFailure: false
         )
         checkError(
@@ -482,6 +513,8 @@ extension MPVPlayerView {
     private func destroyMPVHandleOnMPVQueue(reason: String, sendStopCommand: Bool) {
         MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         setDecoderMode(.initializing)
+        _ = nextBufferingSessionGeneration()
+        resetBufferingStateOnMPVQueue(reason: "destroy-\(reason)", notifyFinish: true)
         stopTimeTimer()
         clearMediaTracksCache()
         lastLoggedSubtitleText = ""

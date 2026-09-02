@@ -83,6 +83,7 @@ extension MPVPlayerView {
                     self.mpvDebugLog(
                         "event file-loaded profile=\(self.activeProfileDescription)"
                     )
+                    self.markBufferingFileLoaded()
                     self.refreshMediaTracksCache()
                     self.refreshPictureInPictureVideoDisplaySize()
                     self.refreshVideoDisplayAspectRatio()
@@ -91,6 +92,7 @@ extension MPVPlayerView {
                         "event playback-restart stage=begin "
                             + "profile=\(self.activeProfileDescription)"
                     )
+                    self.handleBufferingPlaybackRestart()
                     self.hasPlaybackRestarted = true
                     self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-begin")
                     self.refreshDecoderModeAfterPlaybackRestart()
@@ -116,6 +118,7 @@ extension MPVPlayerView {
                     self.handleEndFile(event)
                 case MPV_EVENT_SHUTDOWN:
                     self.mpvDebugLog("event shutdown")
+                    self.resetBufferingStateOnMPVQueue(reason: "shutdown")
                     let pendingSeekRequests = Array(self.pendingSeekCommands.values)
                     self.pendingSeekCommands.removeAll(keepingCapacity: true)
                     let recoverySnapshot = self.lastMPVTimeSnapshot
@@ -195,6 +198,7 @@ extension MPVPlayerView {
         recoverySnapshot: MPVPlaybackTimeSnapshot? = nil
     ) {
         dispatchPrecondition(condition: .onQueue(queue))
+        markBufferingSeekFinished()
         guard let resolution = MPVSeekReplyResolver.resolve(
             request: request,
             error: error
@@ -460,6 +464,7 @@ extension MPVPlayerView {
         let endFile = event.pointee.data?.assumingMemoryBound(to: mpv_event_end_file.self).pointee
         let errorCode = endFile?.error ?? 0
         let reason = endFile?.reason
+        resetBufferingStateOnMPVQueue(reason: "end-file")
         notifyOnMain {
             self.handleEndFileOnMain(reason: reason, errorCode: errorCode)
         }
@@ -556,18 +561,10 @@ extension MPVPlayerView {
         case MPVProperty.videoOutputDisplayWidth, MPVProperty.videoOutputDisplayHeight,
              MPVProperty.videoDisplayWidth, MPVProperty.videoDisplayHeight:
             refreshVideoDisplayAspectRatio()
-        case MPVProperty.pausedForCache:
-            let bufferingValue = property.data?.assumingMemoryBound(to: Int32.self).pointee ?? 0
-            let buffering = bufferingValue != 0
-            notifyOnMain {
-                if buffering {
-                    self.stopTimeTimer()
-                } else if self.isPlaying {
-                    self.startTimeTimer()
-                }
-                self.notifyBufferingProgress(buffering ? 0 : 100)
-                self.notifyState(buffering ? .buffering : .bufferFinished)
-            }
+        case MPVProperty.pausedForCache, MPVProperty.cacheBufferingState,
+             MPVProperty.coreIdle, MPVProperty.pause, MPVProperty.idleActive,
+             MPVProperty.eofReached, MPVProperty.seeking:
+            handleBufferingPropertyChange(property)
         case MPVProperty.demuxerCacheTime:
             publishBufferedProgress()
         case MPVProperty.subtitleText:

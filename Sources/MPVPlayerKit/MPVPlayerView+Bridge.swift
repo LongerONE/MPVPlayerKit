@@ -10,6 +10,19 @@ import libmpv
 #endif
 
 extension MPVPlayerView {
+    nonisolated func nextBufferingSessionGeneration() -> UInt64 {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        bufferingSessionGeneration &+= 1
+        return bufferingSessionGeneration
+    }
+
+    nonisolated func currentBufferingSessionGeneration() -> UInt64 {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return bufferingSessionGeneration
+    }
+
     nonisolated func nextPlaybackIntentGeneration() -> UInt64 {
         playbackStateLock.lock()
         defer { playbackStateLock.unlock() }
