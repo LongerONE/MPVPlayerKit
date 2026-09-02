@@ -17,7 +17,7 @@ extension MPVPlayerView {
                 + "drawable=\(metalLayer.drawableSize) current=\(currentTime) "
                 + "duration=\(duration) playing=\(isPlaying)"
         )
-        animateGeometryTransitionOut(targetSize: targetSize, reason: "prelayout")
+        updateDisplayPresentationMapping(targetSize: targetSize, reason: "prelayout")
     }
 
     @objc public func refreshLayout(_ options: NSDictionary) {
@@ -27,7 +27,7 @@ extension MPVPlayerView {
                 + "bounds=\(bounds) drawable=\(metalLayer.drawableSize) current=\(currentTime) "
                 + "duration=\(duration) playing=\(isPlaying)"
         )
-        updateMetalLayerGeometryIfNeeded()
+        updateDisplayPresentationMapping(targetSize: targetSize, reason: "refresh-layout")
     }
 
     @objc public func play() {

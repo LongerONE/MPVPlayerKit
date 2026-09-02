@@ -57,6 +57,9 @@ extension MPVPlayerView {
         // debug session while libmpv is starting.
         let boundsSnapshot = currentViewBoundsSnapshot()
         mpvDebugLog("setupMPV begin url=\(redactedURLDescription(url)) bounds=\(boundsSnapshot) headers=\(headers.count) profiles=\(setupProfiles.map(\.name).joined(separator: ","))")
+        // Allocate the renderer surface before libmpv receives `wid`. The
+        // surface remains fixed while UIKit animates portrait/landscape.
+        prepareStableMetalCanvasForRendererSetup()
 
         while true {
             prepareProfilesForNextRenderer()
@@ -349,6 +352,16 @@ extension MPVPlayerView {
             notifyOnFailure: false
         )
         checkError(
+            mpv_observe_property(mpv, 0, MPVProperty.videoOutputDisplayWidth, MPV_FORMAT_INT64),
+            operation: "observe video-out-params/dw",
+            notifyOnFailure: false
+        )
+        checkError(
+            mpv_observe_property(mpv, 0, MPVProperty.videoOutputDisplayHeight, MPV_FORMAT_INT64),
+            operation: "observe video-out-params/dh",
+            notifyOnFailure: false
+        )
+        checkError(
             mpv_observe_property(mpv, 0, MPVProperty.subtitleText, MPV_FORMAT_STRING),
             operation: "observe sub-text",
             notifyOnFailure: false
@@ -471,14 +484,8 @@ extension MPVPlayerView {
         setDecoderMode(.initializing)
         stopTimeTimer()
         clearMediaTracksCache()
-        pendingMetalLayerGeometry = nil
-        isMetalGeometryTransitionInProgress = false
-        isDisplayGeometryTransitionDeferred = false
-        pendingRendererGeometryRefreshID = nil
-        rendererGeometryRefreshUsesAutoContext = false
         lastLoggedSubtitleText = ""
         hasLoggedSubtitleTextEvent = false
-        resetGeometryTransitionAnimation()
         notifyOnMain {
             self.updatePictureInPictureVideoDisplaySize(.zero)
         }

@@ -85,6 +85,7 @@ extension MPVPlayerView {
                     )
                     self.refreshMediaTracksCache()
                     self.refreshPictureInPictureVideoDisplaySize()
+                    self.refreshVideoDisplayAspectRatio()
                 case MPV_EVENT_PLAYBACK_RESTART:
                     self.mpvDebugLog(
                         "event playback-restart stage=begin "
@@ -101,22 +102,15 @@ extension MPVPlayerView {
                         self.mpvDebugLog("event playback-restart stage=color-diagnostics-end")
                     }
                     self.refreshPictureInPictureVideoDisplaySize()
+                    self.refreshVideoDisplayAspectRatio()
                     self.mpvDebugLog("event playback-restart stage=end")
                 case MPV_EVENT_VIDEO_RECONFIG:
                     self.mpvDebugLog(
                         "event video-reconfig current=\(self.currentTime) duration=\(self.duration) "
-                            + "playing=\(self.isPlaying) "
-                            + "rendererRefreshID=\(self.pendingRendererGeometryRefreshID.map(String.init) ?? "none")"
+                            + "playing=\(self.isPlaying)"
                     )
-                    if let refreshID = self.pendingRendererGeometryRefreshID {
-                        self.notifyOnMain {
-                            self.finishRendererGeometryRefresh(
-                                id: refreshID,
-                                reason: "video-reconfig"
-                            )
-                        }
-                    }
                     self.refreshPictureInPictureVideoDisplaySize()
+                    self.refreshVideoDisplayAspectRatio()
                 case MPV_EVENT_END_FILE:
                     self.mpvDebugLog("event end-file stage=begin")
                     self.handleEndFile(event)
@@ -559,29 +553,12 @@ extension MPVPlayerView {
         let property = data.assumingMemoryBound(to: mpv_event_property.self).pointee
         let propertyName = String(cString: property.name)
         switch propertyName {
+        case MPVProperty.videoOutputDisplayWidth, MPVProperty.videoOutputDisplayHeight,
+             MPVProperty.videoDisplayWidth, MPVProperty.videoDisplayHeight:
+            refreshVideoDisplayAspectRatio()
         case MPVProperty.pausedForCache:
             let bufferingValue = property.data?.assumingMemoryBound(to: Int32.self).pointee ?? 0
             let buffering = bufferingValue != 0
-            if let refreshID = pendingRendererGeometryRefreshID {
-                mpvDebugLog(
-                    "event paused-for-cache buffering=\(buffering) "
-                        + "rendererRefreshID=\(refreshID) suppressed=true"
-                )
-                if buffering {
-                    // A renderer UPDATE_VO may briefly report a cache wait
-                    // while it rebuilds the presentation path. It does not
-                    // represent a URL reload or a playback-position change.
-                    return
-                }
-                pendingRendererGeometryRefreshID = nil
-                notifyOnMain {
-                    self.finishRendererGeometryRefresh(
-                        id: refreshID,
-                        reason: "paused-for-cache=false"
-                    )
-                }
-                return
-            }
             notifyOnMain {
                 if buffering {
                     self.stopTimeTimer()
@@ -608,6 +585,14 @@ extension MPVPlayerView {
         notifyOnMain {
             self.updatePictureInPictureVideoDisplaySize(size)
         }
+    }
+
+    nonisolated func refreshVideoDisplayAspectRatio() {
+        let width = getInt64(MPVProperty.videoOutputDisplayWidth)
+            ?? getInt64(MPVProperty.videoDisplayWidth)
+        let height = getInt64(MPVProperty.videoOutputDisplayHeight)
+            ?? getInt64(MPVProperty.videoDisplayHeight)
+        updateVideoDisplayAspectRatio(width: width, height: height)
     }
 
 }

@@ -54,6 +54,28 @@ final class MPVPictureInPictureTests: XCTestCase {
     }
 
     @MainActor
+    func testStableCanvasDoesNotFollowControllerBounds() {
+        let playerView = MPVPlayerView(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
+        playerView.updateMetalLayerGeometry(
+            for: playerView.bounds,
+            scale: UIScreen.main.nativeScale,
+            transitionReason: "test",
+            animated: false
+        )
+        let canvas = playerView.stableMetalCanvas
+        let drawable = playerView.metalLayer.drawableSize
+
+        playerView.frame = CGRect(x: 0, y: 0, width: 852, height: 393)
+        playerView.layoutIfNeeded()
+
+        XCTAssertEqual(playerView.stableMetalCanvas, canvas)
+        XCTAssertEqual(playerView.metalLayer.drawableSize, drawable)
+        XCTAssertEqual(playerView.metalLayer.transform.m11, playerView.metalLayer.transform.m22, accuracy: 0.0001)
+        XCTAssertEqual(playerView.metalLayer.transform.m12, 0.0, accuracy: 0.0001)
+        XCTAssertEqual(playerView.metalLayer.transform.m21, 0.0, accuracy: 0.0001)
+    }
+
+    @MainActor
     func testQuickPlayerExposesPictureInPictureControl() async throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false)
@@ -228,52 +250,39 @@ final class MPVPictureInPictureTests: XCTestCase {
         XCTAssertTrue(playerView.isDescendant(of: container))
     }
 
-    /// Returning from the window left the layer presenting the drawable it
-    /// last produced at the Picture in Picture size, which put the video in a
-    /// strip at the top of the restored view. The size matches the one applied
-    /// before the window opened, so the ordinary change test skips it and MPV
-    /// is never told to render at the inline size again.
+    /// Returning from the window must only remap the fixed renderer surface;
+    /// the drawable itself remains unchanged across the PiP presentation size.
     @MainActor
-    func testGeometryResyncRecoversADrawableLeftAtThePictureInPictureSize() {
-        let scale = UIScreen.main.nativeScale
+    func testGeometryResyncKeepsStableDrawableAfterPictureInPicture() {
         let playerView = MPVPlayerView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         playerView.updateMetalLayerGeometry(
             for: playerView.bounds,
-            scale: scale,
+            scale: UIScreen.main.nativeScale,
             transitionReason: "test",
             animated: false
         )
-        let inlineDrawable = CGSize(width: 390 * scale, height: 844 * scale)
-        XCTAssertEqual(playerView.metalLayer.drawableSize, inlineDrawable)
+        let canvas = playerView.stableMetalCanvas
+        let drawable = playerView.metalLayer.drawableSize
 
-        // What the window leaves behind: the layer is sized for the small
-        // Picture in Picture drawable while the view is back at full size.
-        playerView.metalLayer.drawableSize = CGSize(width: 320 * scale, height: 180 * scale)
-
-        // A plain layout pass cannot see it, because the change test compares
-        // against the last geometry applied rather than against the layer.
-        playerView.updateMetalLayerGeometryIfNeeded()
-        XCTAssertNotEqual(playerView.metalLayer.drawableSize, inlineDrawable)
-
+        playerView.frame = CGRect(x: 0, y: 0, width: 320, height: 180)
         playerView.resynchronizeMetalLayerGeometry(reason: "pip-exit")
+        playerView.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        playerView.resynchronizeMetalLayerGeometry(reason: "pip-inline")
 
-        XCTAssertEqual(playerView.metalLayer.drawableSize, inlineDrawable)
-        XCTAssertEqual(playerView.metalLayer.frame, playerView.bounds)
+        XCTAssertEqual(playerView.stableMetalCanvas, canvas)
+        XCTAssertEqual(playerView.metalLayer.drawableSize, drawable)
+        XCTAssertEqual(playerView.metalLayer.transform.m11, playerView.metalLayer.transform.m22, accuracy: 0.0001)
     }
 
     @MainActor
     func testGeometryResyncWaitsForTheRestoredInlineLayout() {
-        let scale = UIScreen.main.nativeScale
         let playerView = MPVPlayerView(frame: .zero)
-        let pictureInPictureDrawable = CGSize(width: 320 * scale, height: 180 * scale)
-        playerView.metalLayer.drawableSize = pictureInPictureDrawable
 
         // PiP delegate callbacks can restore the view before the inline
-        // hierarchy has assigned its final size. Applying this zero size would
-        // leave the small PiP drawable pinned at the top of the player.
+        // hierarchy has assigned its final size. Defer presentation mapping
+        // until UIKit reports a non-zero target.
         playerView.resynchronizeMetalLayerGeometry(reason: "pip-exit")
 
-        XCTAssertEqual(playerView.metalLayer.drawableSize, pictureInPictureDrawable)
         XCTAssertEqual(
             playerView.pendingPictureInPictureGeometryResynchronizationReason,
             "pip-exit"
@@ -284,17 +293,14 @@ final class MPVPictureInPictureTests: XCTestCase {
 
         XCTAssertEqual(
             playerView.metalLayer.drawableSize,
-            CGSize(width: 390 * scale, height: 844 * scale)
+            playerView.stableMetalCanvas?.drawableSize ?? .zero
         )
         XCTAssertNil(playerView.pendingPictureInPictureGeometryResynchronizationReason)
     }
 
     @MainActor
-    func testGeometryResyncRetriesWhenInlineLayoutArrivesAfterPictureInPictureExit() async {
-        let scale = UIScreen.main.nativeScale
+    func testGeometryResyncRetriesWhenInlineLayoutArrivesAfterPictureInPictureExit() async throws {
         let playerView = MPVPlayerView(frame: .zero)
-        let pictureInPictureDrawable = CGSize(width: 320 * scale, height: 180 * scale)
-        playerView.metalLayer.drawableSize = pictureInPictureDrawable
 
         playerView.resynchronizeMetalLayerGeometry(reason: "pip-exit")
         XCTAssertNotNil(playerView.pictureInPictureGeometryResynchronizationTask)
@@ -306,7 +312,7 @@ final class MPVPictureInPictureTests: XCTestCase {
 
         XCTAssertEqual(
             playerView.metalLayer.drawableSize,
-            CGSize(width: 390 * scale, height: 844 * scale)
+            playerView.stableMetalCanvas?.drawableSize ?? .zero
         )
         playerView.pictureInPictureGeometryResynchronizationTask?.cancel()
     }

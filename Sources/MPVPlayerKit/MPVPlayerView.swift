@@ -83,6 +83,8 @@ enum MPVProperty {
     static let subtitleMarginY = "sub-margin-y"
     static let videoOutputDisplayWidth = "video-out-params/dw"
     static let videoOutputDisplayHeight = "video-out-params/dh"
+    static let videoDisplayWidth = "dwidth"
+    static let videoDisplayHeight = "dheight"
     static let estimatedVideoFilterFPS = "estimated-vf-fps"
     static let containerFPS = "container-fps"
     static let osdMarginLeft = "osd-dimensions/ml"
@@ -335,8 +337,11 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var lastLoggedSubtitleText = ""
     nonisolated(unsafe) var hasLoggedSubtitleTextEvent = false
     nonisolated(unsafe) var repeatedMPVLogMessageCounts: [String: Int] = [:]
-    var lastAppliedLayerBounds = CGRect.null
-    var lastAppliedDrawableSize = CGSize.zero
+    /// The renderer surface is allocated once for the playback session. UIKit
+    /// rotation only changes the presentation mapping applied to this surface.
+    var stableMetalCanvas: MPVStableMetalCanvas?
+    var videoDisplayAspectRatio = MPVDisplayGeometry.defaultVideoAspectRatio
+    let videoDisplayAspectRatioLock = NSLock()
     /// A Picture in Picture hierarchy callback can arrive before UIKit has
     /// assigned the view a size in its destination hierarchy. Keep the
     /// resynchronization pending instead of applying a zero-sized drawable.
@@ -346,24 +351,6 @@ public final class MPVPlayerView: UIView {
     /// layout is applied without requiring a device rotation.
     var pictureInPictureGeometryResynchronizationTask: Task<Void, Never>?
     var pictureInPictureGeometryResynchronizationGeneration = 0
-    var pendingMetalLayerGeometry: MPVMetalLayerGeometry?
-    var isMetalGeometryTransitionInProgress = false
-    var isDisplayGeometryTransitionDeferred = false
-    // The ID is main-actor state used to keep a renderer resize completion
-    // from an earlier rotation from dismissing a newer transition overlay.
-    var rendererGeometryRefreshID = 0
-    var activeRendererGeometryRefreshID: Int?
-    // These two values are read and written only on `queue` once playback is
-    // active. The unsafe annotation documents that queue ownership explicitly
-    // for Swift 6's actor checking.
-    nonisolated(unsafe) var pendingRendererGeometryRefreshID: Int?
-    nonisolated(unsafe) var rendererGeometryRefreshUsesAutoContext = false
-    var geometryTransitionOverlayView: UIView?
-    var geometryTransitionPreparedTargetSize = CGSize.zero
-    let geometryTransitionFallbackAlpha: CGFloat = 0.58
-    let geometryTransitionDimAlpha: CGFloat = 0.36
-    let geometryTransitionFadeOutDuration: TimeInterval = 0.32
-    var geometryTransitionAnimationID = 0
     nonisolated(unsafe) var setupProfiles: [MPVSetupProfile] = []
     nonisolated(unsafe) var activeSetupProfileIndex = 0
     nonisolated let pictureInPictureRendererRuntimeState =
@@ -400,6 +387,7 @@ public final class MPVPlayerView: UIView {
 
     func setupLayer() {
         backgroundColor = .black
+        clipsToBounds = true
         metalLayer.framebufferOnly = true
         metalLayer.needsDisplayOnBoundsChange = true
         // A detached view has no target screen. Start conservatively in SDR;
@@ -520,20 +508,14 @@ public final class MPVPlayerView: UIView {
         setupProfiles = []
         activeSetupProfileIndex = 0
         pictureInPictureRendererRuntimeState.reset()
-        lastAppliedLayerBounds = CGRect.null
-        lastAppliedDrawableSize = .zero
+        stableMetalCanvas = nil
+        videoDisplayAspectRatioLock.lock()
+        videoDisplayAspectRatio = MPVDisplayGeometry.defaultVideoAspectRatio
+        videoDisplayAspectRatioLock.unlock()
         pictureInPictureGeometryResynchronizationTask?.cancel()
         pictureInPictureGeometryResynchronizationTask = nil
         pictureInPictureGeometryResynchronizationGeneration &+= 1
         pendingPictureInPictureGeometryResynchronizationReason = nil
-        pendingMetalLayerGeometry = nil
-        isMetalGeometryTransitionInProgress = false
-        isDisplayGeometryTransitionDeferred = false
-        rendererGeometryRefreshID &+= 1
-        activeRendererGeometryRefreshID = nil
-        rendererGeometryRefreshUsesAutoContext = false
-        geometryTransitionPreparedTargetSize = .zero
-        resetGeometryTransitionAnimation()
         currentTime = 0.0
         duration = 0.0
         bufferedProgress = nil
@@ -553,7 +535,7 @@ public final class MPVPlayerView: UIView {
             resynchronizeMetalLayerGeometry(reason: reason)
             return
         }
-        updateMetalLayerGeometryIfNeeded()
+        updateDisplayPresentationMapping(reason: "layout")
     }
 
     public override func didMoveToSuperview() {

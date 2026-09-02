@@ -1,13 +1,102 @@
-import AVFoundation
 import QuartzCore
 import UIKit
-#if canImport(Libmpv)
-import Libmpv
-#elseif canImport(libmpv)
-import libmpv
-#else
-#error("MPVPlayerKit requires MPVKit's Libmpv module.")
-#endif
+
+/// Geometry written to CAMetalLayer only when a playback session starts.
+/// It intentionally does not contain the view's current bounds.
+struct MPVStableMetalCanvas: Equatable {
+    let logicalSize: CGSize
+    let drawableSize: CGSize
+    let contentsScale: CGFloat
+}
+
+/// Pure mapping from the fixed renderer surface into the current controller
+/// bounds. UIKit applies it to the live CAMetalLayer; libmpv never sees it.
+struct MPVDisplayGeometry: Equatable {
+    static let defaultVideoAspectRatio: CGFloat = 16.0 / 9.0
+
+    let sourceVideoRect: CGRect
+    let targetVideoRect: CGRect
+    let scale: CGFloat
+    let translation: CGPoint
+    let rotation: CGFloat
+
+    static func make(
+        canvasSize: CGSize,
+        videoAspectRatio: CGFloat,
+        targetBounds: CGRect,
+        contentMode: MPVContentModeSnapshot
+    ) -> MPVDisplayGeometry {
+        let safeCanvas = usableSize(canvasSize)
+        let safeTarget = usableRect(targetBounds)
+        let aspect = videoAspectRatio.isFinite && videoAspectRatio > 0.0
+            ? videoAspectRatio
+            : defaultVideoAspectRatio
+        let sourceBounds = CGRect(origin: .zero, size: safeCanvas)
+        let sourceVideoRect: CGRect
+        let targetVideoRect: CGRect
+
+        switch contentMode {
+        case .fit:
+            sourceVideoRect = aspectRect(aspect, in: sourceBounds, fill: false)
+            targetVideoRect = aspectRect(aspect, in: safeTarget, fill: false)
+        case .fill:
+            // mpv's panscan fills and crops the fixed canvas. The pixels
+            // available to UIKit are therefore the whole canvas; only the
+            // target rect is allowed to extend beyond the controller bounds.
+            sourceVideoRect = sourceBounds
+            let canvasAspect = safeCanvas.width / max(safeCanvas.height, 1.0)
+            targetVideoRect = aspectRect(canvasAspect, in: safeTarget, fill: true)
+        }
+
+        let scale = max(
+            targetVideoRect.width / max(sourceVideoRect.width, 1.0),
+            targetVideoRect.height / max(sourceVideoRect.height, 1.0)
+        )
+        let translation = CGPoint(
+            x: targetVideoRect.midX - sourceVideoRect.midX * scale,
+            y: targetVideoRect.midY - sourceVideoRect.midY * scale
+        )
+        return MPVDisplayGeometry(
+            sourceVideoRect: sourceVideoRect,
+            targetVideoRect: targetVideoRect,
+            scale: scale,
+            translation: translation,
+            rotation: 0.0
+        )
+    }
+
+    private static func usableSize(_ size: CGSize) -> CGSize {
+        CGSize(
+            width: size.width.isFinite && size.width > 1.0 ? size.width : 1.0,
+            height: size.height.isFinite && size.height > 1.0 ? size.height : 1.0
+        )
+    }
+
+    private static func usableRect(_ rect: CGRect) -> CGRect {
+        CGRect(origin: rect.origin, size: usableSize(rect.size))
+    }
+
+    private static func aspectRect(
+        _ aspect: CGFloat,
+        in bounds: CGRect,
+        fill: Bool
+    ) -> CGRect {
+        let containerAspect = bounds.width / max(bounds.height, 1.0)
+        let size: CGSize
+        let fitsWidth = fill ? aspect < containerAspect : aspect > containerAspect
+        if fitsWidth {
+            size = CGSize(width: bounds.width, height: bounds.width / aspect)
+        } else {
+            size = CGSize(width: bounds.height * aspect, height: bounds.height)
+        }
+        return CGRect(
+            x: bounds.midX - size.width / 2.0,
+            y: bounds.midY - size.height / 2.0,
+            width: size.width,
+            height: size.height
+        )
+    }
+}
 
 struct MPVMetalLayerGeometry: Equatable {
     let layerBounds: CGRect
@@ -47,27 +136,67 @@ extension MPVPlayerView {
         return CGSize(width: width, height: height)
     }
 
+    /// Called from the MPV queue before `wid` is assigned. A 90° controller
+    /// rotation never changes this drawable or the Vulkan swapchain.
+    nonisolated func prepareStableMetalCanvasForRendererSetup() {
+        let apply = { @MainActor [self] in
+            ensureStableMetalCanvas()
+        }
+        if Thread.isMainThread {
+            MainActor.assumeIsolated(apply)
+        } else {
+            DispatchQueue.main.sync {
+                MainActor.assumeIsolated(apply)
+            }
+        }
+    }
+
+    private func ensureStableMetalCanvas() {
+        guard stableMetalCanvas == nil else { return }
+        let screen = window?.windowScene?.screen ?? UIScreen.main
+        let screenBounds = screen.bounds
+        let logicalSize = CGSize(
+            width: max(screenBounds.width, screenBounds.height),
+            height: min(screenBounds.width, screenBounds.height)
+        )
+        let scale = max(screen.nativeScale, 1.0)
+        let canvas = MPVStableMetalCanvas(
+            logicalSize: logicalSize,
+            drawableSize: CGSize(
+                width: logicalSize.width * scale,
+                height: logicalSize.height * scale
+            ),
+            contentsScale: scale
+        )
+        stableMetalCanvas = canvas
+
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        metalLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        metalLayer.bounds = CGRect(origin: .zero, size: canvas.logicalSize)
+        metalLayer.contentsScale = canvas.contentsScale
+        metalLayer.drawableSize = canvas.drawableSize
+        metalLayer.position = CGPoint(x: bounds.midX, y: bounds.midY)
+        metalLayer.transform = CATransform3DIdentity
+        CATransaction.commit()
+
+        mpvDebugLog(
+            "stable metal canvas prepared logical=\(canvas.logicalSize) "
+                + "drawable=\(canvas.drawableSize) scale=\(canvas.contentsScale)"
+        )
+    }
+
     func updateMetalLayerGeometryIfNeeded(
-        animated: Bool = true,
-        reconfigureVideoOutput: Bool = true
+        animated _: Bool = true,
+        reconfigureVideoOutput _: Bool = true
     ) {
         if Thread.isMainThread == false {
             DispatchQueue.main.async { [weak self] in
-                self?.updateMetalLayerGeometryIfNeeded(
-                    animated: animated,
-                    reconfigureVideoOutput: reconfigureVideoOutput
-                )
+                self?.updateMetalLayerGeometryIfNeeded()
             }
             return
         }
-
-        updateMetalLayerGeometry(
-            for: CGRect(origin: .zero, size: bounds.size),
-            scale: UIScreen.main.nativeScale,
-            transitionReason: "layout",
-            animated: animated,
-            reconfigureVideoOutput: reconfigureVideoOutput
-        )
+        updateDisplayPresentationMapping(reason: "layout")
     }
 
     @objc public func beginDisplayGeometryTransition() {
@@ -77,8 +206,10 @@ extension MPVPlayerView {
             }
             return
         }
-        isDisplayGeometryTransitionDeferred = true
-        mpvDebugLog("display geometry transition began")
+        mpvDebugLog(
+            "display geometry transition began bounds=\(bounds) "
+                + "canvas=\(stableMetalCanvas?.logicalSize ?? .zero)"
+        )
     }
 
     @objc public func endDisplayGeometryTransition() {
@@ -88,29 +219,14 @@ extension MPVPlayerView {
             }
             return
         }
-        isDisplayGeometryTransitionDeferred = false
+        updateDisplayPresentationMapping(reason: "display-transition-end")
         mpvDebugLog(
             "display geometry transition ended bounds=\(bounds) "
                 + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
         )
-        // UIKit has completed the display rotation. Apply the final layer
-        // geometry here; the renderer refresh helper re-syncs MPV without
-        // toggling `vid`, which would tear down the active video output.
-        updateMetalLayerGeometryIfNeeded(
-            animated: false,
-            reconfigureVideoOutput: false
-        )
     }
 
-    /// Re-sizes the renderer to the view after it changed window hierarchy.
-    ///
-    /// Picture in Picture moves this view between the inline hierarchy and the
-    /// Picture in Picture window. A plain layout pass is not enough to recover
-    /// from that: the layer keeps presenting the drawable it last produced at
-    /// the other size, and MPV is only told about a new size when the geometry
-    /// is applied, so a size that happens to match the one applied last would
-    /// be skipped and leave the window rendering at the previous size. The
-    /// change test is therefore cleared rather than consulted.
+    /// PiP changes the presentation container, not the renderer surface.
     func resynchronizeMetalLayerGeometry(reason: String) {
         guard Thread.isMainThread else {
             DispatchQueue.main.async { [weak self] in
@@ -119,397 +235,141 @@ extension MPVPlayerView {
             return
         }
         layoutIfNeeded()
-        guard bounds.width > 0, bounds.height > 0 else {
+        guard bounds.width > 0.0, bounds.height > 0.0 else {
             pendingPictureInPictureGeometryResynchronizationReason = reason
-            mpvDebugLog("metal geometry resync deferred reason=\(reason) bounds=\(bounds)")
+            mpvDebugLog("display mapping resync deferred reason=\(reason) bounds=\(bounds)")
             schedulePictureInPictureGeometryResynchronization(reason: reason)
             return
         }
         pendingPictureInPictureGeometryResynchronizationReason = nil
-        mpvDebugLog("metal geometry resync reason=\(reason) bounds=\(bounds)")
-        lastAppliedLayerBounds = .null
-        lastAppliedDrawableSize = .zero
-        updateMetalLayerGeometry(
-            for: CGRect(origin: .zero, size: bounds.size),
-            scale: UIScreen.main.nativeScale,
-            transitionReason: reason,
-            // The system animates the Picture in Picture transition itself, so
-            // the snapshot cross fade would only show a stale frame over it.
-            animated: false
-        )
-    }
-
-    /// PiP delegate callbacks can arrive while AVKit is still restoring the
-    /// inline hierarchy. Rotation fixes the symptom because it performs a new
-    /// layout pass; do the equivalent here for a short, bounded period instead
-    /// of leaving the PiP-sized drawable visible until the user rotates.
-    func schedulePictureInPictureGeometryResynchronization(reason: String) {
-        pictureInPictureGeometryResynchronizationTask?.cancel()
-        pictureInPictureGeometryResynchronizationGeneration &+= 1
-        let generation = pictureInPictureGeometryResynchronizationGeneration
-
-        pictureInPictureGeometryResynchronizationTask = Task { @MainActor [weak self] in
-            guard let self else { return }
-            var lastResynchronizedBounds: CGRect?
-
-            // AVKit completes the return animation asynchronously. Eight
-            // passes cover that transition without a persistent polling loop.
-            for attempt in 0..<8 {
-                guard Task.isCancelled == false,
-                      generation == self.pictureInPictureGeometryResynchronizationGeneration
-                else {
-                    return
-                }
-
-                // Avoid a nested resynchronization from layoutSubviews; this
-                // task owns the forced update for this pass.
-                self.pendingPictureInPictureGeometryResynchronizationReason = nil
-                self.layoutPictureInPictureHierarchy()
-
-                let currentBounds = self.bounds
-                guard currentBounds.width > 0, currentBounds.height > 0 else {
-                    self.pendingPictureInPictureGeometryResynchronizationReason = reason
-                    try? await Task.sleep(nanoseconds: 100_000_000)
-                    continue
-                }
-
-                if attempt == 0 || currentBounds != lastResynchronizedBounds {
-                    self.resynchronizeMetalLayerGeometry(reason: reason)
-                    lastResynchronizedBounds = currentBounds
-                }
-
-                try? await Task.sleep(nanoseconds: 100_000_000)
-            }
-
-            guard generation == self.pictureInPictureGeometryResynchronizationGeneration else {
-                return
-            }
-            self.pictureInPictureGeometryResynchronizationTask = nil
-        }
-    }
-
-    private func layoutPictureInPictureHierarchy() {
-        setNeedsLayout()
-        var ancestor = superview
-        while let currentAncestor = ancestor {
-            currentAncestor.setNeedsLayout()
-            ancestor = currentAncestor.superview
-        }
-        window?.setNeedsLayout()
-        window?.layoutIfNeeded()
-        superview?.layoutIfNeeded()
-        layoutIfNeeded()
+        updateDisplayPresentationMapping(reason: reason)
     }
 
     func updateMetalLayerGeometry(
         for targetBounds: CGRect,
-        scale: CGFloat,
+        scale _: CGFloat,
         transitionReason: String,
-        animated: Bool,
-        reconfigureVideoOutput: Bool = true
+        animated _: Bool,
+        reconfigureVideoOutput _: Bool = true
     ) {
-        let geometry = MPVMetalLayerGeometry(
-            layerBounds: CGRect(origin: .zero, size: targetBounds.size),
-            drawableSize: CGSize(
-                width: targetBounds.size.width * scale,
-                height: targetBounds.size.height * scale
-            ),
-            contentsScale: scale
-        )
-        let geometryChanged = hasMetalGeometryChanged(
-            layerBounds: geometry.layerBounds,
-            drawableSize: geometry.drawableSize
-        )
-
-        guard geometryChanged else { return }
-
-        guard mpv != nil else {
-            applyMetalLayerGeometry(geometry)
-            return
-        }
-
-        if reconfigureVideoOutput == false {
-            pendingMetalLayerGeometry = nil
-            applyMetalLayerGeometry(geometry)
-            mpvDebugLog(
-                "metal geometry applied for display transition "
-                    + "bounds=\(geometry.layerBounds) drawable=\(geometry.drawableSize) "
-                    + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
-            )
-            if requestRendererGeometryRefresh(for: geometry) == false {
-                animateGeometryTransitionIn()
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.updateMetalLayerGeometry(
+                    for: targetBounds,
+                    scale: 1.0,
+                    transitionReason: transitionReason,
+                    animated: false
+                )
             }
             return
         }
-
-        if isDisplayGeometryTransitionDeferred {
-            mpvDebugLog(
-                "metal geometry deferred during display transition geometry=\(geometry) "
-                    + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
-            )
-            return
-        }
-
-        pendingMetalLayerGeometry = geometry
-        guard isMetalGeometryTransitionInProgress == false else { return }
-        if animated {
-            animateGeometryTransitionOut(
-                targetSize: geometry.layerBounds.size,
-                reason: transitionReason
-            )
-        } else {
-            resetGeometryTransitionAnimation(reason: transitionReason)
-        }
-        beginMetalGeometryTransition()
+        updateDisplayPresentationMapping(
+            targetSize: targetBounds.size,
+            reason: transitionReason
+        )
     }
 
-    private func applyMetalLayerGeometry(_ geometry: MPVMetalLayerGeometry) {
+    func updateDisplayPresentationMapping(reason: String) {
+        updateDisplayPresentationMapping(targetSize: bounds.size, reason: reason)
+    }
+
+    func updateDisplayPresentationMapping(targetSize: CGSize, reason: String) {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.updateDisplayPresentationMapping(targetSize: targetSize, reason: reason)
+            }
+            return
+        }
+        guard targetSize.width > 1.0, targetSize.height > 1.0 else { return }
+        ensureStableMetalCanvas()
+        guard let canvas = stableMetalCanvas else { return }
+
+        let aspect = currentVideoDisplayAspectRatio()
+        let mapping = MPVDisplayGeometry.make(
+            canvasSize: canvas.logicalSize,
+            videoAspectRatio: aspect,
+            targetBounds: CGRect(origin: .zero, size: targetSize),
+            contentMode: currentContentModeSnapshot()
+        )
+        let canvasCenter = CGPoint(
+            x: canvas.logicalSize.width / 2.0,
+            y: canvas.logicalSize.height / 2.0
+        )
+        let layerPosition = CGPoint(
+            x: canvasCenter.x * mapping.scale + mapping.translation.x,
+            y: canvasCenter.y * mapping.scale + mapping.translation.y
+        )
+
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         metalLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        metalLayer.transform = CATransform3DIdentity
-        metalLayer.frame = geometry.layerBounds
-        metalLayer.contentsScale = geometry.contentsScale
-        metalLayer.drawableSize = geometry.drawableSize
+        metalLayer.position = layerPosition
+        metalLayer.transform = CATransform3DMakeScale(mapping.scale, mapping.scale, 1.0)
         CATransaction.commit()
 
-        lastAppliedLayerBounds = geometry.layerBounds
-        lastAppliedDrawableSize = geometry.drawableSize
         mpvDebugLog(
-            "metal geometry applied bounds=\(geometry.layerBounds) "
-                + "drawable=\(geometry.drawableSize) scale=\(geometry.contentsScale)"
+            "display mapping applied reason=\(reason) target=\(targetSize) "
+                + "aspect=\(aspect) source=\(mapping.sourceVideoRect) "
+                + "targetVideo=\(mapping.targetVideoRect) scale=\(mapping.scale) "
+                + "translation=\(mapping.translation) rotation=0"
         )
     }
 
-    private func beginMetalGeometryTransition() {
-        isMetalGeometryTransitionInProgress = true
-        queue.async { [weak self] in
-            guard let self, let mpv = self.mpv, self.isStopped() == false else {
-                DispatchQueue.main.async { [weak self] in
-                    self?.applyPendingMetalGeometryWithoutVideoOutput()
-                }
-                return
-            }
-            self.mpvDebugLog(
-                "metal geometry transition suspending video output "
-                    + "current=\(self.currentTime) duration=\(self.duration) playing=\(self.isPlaying)"
-            )
-            let suspendResult = mpv_set_property_string(mpv, MPVProperty.videoID, "no")
-            self.checkError(
-                suspendResult,
-                operation: "layout transition vid=no",
-                notifyOnFailure: false
-            )
-            guard suspendResult >= 0 else {
-                DispatchQueue.main.async { [weak self] in
-                    self?.cancelMetalGeometryTransitionAfterSuspendFailure()
-                }
-                return
-            }
-            DispatchQueue.main.async { [weak self] in
-                self?.applyPendingMetalGeometryAndResumeVideoOutput()
-            }
+    func currentVideoDisplayAspectRatio() -> CGFloat {
+        videoDisplayAspectRatioLock.lock()
+        defer { videoDisplayAspectRatioLock.unlock() }
+        return videoDisplayAspectRatio
+    }
+
+    nonisolated func updateVideoDisplayAspectRatio(width: Int64?, height: Int64?) {
+        guard let width, let height, width > 0, height > 0 else { return }
+        let aspect = CGFloat(width) / CGFloat(height)
+        guard aspect.isFinite, aspect > 0.0 else { return }
+        videoDisplayAspectRatioLock.lock()
+        let changed = abs(videoDisplayAspectRatio - aspect) > 0.0001
+        videoDisplayAspectRatio = aspect
+        videoDisplayAspectRatioLock.unlock()
+        guard changed else { return }
+        notifyOnMain {
+            self.updateDisplayPresentationMapping(reason: "video-aspect")
         }
     }
 
-    private func applyPendingMetalGeometryWithoutVideoOutput() {
-        if let geometry = pendingMetalLayerGeometry {
-            pendingMetalLayerGeometry = nil
-            applyMetalLayerGeometry(geometry)
-        }
-        isMetalGeometryTransitionInProgress = false
-        animateGeometryTransitionIn()
-    }
-
-    private func cancelMetalGeometryTransitionAfterSuspendFailure() {
-        pendingMetalLayerGeometry = nil
-        isMetalGeometryTransitionInProgress = false
-        animateGeometryTransitionIn()
-    }
-
-    private func applyPendingMetalGeometryAndResumeVideoOutput() {
-        guard let geometry = pendingMetalLayerGeometry else {
-            isMetalGeometryTransitionInProgress = false
-            animateGeometryTransitionIn()
-            return
-        }
-        pendingMetalLayerGeometry = nil
-        applyMetalLayerGeometry(geometry)
-
-        let contentModeSnapshot = currentContentModeSnapshot()
-        queue.async { [weak self] in
-            guard let self, let mpv = self.mpv, self.isStopped() == false else {
-                DispatchQueue.main.async { [weak self] in
-                    self?.finishMetalGeometryTransition()
-                }
-                return
-            }
-            self.checkError(
-                mpv_set_property_string(mpv, MPVProperty.videoID, "auto"),
-                operation: "layout transition vid=auto",
-                notifyOnFailure: false
-            )
-            self.applyContentMode(contentModeSnapshot)
-            self.mpvDebugLog(
-                "metal geometry transition resumed video output "
-                    + "bounds=\(geometry.layerBounds) drawable=\(geometry.drawableSize)"
-            )
-            DispatchQueue.main.async { [weak self] in
-                self?.finishMetalGeometryTransition()
-            }
-        }
-    }
-
-    private func finishMetalGeometryTransition() {
-        isMetalGeometryTransitionInProgress = false
-        if isDisplayGeometryTransitionDeferred {
-            resetGeometryTransitionAnimation(reason: "display-transition")
-            return
-        }
-        if pendingMetalLayerGeometry != nil {
-            beginMetalGeometryTransition()
-        } else {
-            animateGeometryTransitionIn()
-        }
-    }
-
-    func hasMetalGeometryChanged(layerBounds: CGRect, drawableSize: CGSize) -> Bool {
-        guard layerBounds.width > 1.0, layerBounds.height > 1.0 else {
-            return false
-        }
-        if lastAppliedLayerBounds.isNull {
-            return true
-        }
-        return abs(lastAppliedLayerBounds.width - layerBounds.width) > 0.5
-            || abs(lastAppliedLayerBounds.height - layerBounds.height) > 0.5
-            || abs(lastAppliedDrawableSize.width - drawableSize.width) > 0.5
-            || abs(lastAppliedDrawableSize.height - drawableSize.height) > 0.5
-    }
-
-    func animateGeometryTransitionOut(targetSize: CGSize, reason: String) {
-        prepareGeometryTransitionOverlay(targetSize: targetSize, reason: reason)
-    }
-
-    func prepareGeometryTransitionOverlay(targetSize: CGSize, reason: String) {
-        guard Thread.isMainThread else {
-            DispatchQueue.main.async { [weak self] in
-                self?.prepareGeometryTransitionOverlay(targetSize: targetSize, reason: reason)
-            }
-            return
-        }
-        guard mpv != nil else {
-            return
-        }
-        guard UIAccessibility.isReduceMotionEnabled == false else {
-            resetGeometryTransitionAnimation(reason: "reduce-motion")
-            return
-        }
-        guard targetSize.width > 1.0, targetSize.height > 1.0, bounds.width > 1.0, bounds.height > 1.0 else {
-            return
-        }
-        if geometryTransitionOverlayView != nil,
-           isLayoutSizeClose(geometryTransitionPreparedTargetSize, targetSize) {
-            return
-        }
-        guard isLayoutSizeClose(targetSize, bounds.size) == false else {
-            mpvDebugLog("geometry transition skipped reason=\(reason) sameSize bounds=\(bounds) target=\(targetSize)")
-            resetGeometryTransitionAnimation(reason: "same-size-\(reason)")
-            return
-        }
-
-        geometryTransitionAnimationID += 1
-        geometryTransitionPreparedTargetSize = targetSize
-        geometryTransitionOverlayView?.removeFromSuperview()
-
-        guard let snapshotView = snapshotView(afterScreenUpdates: false)
-            ?? resizableSnapshotView(from: bounds, afterScreenUpdates: false, withCapInsets: .zero) else {
-            mpvDebugLog("geometry transition skipped reason=\(reason) noSnapshot bounds=\(bounds) target=\(targetSize)")
-            resetGeometryTransitionAnimation(reason: "no-snapshot-\(reason)")
-            return
-        }
-
-        let overlayView = UIView(frame: bounds)
-        overlayView.isUserInteractionEnabled = false
-        overlayView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        overlayView.backgroundColor = UIColor.black.withAlphaComponent(geometryTransitionFallbackAlpha)
-
-        snapshotView.frame = overlayView.bounds
-        snapshotView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        overlayView.addSubview(snapshotView)
-
-        let dimView = UIView(frame: overlayView.bounds)
-        dimView.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-        dimView.backgroundColor = .black
-        dimView.alpha = geometryTransitionDimAlpha
-        overlayView.addSubview(dimView)
-
-        addSubview(overlayView)
-        bringSubviewToFront(overlayView)
-        geometryTransitionOverlayView = overlayView
-        let transitionID = geometryTransitionAnimationID
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self, weak overlayView] in
-            guard let self,
-                  self.geometryTransitionAnimationID == transitionID,
-                  self.geometryTransitionOverlayView === overlayView else {
-                return
-            }
-            self.mpvDebugLog("geometry transition overlay timeout fade out id=\(transitionID) reason=\(reason) bounds=\(self.bounds) target=\(targetSize)")
-            self.animateGeometryTransitionIn()
-        }
-        mpvDebugLog("geometry transition overlay prepared id=\(geometryTransitionAnimationID) reason=\(reason) bounds=\(bounds) target=\(targetSize) hasSnapshot=true fallbackAlpha=\(geometryTransitionFallbackAlpha) dimAlpha=\(geometryTransitionDimAlpha)")
-    }
-
-    func animateGeometryTransitionIn() {
-        guard Thread.isMainThread else {
-            DispatchQueue.main.async { [weak self] in
-                self?.animateGeometryTransitionIn()
-            }
-            return
-        }
-        guard UIAccessibility.isReduceMotionEnabled == false else {
-            resetGeometryTransitionAnimation(reason: "reduce-motion")
-            return
-        }
-        geometryTransitionAnimationID += 1
-        geometryTransitionPreparedTargetSize = .zero
-        let transitionID = geometryTransitionAnimationID
-        guard let overlayView = geometryTransitionOverlayView else {
-            return
-        }
-        mpvDebugLog("geometry transition overlay fade out id=\(transitionID) bounds=\(bounds)")
-        UIView.animate(
-            withDuration: geometryTransitionFadeOutDuration,
-            delay: 0,
-            options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseInOut]
-        ) {
-            overlayView.alpha = 0.0
-        } completion: { [weak self, weak overlayView] _ in
+    func schedulePictureInPictureGeometryResynchronization(reason: String) {
+        pictureInPictureGeometryResynchronizationTask?.cancel()
+        pictureInPictureGeometryResynchronizationGeneration &+= 1
+        let generation = pictureInPictureGeometryResynchronizationGeneration
+        pictureInPictureGeometryResynchronizationTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            if self.geometryTransitionAnimationID == transitionID {
-                self.geometryTransitionOverlayView = nil
+            var lastBounds: CGRect?
+            for attempt in 0..<8 {
+                guard Task.isCancelled == false,
+                      generation == self.pictureInPictureGeometryResynchronizationGeneration else {
+                    return
+                }
+                self.setNeedsLayout()
+                self.superview?.setNeedsLayout()
+                self.window?.setNeedsLayout()
+                self.window?.layoutIfNeeded()
+                self.superview?.layoutIfNeeded()
+                self.layoutIfNeeded()
+                let currentBounds = self.bounds
+                guard currentBounds.width > 0.0, currentBounds.height > 0.0 else {
+                    self.pendingPictureInPictureGeometryResynchronizationReason = reason
+                    try? await Task.sleep(nanoseconds: 100_000_000)
+                    continue
+                }
+                if attempt == 0 || currentBounds != lastBounds {
+                    self.pendingPictureInPictureGeometryResynchronizationReason = nil
+                    self.updateDisplayPresentationMapping(reason: reason)
+                    lastBounds = currentBounds
+                }
+                try? await Task.sleep(nanoseconds: 100_000_000)
             }
-            overlayView?.removeFromSuperview()
-        }
-    }
-
-    func resetGeometryTransitionAnimation(reason: String = "reset") {
-        guard Thread.isMainThread else {
-            DispatchQueue.main.async { [weak self] in
-                self?.resetGeometryTransitionAnimation(reason: reason)
+            if generation == self.pictureInPictureGeometryResynchronizationGeneration {
+                self.pictureInPictureGeometryResynchronizationTask = nil
             }
-            return
         }
-        let hadOverlay = geometryTransitionOverlayView != nil
-        geometryTransitionAnimationID += 1
-        geometryTransitionPreparedTargetSize = .zero
-        geometryTransitionOverlayView?.layer.removeAllAnimations()
-        geometryTransitionOverlayView?.removeFromSuperview()
-        geometryTransitionOverlayView = nil
-        mpvDebugLog("geometry transition reset reason=\(reason) hadOverlay=\(hadOverlay) id=\(geometryTransitionAnimationID)")
-    }
-
-    func isLayoutSizeClose(_ lhs: CGSize, _ rhs: CGSize) -> Bool {
-        abs(lhs.width - rhs.width) <= 0.5 && abs(lhs.height - rhs.height) <= 0.5
     }
 
     func startTimeTimer() {
@@ -530,5 +390,4 @@ extension MPVPlayerView {
         timeTimer?.cancel()
         timeTimer = nil
     }
-
 }
