@@ -6,6 +6,9 @@ extension MPVQuickPlayerViewController {
         with coordinator: UIViewControllerTransitionCoordinator
     ) {
         super.viewWillTransition(to: size, with: coordinator)
+        isDisplayTransitionInProgress = true
+        loadingIndicator.stopAnimating()
+        player.playbackView.beginDisplayGeometryTransition()
 
         let synchronizeMenuLayout = { [weak self] in
             guard let self else { return }
@@ -18,7 +21,15 @@ extension MPVQuickPlayerViewController {
         }
         coordinator.animate(
             alongsideTransition: { _ in synchronizeMenuLayout() },
-            completion: { _ in synchronizeMenuLayout() }
+            completion: { [weak self] _ in
+                synchronizeMenuLayout()
+                guard let self else { return }
+                player.playbackView.endDisplayGeometryTransition()
+                isDisplayTransitionInProgress = false
+                if Self.shouldShowLoading(for: playbackState) {
+                    loadingIndicator.startAnimating()
+                }
+            }
         )
     }
 

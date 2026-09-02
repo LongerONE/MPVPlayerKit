@@ -47,10 +47,10 @@ extension MPVPlayerView {
         return CGSize(width: width, height: height)
     }
 
-    func updateMetalLayerGeometryIfNeeded() {
+    func updateMetalLayerGeometryIfNeeded(animated: Bool = true) {
         if Thread.isMainThread == false {
             DispatchQueue.main.async { [weak self] in
-                self?.updateMetalLayerGeometryIfNeeded()
+                self?.updateMetalLayerGeometryIfNeeded(animated: animated)
             }
             return
         }
@@ -59,8 +59,31 @@ extension MPVPlayerView {
             for: CGRect(origin: .zero, size: bounds.size),
             scale: UIScreen.main.nativeScale,
             transitionReason: "layout",
-            animated: true
+            animated: animated
         )
+    }
+
+    @objc public func beginDisplayGeometryTransition() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.beginDisplayGeometryTransition()
+            }
+            return
+        }
+        isDisplayGeometryTransitionDeferred = true
+        mpvDebugLog("display geometry transition began")
+    }
+
+    @objc public func endDisplayGeometryTransition() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.endDisplayGeometryTransition()
+            }
+            return
+        }
+        isDisplayGeometryTransitionDeferred = false
+        mpvDebugLog("display geometry transition ended bounds=\(bounds)")
+        updateMetalLayerGeometryIfNeeded(animated: false)
     }
 
     /// Re-sizes the renderer to the view after it changed window hierarchy.
@@ -188,6 +211,11 @@ extension MPVPlayerView {
             return
         }
 
+        if isDisplayGeometryTransitionDeferred {
+            mpvDebugLog("metal geometry deferred during display transition geometry=\(geometry)")
+            return
+        }
+
         pendingMetalLayerGeometry = geometry
         guard isMetalGeometryTransitionInProgress == false else { return }
         if animated {
@@ -295,6 +323,10 @@ extension MPVPlayerView {
 
     private func finishMetalGeometryTransition() {
         isMetalGeometryTransitionInProgress = false
+        if isDisplayGeometryTransitionDeferred {
+            resetGeometryTransitionAnimation(reason: "display-transition")
+            return
+        }
         if pendingMetalLayerGeometry != nil {
             beginMetalGeometryTransition()
         } else {

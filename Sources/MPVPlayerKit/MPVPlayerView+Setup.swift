@@ -473,6 +473,7 @@ extension MPVPlayerView {
         clearMediaTracksCache()
         pendingMetalLayerGeometry = nil
         isMetalGeometryTransitionInProgress = false
+        isDisplayGeometryTransitionDeferred = false
         lastLoggedSubtitleText = ""
         hasLoggedSubtitleTextEvent = false
         resetGeometryTransitionAnimation()

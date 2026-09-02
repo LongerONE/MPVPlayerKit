@@ -47,9 +47,9 @@ extension MPVQuickPlayerViewController: MPVPlayerDelegate {
             MPVQuickPlayerSymbol.image(isPlaying ? .pause : .play, pointSize: 20),
             for: .normal
         )
-        if Self.shouldShowLoading(for: state) {
+        if Self.shouldShowLoading(for: state), isDisplayTransitionInProgress == false {
             loadingIndicator.startAnimating()
-        } else {
+        } else if Self.shouldShowLoading(for: state) == false {
             loadingIndicator.stopAnimating()
         }
         updateStatusLabel()

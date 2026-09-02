@@ -348,6 +348,7 @@ public final class MPVPlayerView: UIView {
     var pictureInPictureGeometryResynchronizationGeneration = 0
     var pendingMetalLayerGeometry: MPVMetalLayerGeometry?
     var isMetalGeometryTransitionInProgress = false
+    var isDisplayGeometryTransitionDeferred = false
     var geometryTransitionOverlayView: UIView?
     var geometryTransitionPreparedTargetSize = CGSize.zero
     let geometryTransitionFallbackAlpha: CGFloat = 0.58
@@ -518,6 +519,7 @@ public final class MPVPlayerView: UIView {
         pendingPictureInPictureGeometryResynchronizationReason = nil
         pendingMetalLayerGeometry = nil
         isMetalGeometryTransitionInProgress = false
+        isDisplayGeometryTransitionDeferred = false
         geometryTransitionPreparedTargetSize = .zero
         resetGeometryTransitionAnimation()
         currentTime = 0.0

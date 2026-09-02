@@ -70,6 +70,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var idleTimerDisabledBeforePlayback: Bool?
     var decoderMode = MPVDecoderMode.initializing
     var bufferingProgress = 0
+    var isDisplayTransitionInProgress = false
     var pendingSubtitleRequestID: UUID?
     var isCancellingSubtitleLoad = false
     var isUsingManualLandscape: Bool
