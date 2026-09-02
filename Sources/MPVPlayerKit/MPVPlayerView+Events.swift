@@ -103,6 +103,10 @@ extension MPVPlayerView {
                     self.refreshPictureInPictureVideoDisplaySize()
                     self.mpvDebugLog("event playback-restart stage=end")
                 case MPV_EVENT_VIDEO_RECONFIG:
+                    self.mpvDebugLog(
+                        "event video-reconfig current=\(self.currentTime) duration=\(self.duration) "
+                            + "playing=\(self.isPlaying)"
+                    )
                     self.refreshPictureInPictureVideoDisplaySize()
                 case MPV_EVENT_END_FILE:
                     self.mpvDebugLog("event end-file stage=begin")

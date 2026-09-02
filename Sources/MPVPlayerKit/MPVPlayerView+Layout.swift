@@ -82,7 +82,10 @@ extension MPVPlayerView {
             return
         }
         isDisplayGeometryTransitionDeferred = false
-        mpvDebugLog("display geometry transition ended bounds=\(bounds)")
+        mpvDebugLog(
+            "display geometry transition ended bounds=\(bounds) "
+                + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
+        )
         updateMetalLayerGeometryIfNeeded(animated: false)
     }
 
@@ -212,7 +215,10 @@ extension MPVPlayerView {
         }
 
         if isDisplayGeometryTransitionDeferred {
-            mpvDebugLog("metal geometry deferred during display transition geometry=\(geometry)")
+        mpvDebugLog(
+            "metal geometry deferred during display transition geometry=\(geometry) "
+                + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
+        )
             return
         }
 
@@ -254,7 +260,10 @@ extension MPVPlayerView {
                 }
                 return
             }
-            self.mpvDebugLog("metal geometry transition suspending video output")
+            self.mpvDebugLog(
+                "metal geometry transition suspending video output "
+                    + "current=\(self.currentTime) duration=\(self.duration) playing=\(self.isPlaying)"
+            )
             let suspendResult = mpv_set_property_string(mpv, MPVProperty.videoID, "no")
             self.checkError(
                 suspendResult,

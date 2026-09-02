@@ -12,13 +12,21 @@ import libmpv
 extension MPVPlayerView {
     @objc public func prepareLayoutTransition(_ options: NSDictionary) {
         let targetSize = layoutTargetSize(from: options)
-        mpvDebugLog("prepareLayoutTransition requested target=\(targetSize) bounds=\(bounds) drawable=\(metalLayer.drawableSize)")
+        mpvDebugLog(
+            "prepareLayoutTransition requested target=\(targetSize) bounds=\(bounds) "
+                + "drawable=\(metalLayer.drawableSize) current=\(currentTime) "
+                + "duration=\(duration) playing=\(isPlaying)"
+        )
         animateGeometryTransitionOut(targetSize: targetSize, reason: "prelayout")
     }
 
     @objc public func refreshLayout(_ options: NSDictionary) {
         let targetSize = layoutTargetSize(from: options)
-        mpvDebugLog("refreshLayout requested width=\(targetSize.width) height=\(targetSize.height) bounds=\(bounds) drawable=\(metalLayer.drawableSize)")
+        mpvDebugLog(
+            "refreshLayout requested width=\(targetSize.width) height=\(targetSize.height) "
+                + "bounds=\(bounds) drawable=\(metalLayer.drawableSize) current=\(currentTime) "
+                + "duration=\(duration) playing=\(isPlaying)"
+        )
         updateMetalLayerGeometryIfNeeded()
     }
 

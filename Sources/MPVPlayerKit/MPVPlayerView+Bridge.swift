@@ -232,6 +232,9 @@ extension MPVPlayerView {
     }
 
     func notifyState(_ state: MPVPlayerState) {
+        mpvDebugLog(
+            "notify state=\(state) current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
+        )
         notifyOnMain {
             NotificationCenter.default.post(
                 name: MPVPlayerKitNotification.didChangeState,
@@ -263,6 +266,9 @@ extension MPVPlayerView {
     }
 
     func notifyBufferingProgress(_ bufferingProgress: Int) {
+        mpvDebugLog(
+            "notify buffering progress=\(bufferingProgress) current=\(currentTime) duration=\(duration)"
+        )
         NotificationCenter.default.post(
             name: MPVPlayerKitNotification.didUpdateBufferingProgress,
             object: self,
