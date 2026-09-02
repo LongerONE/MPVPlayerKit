@@ -474,6 +474,8 @@ extension MPVPlayerView {
         pendingMetalLayerGeometry = nil
         isMetalGeometryTransitionInProgress = false
         isDisplayGeometryTransitionDeferred = false
+        pendingRendererGeometryRefreshID = nil
+        rendererGeometryRefreshUsesAutoContext = false
         lastLoggedSubtitleText = ""
         hasLoggedSubtitleTextEvent = false
         resetGeometryTransitionAnimation()

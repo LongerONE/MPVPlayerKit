@@ -105,8 +105,17 @@ extension MPVPlayerView {
                 case MPV_EVENT_VIDEO_RECONFIG:
                     self.mpvDebugLog(
                         "event video-reconfig current=\(self.currentTime) duration=\(self.duration) "
-                            + "playing=\(self.isPlaying)"
+                            + "playing=\(self.isPlaying) "
+                            + "rendererRefreshID=\(self.pendingRendererGeometryRefreshID.map(String.init) ?? "none")"
                     )
+                    if let refreshID = self.pendingRendererGeometryRefreshID {
+                        self.notifyOnMain {
+                            self.finishRendererGeometryRefresh(
+                                id: refreshID,
+                                reason: "video-reconfig"
+                            )
+                        }
+                    }
                     self.refreshPictureInPictureVideoDisplaySize()
                 case MPV_EVENT_END_FILE:
                     self.mpvDebugLog("event end-file stage=begin")
@@ -553,6 +562,26 @@ extension MPVPlayerView {
         case MPVProperty.pausedForCache:
             let bufferingValue = property.data?.assumingMemoryBound(to: Int32.self).pointee ?? 0
             let buffering = bufferingValue != 0
+            if let refreshID = pendingRendererGeometryRefreshID {
+                mpvDebugLog(
+                    "event paused-for-cache buffering=\(buffering) "
+                        + "rendererRefreshID=\(refreshID) suppressed=true"
+                )
+                if buffering {
+                    // A renderer UPDATE_VO may briefly report a cache wait
+                    // while it rebuilds the presentation path. It does not
+                    // represent a URL reload or a playback-position change.
+                    return
+                }
+                pendingRendererGeometryRefreshID = nil
+                notifyOnMain {
+                    self.finishRendererGeometryRefresh(
+                        id: refreshID,
+                        reason: "paused-for-cache=false"
+                    )
+                }
+                return
+            }
             notifyOnMain {
                 if buffering {
                     self.stopTimeTimer()

@@ -93,9 +93,9 @@ extension MPVPlayerView {
             "display geometry transition ended bounds=\(bounds) "
                 + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
         )
-        // UIKit has completed the display rotation. Update only the
-        // presentation layer here; toggling `vid` would tear down and rebuild
-        // the active video output and report a false cache wait to clients.
+        // UIKit has completed the display rotation. Apply the final layer
+        // geometry here; the renderer refresh helper re-syncs MPV without
+        // toggling `vid`, which would tear down the active video output.
         updateMetalLayerGeometryIfNeeded(
             animated: false,
             reconfigureVideoOutput: false
@@ -230,14 +230,15 @@ extension MPVPlayerView {
 
         if reconfigureVideoOutput == false {
             pendingMetalLayerGeometry = nil
-            resetGeometryTransitionAnimation(reason: "display-transition")
             applyMetalLayerGeometry(geometry)
-            refreshVideoGeometryWithoutOutputReconfiguration()
             mpvDebugLog(
-                "metal geometry applied without video output reconfiguration "
+                "metal geometry applied for display transition "
                     + "bounds=\(geometry.layerBounds) drawable=\(geometry.drawableSize) "
                     + "current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
             )
+            if requestRendererGeometryRefresh(for: geometry) == false {
+                animateGeometryTransitionIn()
+            }
             return
         }
 
@@ -262,48 +263,11 @@ extension MPVPlayerView {
         beginMetalGeometryTransition()
     }
 
-    /// Refreshes MPV's destination rectangle after UIKit changes the
-    /// CAMetalLayer size. Changing the layer alone updates MoltenVK's
-    /// swapchain, but `vo_gpu_next` can retain the previous destination
-    /// rectangle. A tiny panscan pulse reaches MPV's resize-only path without
-    /// toggling `vid`, so the active decoder and network cache stay intact.
-    private func refreshVideoGeometryWithoutOutputReconfiguration() {
-        guard mpv != nil else { return }
-
-        let currentContentMode = currentContentModeSnapshot()
-        let finalPanscan: Double = currentContentMode == .fill ? 1.0 : 0.0
-        let temporaryPanscan = currentContentMode == .fill ? 0.999 : 0.001
-        let targetDrawableSize = metalLayer.drawableSize
-
-        queue.async { [weak self] in
-            guard let self, self.mpv != nil, self.isStopped() == false else { return }
-
-            let status = self.setDouble(MPVProperty.panscan, temporaryPanscan)
-            self.mpvDebugLog(
-                "video geometry resize-only refresh requested "
-                    + "panscan=\(temporaryPanscan) target=\(targetDrawableSize) status=\(status)"
-            )
-
-            // Keep the pulse long enough for MPV to process the first option
-            // update. Read the mode again so a user change during rotation is
-            // not overwritten by the delayed restore.
-            self.queue.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                guard let self, self.mpv != nil, self.isStopped() == false else { return }
-                let latestContentMode = self.currentContentModeSnapshot()
-                let restoredPanscan = latestContentMode == .fill ? finalPanscan : 0.0
-                let restoreStatus = self.setDouble(MPVProperty.panscan, restoredPanscan)
-                self.mpvDebugLog(
-                    "video geometry resize-only refresh restored "
-                        + "panscan=\(restoredPanscan) target=\(targetDrawableSize) "
-                        + "status=\(restoreStatus)"
-                )
-            }
-        }
-    }
-
     private func applyMetalLayerGeometry(_ geometry: MPVMetalLayerGeometry) {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        metalLayer.anchorPoint = CGPoint(x: 0.5, y: 0.5)
+        metalLayer.transform = CATransform3DIdentity
         metalLayer.frame = geometry.layerBounds
         metalLayer.contentsScale = geometry.contentsScale
         metalLayer.drawableSize = geometry.drawableSize

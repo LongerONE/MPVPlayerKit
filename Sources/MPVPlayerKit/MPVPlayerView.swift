@@ -349,6 +349,15 @@ public final class MPVPlayerView: UIView {
     var pendingMetalLayerGeometry: MPVMetalLayerGeometry?
     var isMetalGeometryTransitionInProgress = false
     var isDisplayGeometryTransitionDeferred = false
+    // The ID is main-actor state used to keep a renderer resize completion
+    // from an earlier rotation from dismissing a newer transition overlay.
+    var rendererGeometryRefreshID = 0
+    var activeRendererGeometryRefreshID: Int?
+    // These two values are read and written only on `queue` once playback is
+    // active. The unsafe annotation documents that queue ownership explicitly
+    // for Swift 6's actor checking.
+    nonisolated(unsafe) var pendingRendererGeometryRefreshID: Int?
+    nonisolated(unsafe) var rendererGeometryRefreshUsesAutoContext = false
     var geometryTransitionOverlayView: UIView?
     var geometryTransitionPreparedTargetSize = CGSize.zero
     let geometryTransitionFallbackAlpha: CGFloat = 0.58
@@ -520,6 +529,9 @@ public final class MPVPlayerView: UIView {
         pendingMetalLayerGeometry = nil
         isMetalGeometryTransitionInProgress = false
         isDisplayGeometryTransitionDeferred = false
+        rendererGeometryRefreshID &+= 1
+        activeRendererGeometryRefreshID = nil
+        rendererGeometryRefreshUsesAutoContext = false
         geometryTransitionPreparedTargetSize = .zero
         resetGeometryTransitionAnimation()
         currentTime = 0.0
