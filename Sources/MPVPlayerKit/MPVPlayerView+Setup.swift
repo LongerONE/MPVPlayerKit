@@ -148,7 +148,12 @@ extension MPVPlayerView {
 
     nonisolated func applyVideoQualityProperties(_ preset: MPVVideoQualityPreset) {
         preset.options.forEach { option in
-            _ = command("set", args: [option.0, option.1], checkForErrors: false)
+            let status = command("set", args: [option.0, option.1], checkForErrors: false)
+            if status < 0 {
+                mpvDebugLog(
+                    "video quality option failed name=\(option.0) value=\(option.1) status=\(status)"
+                )
+            }
         }
         mpvDebugLog("video quality updated preset=\(preset) options=\(preset.options)")
         logEffectiveVideoSettings(reason: "quality-runtime")

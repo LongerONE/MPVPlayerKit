@@ -501,7 +501,7 @@ final class MPVPictureInPictureTests: XCTestCase {
             MPVPictureInPictureRendererInvariantSnapshot.optionMap($0.options)
         }
         XCTAssertTrue(balancedProfileOptions.allSatisfy {
-            $0["hdr-compute-peak"] == "no"
+            $0["hdr-compute-peak"] == "auto"
         })
         XCTAssertRendererOptionsAndProfiles(
             playerView: playerView,

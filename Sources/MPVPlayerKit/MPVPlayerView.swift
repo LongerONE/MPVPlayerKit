@@ -133,7 +133,10 @@ enum MPVVideoQualityPreset: Int {
                 ("sigmoid-upscaling", "no"),
                 ("dither", "no"),
                 ("dither-depth", "no"),
-                ("hdr-compute-peak", "no"),
+                // Keep adaptive HDR tone mapping enabled in the low-cost
+                // tiers. Disabling peak detection can make HDR output
+                // unstable on some device/render-target combinations.
+                ("hdr-compute-peak", "auto"),
                 ("allow-delayed-peak-detect", "no"),
                 ("interpolation", "no"),
             ]
@@ -151,7 +154,7 @@ enum MPVVideoQualityPreset: Int {
                 ("sigmoid-upscaling", "no"),
                 ("dither", "no"),
                 ("dither-depth", "auto"),
-                ("hdr-compute-peak", "no"),
+                ("hdr-compute-peak", "auto"),
                 ("allow-delayed-peak-detect", "no"),
                 ("interpolation", "no"),
             ]
