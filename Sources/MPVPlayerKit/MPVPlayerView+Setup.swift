@@ -160,7 +160,12 @@ extension MPVPlayerView {
     }
 
     nonisolated var videoRenderOptions: [(String, String)] {
-        [("deband", debandEnabled ? "yes" : "no")]
+        [("deband", effectiveDebandEnabled ? "yes" : "no")]
+    }
+
+    nonisolated var effectiveDebandEnabled: Bool {
+        // Keep the power-saving tier free of the optional debanding pass.
+        debandEnabled && videoQualityPreset != .powerSaving
     }
 
     nonisolated var cacheOptions: [(String, String)] {
@@ -207,7 +212,9 @@ extension MPVPlayerView {
         videoRenderOptions.forEach { option in
             _ = command("set", args: [option.0, option.1], checkForErrors: false)
         }
-        mpvDebugLog("video render options updated deband=\(debandEnabled)")
+        mpvDebugLog(
+            "video render options updated deband=\(effectiveDebandEnabled) requested=\(debandEnabled)"
+        )
         logEffectiveVideoSettings(reason: "render-runtime")
     }
 

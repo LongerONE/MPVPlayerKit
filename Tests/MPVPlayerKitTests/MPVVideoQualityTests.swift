@@ -14,7 +14,7 @@ final class MPVVideoQualityTests: XCTestCase {
         XCTAssertEqual(powerSaving["linear-downscaling"], "no")
         XCTAssertEqual(powerSaving["dither"], "no")
         XCTAssertEqual(powerSaving["interpolation"], "no")
-        XCTAssertEqual(powerSaving["allow-delayed-peak-detect"], "no")
+        XCTAssertEqual(powerSaving["allow-delayed-peak-detect"], "yes")
         XCTAssertEqual(powerSaving["sigmoid-upscaling"], "no")
         XCTAssertEqual(powerSaving["hdr-compute-peak"], "auto")
 
@@ -44,6 +44,21 @@ final class MPVVideoQualityTests: XCTestCase {
         XCTAssertEqual(Set(balanced.keys), Set(highQuality.keys))
     }
 
+    @MainActor
+    func testPowerSavingDisablesDebandWhileOtherTiersRespectRequest() {
+        let playerView = MPVPlayerView(frame: .zero)
+        playerView.debandEnabled = true
+
+        playerView.videoQualityPreset = .powerSaving
+        XCTAssertEqual(playerView.videoRenderOptions.first?.1, "no")
+
+        playerView.videoQualityPreset = .balanced
+        XCTAssertEqual(playerView.videoRenderOptions.first?.1, "yes")
+
+        playerView.videoQualityPreset = .highQuality
+        XCTAssertEqual(playerView.videoRenderOptions.first?.1, "yes")
+    }
+
     func testQualityOptionsOverrideAutomaticColorPolicyForEveryOutputTier() {
         for usesExtendedDynamicRangeOutput in [false, true] {
             let outputMode = MPVColorMappingPolicy.outputMode(
@@ -63,7 +78,8 @@ final class MPVVideoQualityTests: XCTestCase {
                 let expectedPeak = quality == .highQuality ? "yes" : "auto"
 
                 XCTAssertEqual(options["hdr-compute-peak"], expectedPeak)
-                XCTAssertEqual(options["allow-delayed-peak-detect"], "no")
+                let expectedDelayedPeak = quality == .powerSaving ? "yes" : "no"
+                XCTAssertEqual(options["allow-delayed-peak-detect"], expectedDelayedPeak)
             }
         }
     }

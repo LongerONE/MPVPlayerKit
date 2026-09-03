@@ -197,6 +197,7 @@ extension MPVPlayerView {
             self.videoQualityPreset = preset
             guard self.mpv != nil else { return }
             self.applyVideoQualityProperties(preset)
+            self.applyVideoRenderProperties()
         }
     }
 

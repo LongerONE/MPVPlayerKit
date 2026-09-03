@@ -137,7 +137,8 @@ enum MPVVideoQualityPreset: Int {
                 // tiers. Disabling peak detection can make HDR output
                 // unstable on some device/render-target combinations.
                 ("hdr-compute-peak", "auto"),
-                ("allow-delayed-peak-detect", "no"),
+                // Permit mpv to avoid an extra FBO in the simple low-cost path.
+                ("allow-delayed-peak-detect", "yes"),
                 ("interpolation", "no"),
             ]
         case .balanced:
