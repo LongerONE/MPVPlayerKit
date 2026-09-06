@@ -1,18 +1,34 @@
 # MPVPlayerKit
 
+English | [简体中文](README.zh-CN.md)
+
 An iOS 15+ Swift Package that wraps [MPVKit](https://github.com/mpvkit/MPVKit) with a small UIKit API.
 
 ## Features
 
 - HTTP and local video playback
 - Play, pause, stop, exact seek and playback-rate control
+- Hardware decoding with automatic fallback from VideoToolbox to software
+- HDR and Dolby Vision playback with EDR-aware Metal output
 - Audio, video and subtitle track discovery and selection
 - Framework-owned SRT/VTT parsing, timing, styling and default rendering
 - Replaceable client subtitle renderer for custom application UI
 - External ASS/SSA loading through MPV with original-style support
+- Subtitle delay, style presets and per-instance custom fonts
 - Picture in Picture for custom and quick-player interfaces
+- Now Playing controls on the lock screen and in Control Center
+- Memory buffer configuration with 10/30/60/120 second durations
+- Full-screen pan gestures for seeking, brightness and volume, each individually disableable
+- Forced landscape that also works when the host app declares only portrait support
 - A reusable rendering view for custom player interfaces
 - An optional ready-to-present `MPVQuickPlayerViewController`
+
+## Requirements
+
+- iOS 15.0 or later
+- Swift 6 toolchain (the package builds with swift-tools 6.0 in the Swift 6 language mode)
+- [MPVKit](https://github.com/mpvkit/MPVKit) 1.0.0, pinned exactly
+- Rendering runs on a custom `CAMetalLayer`; EDR output requires iOS 16 or later on a device that supports it
 
 ## Installation
 
@@ -52,58 +68,107 @@ if let subtitle = subtitleTracks.first {
 }
 ```
 
-Set `MPVPlayer.delegate` to receive state, time, buffering, buffered progress,
-decoder-mode and Picture in Picture updates. `MPVPlayer.bufferedProgress` and
-`didUpdateBufferedProgress` report a 0...100 percentage when both the media
-duration and mpv cache position are available; otherwise the value is `nil`.
+`MPVPlayerConfiguration` accepts:
+
+| Field | Purpose |
+| --- | --- |
+| `url` | Local file or HTTP(S) media URL |
+| `headers` | Extra HTTP request headers forwarded to mpv (`Authorization` and `X-Emby-Authorization` are deliberately not forwarded) |
+| `userAgent` | Custom HTTP user agent |
+| `forceSoftwareDecode` | Skips the hardware decoding paths |
+| `isDolbyVisionPlayback` | Hints the pipeline that the stream is Dolby Vision |
+| `videoQuality` | Rendering preset, see [Video quality](#video-quality) |
+| `debandEnabled` | Enables debanding |
+| `cacheConfiguration` | Memory buffer settings, see [Cache](#cache) |
+
+The display mode of `player.playbackView` follows `player.contentMode`, mapping aspect-fit and aspect-fill onto mpv's fit and fill modes.
+
+Set `MPVPlayer.delegate` to receive updates; every method has a default empty implementation:
+
+```swift
+public protocol MPVPlayerDelegate: AnyObject {
+    func player(_ player: MPVPlayer, didChangeState state: MPVPlaybackState)
+    func player(_ player: MPVPlayer, didUpdateCurrentTime currentTime: TimeInterval, duration: TimeInterval)
+    func player(_ player: MPVPlayer, didUpdateBufferingProgress progress: Int)
+    func player(_ player: MPVPlayer, didUpdateBufferedProgress progress: Int?)
+    func player(_ player: MPVPlayer, didUpdateDecoderMode mode: MPVDecoderMode)
+    func player(_ player: MPVPlayer, didChangePictureInPictureActive isActive: Bool)
+}
+```
+
+`MPVPlaybackState` reports `buffering`, `readyToPlay`, `bufferFinished`, `paused`, `playedToTheEnd` and `error`. `MPVPlayer.bufferedProgress` and `didUpdateBufferedProgress` report a 0...100 percentage when both the media duration and mpv cache position are available; otherwise the value is `nil`.
+
+## Playback engine
+
+### Decoding
+
+Hardware decoding tries `videotoolbox` first, falls back to `videotoolbox-copy`, and then to software decoding when a profile fails on the first playback attempt. The Simulator always decodes in software. Set `forceSoftwareDecode: true` in the configuration to skip the hardware paths. The active mode is reported through `didUpdateDecoderMode` (`initializing`, `hardware`, `software`).
+
+### Video quality
+
+`MPVVideoQuality` selects a rendering preset:
+
+- `.powerSaving` — bilinear scalers, no dithering, no sigmoid upscaling.
+- `.balanced` (default) — lanczos upscaling, mitchell downscaling.
+- `.highQuality` — `ewa_lanczossharp` upscaling with sigmoid upscaling, correct downscaling and dithering for the best detail retention.
+
+Debanding is toggled through `updateVideoRenderOptions(debandEnabled:)` and is forced off in the `.powerSaving` preset.
+
+### HDR and Dolby Vision
+
+The Metal layer switches between SDR output (`bgra8Unorm_srgb`, sRGB color space) and EDR output (`rgba16Float`, extended linear sRGB) depending on the target screen's EDR headroom. Tone mapping stays with mpv, so HDR and Dolby Vision content is neither clipped nor double-mapped. The Simulator and iOS 15 devices remain in SDR.
+
+### Seek and progress
+
+`seek(to:autoPlay:)` issues mpv's absolute exact seek. The target position is published optimistically — consecutive seeks and remote-command skips stay in sync — and rolls back if mpv rejects the command. Seeking while paused refreshes the displayed frame. Time and duration are polled twice a second and delivered through `didUpdateCurrentTime`.
+
+### Buffering
+
+State transitions are driven by a pure state machine (`MPVBufferingStateMachine`) that observes mpv's `paused-for-cache`, cache-buffering-state, idle and end-of-file properties, with a fallback timer for streams that never report buffering state.
+
+### Cache
+
+`MPVCacheConfiguration(isEnabled:duration:)` configures mpv's demuxer memory buffer. Supported durations are 10, 30, 60, and 120 seconds (default 30).
 
 ## Picture in Picture
 
 Picture in Picture is available through `startPictureInPicture()`,
 `stopPictureInPicture()`, and `togglePictureInPicture()`. The built-in quick
-player starts Picture in Picture only after its button is tapped. Hosts that
+player starts Picture in Picture only after its button is tapped, and
+activates a playback audio session first. Hosts that
 explicitly opt into background-initiated Picture in Picture may set
 `allowsAutomaticPictureInPictureFromInline`; this requires the Audio, AirPlay,
 and Picture in Picture background mode.
 
-The window is fed by raw MPV video screenshots, and is kept consistent with the
-inline `MPVPlayerView`:
+Picture in Picture uses the video-call content source: the inline
+`MPVPlayerView` itself is moved into the system window and moved back on exit,
+so mpv keeps rendering through its own Metal pipeline — subtitles, tone mapping,
+the fit/fill mode and the full frame rate all carry over unchanged. No frame
+capture is involved.
 
-- The window is shaped like the video: frames carry the display aspect ratio MPV
-  reports, so anamorphic video is not stretched and the shape of the drawable or
-  of the fit/fill mode never leaks into the window.
-- Captures follow the video frame rate up to 30 frames per second, and back off
-  automatically when a capture costs more than its interval.
-- Downscaling to the window size uses Accelerate resampling, and frames are
-  forced opaque so nothing composites through the video.
-- MPV subtitles are drawn into the captured frame with the player's own subtitle
-  size, colors and bottom margin. Disable this with
-  `drawsSubtitlesInPictureInPicture` when subtitles are composited outside of
-  MPV. Image-based subtitle tracks (PGS, VobSub) have no text to draw, and
-  original-style ASS tracks are drawn with the player style.
-- The inline fit/fill mode does not change the window: it always shows the whole
-  video frame at the aspect ratio of the video.
+- The window is shaped like the video: its content size follows the display
+  aspect ratio MPV reports, so anamorphic video is not stretched and the shape
+  of the inline container never leaks into the window.
+- On exit the player view is restored to its original inline hierarchy and
+  playback continues seamlessly.
+- `isPictureInPictureSupported` reports whether the system offers Picture in
+  Picture (and the coordinator was created); `isPictureInPictureActive` mirrors
+  the current state, also delivered through `didChangePictureInPictureActive`.
 
-`pictureInPictureCaptureMode` selects how frames are captured:
+Playback position, rate and skip handling are published to the Now Playing
+controls on the lock screen and in Control Center; see
+[System media controls](#system-media-controls).
 
-- `.videoWithSubtitleOverlay` (default) reads back the raw video image, which
-  never needs a video output render pass, and draws the subtitle line described
-  above into it.
-- `.window` reads back what MPV renders into its window and crops it to the
-  video area, so MPV's own subtitles, fit/fill cropping and tone mapping come
-  along, and the read back frame is the size of the drawable rather than of the
-  video. It is experimental: the mode needs a video output render pass, which
-  crashed on the builds that led to the default above. Verify on device.
+## System media controls
 
-The window controls play, pause, and skip backward and forward by the interval
-the system asks for. Playback progress comes from the display layer timebase,
-which carries the MPV position and the current playback rate; a stream with an
-unknown duration is reported as live. The same position and rate are published
-to the Now Playing controls on the lock screen and in Control Center.
+The built-in coordinator publishes `MPNowPlayingInfoCenter` — the title comes
+from the URL's last path component, alongside elapsed time, playback rate, and
+the duration (or a live-stream marker when the duration is unknown) — and
+registers `MPRemoteCommandCenter` handlers for play, pause, toggle play/pause,
+skip backward and forward (15 second interval) and `changePlaybackPosition`.
 
-Repeated skips accumulate: a seek publishes its target position immediately, so
-the next skip starts from it instead of from the last position MPV reported.
-Seeking while paused refreshes the window with the frame at the new position.
+Hosts that drive their own Remote Command Center can opt out with
+`playerView.systemPlaybackControlsEnabled = false`.
 
 ## Client-rendered subtitles
 
@@ -181,7 +246,7 @@ let playerViewController = MPVQuickPlayerViewController(
 present(playerViewController, animated: true)
 ```
 
-The quick interface provides play/pause, seeking, time display, a Picture in Picture button that enters and leaves the window, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, memory buffer settings, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
+Playback starts automatically when the view appears unless `autoplay` is set to `false`. The quick interface provides play/pause, seeking, time display, a Picture in Picture button that enters and leaves the window, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, memory buffer settings, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
 
 Landscape lock can also be changed while the player is visible:
 
@@ -189,15 +254,41 @@ Landscape lock can also be changed while the player is visible:
 playerViewController.setForceLandscape(true)
 ```
 
-It also supports full-screen pan gestures: horizontal seeking, brightness on the left half and system volume on the right half. Each gesture can be disabled when the host app owns that interaction:
+On iOS 16 or later the rotation goes through scene geometry updates; on iOS 15 the orientation is forced directly. When the host app declares portrait support only, the quick player rotates its own content — kept in sync with presented view controllers, alerts excepted — so forced landscape still works.
+
+### Gestures
+
+A single tap toggles the top and bottom control layers. Three full-screen pan gestures are built in:
+
+- **Horizontal drag** — scrubbing. A full-screen-wide drag covers 10% of the media duration (clamped to 60–600 seconds); the seek is applied once when the finger is released, with a HUD showing the direction, the target time and a progress bar.
+- **Vertical drag on the left half** — screen brightness, with a percentage HUD.
+- **Vertical drag on the right half** — system volume, adjusted through a hidden `MPVolumeView`.
+
+Each gesture can be disabled when the host app owns that interaction:
 
 ```swift
 playerViewController.gestureOptions = [.seeking, .volume]
 ```
 
-Settings can also be changed programmatically through `setPlaybackRate`, `setVideoQuality`, `setDebandEnabled`, `setCacheConfiguration`, `setSubtitleDelay`, and `setSubtitleStyle`. `MPVCacheConfiguration` supports 10, 30, 60, and 120 second memory buffer durations. The quick player's cache settings are persisted as app-local global preferences. The underlying `player` remains public for direct access to every `MPVPlayer` operation.
+`MPVQuickPlayerGestureOptions` is an `OptionSet` with `.seeking`, `.brightness`, `.volume` and `.all` (the default). An empty set keeps only the tap.
+
+### Programmatic settings
+
+Settings can also be changed programmatically through `setPlaybackRate` (clamped to 0.25...4.0), `setVideoQuality`, `setDebandEnabled`, `setCacheConfiguration`, `setSubtitleDelay` (clamped to ±60 seconds), and `setSubtitleStyle`. `MPVCacheConfiguration` supports 10, 30, 60, and 120 second memory buffer durations. The quick player's cache settings are persisted as app-local global preferences and reused by later quick-player instances. The underlying `player` remains public for direct access to every `MPVPlayer` operation.
 
 It is optional; `MPVPlayer` does not depend on it at runtime.
+
+## Objective-C bridge
+
+`MPVPlayerView` exposes its full surface to Objective-C through `@objc` members, for hosts that build their own playback engine on top of it — including hosts that load the class through the Objective-C runtime and drive it with `NSDictionary` options:
+
+- Setup and playback: `configure(_:)` (URL, headers, user agent, decoding, quality, deband and cache options), `play()`, `pause()`, `stop()`, `seek(_:)`, `updatePlayRate(_:)`
+- Tracks and subtitles: `mediaTracks(_:)`, `selectTrack(_:)`, `loadSubtitle(_:)`, `cancelSubtitleLoad(_:)`, `setSubtitleVisible(_:)`, `updateSubtitleStyle(_:)`, `updateSubtitleDelay(_:)`, `setSubtitleFontFromURL(_:)`, `resetSubtitleFontFromBridge()`, `currentSubtitleText()`
+- Rendering and layout: `playerContentModeRawValue`, `prepareLayoutTransition(_:)`, `refreshLayout(_:)`, `beginDisplayGeometryTransition()`, `endDisplayGeometryTransition()`
+- Picture in Picture: `isPictureInPictureSupported`, `isPictureInPictureActive`, `startPictureInPicture()`, `stopPictureInPicture()`, `togglePictureInPicture()`, `allowsAutomaticPictureInPictureFromInline`
+- System controls: `systemPlaybackControlsEnabled`
+
+State changes are also broadcast as `NSNotification` objects: `MPVPlayerViewDidChangeState`, `MPVPlayerViewDidUpdateTime`, `MPVPlayerViewDidUpdateBufferingProgress`, `MPVPlayerViewDidUpdateBufferedProgress`, `MPVPlayerViewDidUpdateDecoderMode`, `MPVPlayerViewDidLoadSubtitle`, `MPVPlayerViewDidCompleteSeek` and `MPVPlayerViewDidChangePictureInPicture`.
 
 ## Demo
 
@@ -208,6 +299,7 @@ Open `Demo/MPVPlayerKitDemo.xcodeproj` and run the `MPVPlayerKitDemo` scheme. Th
 - MPVKit is pinned to the `1.0.0` release so the native runtime and its transitive binary dependencies remain reproducible.
 - The package is distributed as a dynamic library so MPVKit's native runtime stays isolated from an app's other media dependencies.
 - The bundled Noto fonts are used for consistent multilingual subtitle rendering. Their original license files are included under `Resources`.
+- Not included (yet): loop/repeat playback, a long-press playback-rate gesture, double-tap gestures, a screen-lock gesture, screenshot or recording APIs, and a player-level volume API — the quick player's volume gesture adjusts the system volume.
 
 ## License
 
