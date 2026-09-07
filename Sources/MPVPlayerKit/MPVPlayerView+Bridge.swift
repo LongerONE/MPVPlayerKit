@@ -178,11 +178,8 @@ extension MPVPlayerView {
     @discardableResult
     nonisolated func checkError(_ status: CInt, operation: String? = nil, notifyOnFailure: Bool = true) -> Bool {
         if status < 0 {
-            #if DEBUG
-            let name = operation ?? "unknown"
-            let message = String(cString: mpv_error_string(status))
-            mpvDebugLog("api error operation=\(name) status=\(status) message=\(message)")
-            #endif
+            let category = operation?.split(separator: " ").first.map(String.init) ?? "未知"
+            recordDiagnosticEvent("MPV调用失败", fields: ["调用类别": category, "错误码": String(status)])
             if notifyOnFailure {
                 notifyOnMain {
                     self.notifyState(.error)
@@ -226,25 +223,13 @@ extension MPVPlayerView {
         return defaultValue
     }
 
-    nonisolated func mpvDebugLog(_ message: String) {
-        #if DEBUG
-        let uptime = String(format: "%.6f", ProcessInfo.processInfo.systemUptime)
-        let executor: String
-        if Thread.isMainThread {
-            executor = "main"
-        } else if DispatchQueue.getSpecific(key: queueSpecificKey) != nil {
-            executor = "mpv"
-        } else {
-            executor = "other"
-        }
-        print(
-            "MPVPlayerView[\(ObjectIdentifier(self))] "
-                + "uptime=\(uptime) executor=\(executor) \(message)"
-        )
-        #endif
+    nonisolated func mpvDebugLog(_ message: @autoclosure () -> String) {
+        // 历史自由文本包含地址、字体文件名等，不再输出或求值。
+        // 使用 PowerDiagnostics 的白名单事件，避免隐私泄漏和高频字符串构造。
     }
 
     func notifyState(_ state: MPVPlayerState) {
+        requestDiagnosticSnapshot("播放状态变化", fields: ["状态": String(describing: state)])
         mpvDebugLog(
             "notify state=\(state) current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
         )

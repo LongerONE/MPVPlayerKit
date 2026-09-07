@@ -141,6 +141,7 @@ public struct MPVPlayerConfiguration: Sendable {
     public var videoQuality: MPVVideoQuality
     public var debandEnabled: Bool
     public var cacheConfiguration: MPVCacheConfiguration
+    public var diagnostics: MPVDiagnosticConfiguration
 
     public init(
         url: URL,
@@ -150,7 +151,8 @@ public struct MPVPlayerConfiguration: Sendable {
         isDolbyVisionPlayback: Bool = false,
         videoQuality: MPVVideoQuality = .balanced,
         debandEnabled: Bool = false,
-        cacheConfiguration: MPVCacheConfiguration = .default
+        cacheConfiguration: MPVCacheConfiguration = .default,
+        diagnostics: MPVDiagnosticConfiguration = .init()
     ) {
         self.url = url
         self.headers = headers
@@ -160,6 +162,7 @@ public struct MPVPlayerConfiguration: Sendable {
         self.videoQuality = videoQuality
         self.debandEnabled = debandEnabled
         self.cacheConfiguration = cacheConfiguration
+        self.diagnostics = diagnostics
     }
 
     var bridgeDictionary: NSDictionary {
@@ -170,6 +173,9 @@ public struct MPVPlayerConfiguration: Sendable {
             "isDolbyVisionPlayback": NSNumber(value: isDolbyVisionPlayback),
             "videoQuality": NSNumber(value: videoQuality.rawValue),
             "debandEnabled": NSNumber(value: debandEnabled),
+            "diagnosticsEnabled": NSNumber(value: diagnostics.isEnabled),
+            "diagnosticSource": diagnostics.source.rawValue,
+            "diagnosticHost": diagnostics.host.rawValue,
         ]
         values["cacheEnabled"] = NSNumber(value: cacheConfiguration.isEnabled)
         values["cacheDuration"] = NSNumber(value: cacheConfiguration.duration)

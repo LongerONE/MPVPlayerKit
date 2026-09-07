@@ -156,6 +156,7 @@ extension MPVPlayerView {
             }
         }
         mpvDebugLog("video quality updated preset=\(preset) options=\(preset.options)")
+        recordDiagnosticSnapshot("画质设置变化")
         logEffectiveVideoSettings(reason: "quality-runtime")
     }
 
@@ -205,6 +206,7 @@ extension MPVPlayerView {
         mpvDebugLog(
             "cache options updated enabled=\(configuration.isEnabled) seconds=\(configuration.duration)"
         )
+        recordDiagnosticSnapshot("缓存设置变化")
         logEffectiveCacheSettings(reason: "runtime")
     }
 
@@ -215,6 +217,7 @@ extension MPVPlayerView {
         mpvDebugLog(
             "video render options updated deband=\(effectiveDebandEnabled) requested=\(debandEnabled)"
         )
+        recordDiagnosticSnapshot("渲染设置变化")
         logEffectiveVideoSettings(reason: "render-runtime")
     }
 
@@ -247,6 +250,7 @@ extension MPVPlayerView {
     }
 
     func setupMPV(url: URL, profile: MPVSetupProfile) -> Bool {
+        recordDiagnosticEvent("尝试解码配置", fields: ["配置": profile.name, "序号": String(activeSetupProfileIndex)])
         mpvDebugLog("setupMPV profile begin name=\(profile.name) index=\(activeSetupProfileIndex + 1)/\(setupProfiles.count)")
         mpvDebugLog(
             "setupMPV profile options name=\(profile.name) count=\(profile.options.count)"
@@ -276,11 +280,8 @@ extension MPVPlayerView {
 
         let loadURL = url.absoluteString
 
-        #if DEBUG
-        checkError(mpv_request_log_messages(mpv, "v"), operation: "request_log_messages", notifyOnFailure: false)
-        #else
+        // 原始 mpv 日志可能包含媒体地址或字幕正文；只使用白名单结构化诊断。
         checkError(mpv_request_log_messages(mpv, "no"), operation: "request_log_messages", notifyOnFailure: false)
-        #endif
 
         var metalLayerHandle = Int64(Int(bitPattern: Unmanaged.passUnretained(metalLayer).toOpaque()))
         guard checkError(
@@ -351,6 +352,8 @@ extension MPVPlayerView {
             "render diagnostics reason=setup "
                 + renderingDiagnosticDescription()
         )
+        recordDiagnosticSnapshot("渲染初始化")
+        _ = mpv_observe_property(mpv, 0, MPVProperty.hwdecCurrent, MPV_FORMAT_STRING)
         logEffectiveVideoSettings(reason: "setup")
         logEffectiveCacheSettings(reason: "setup")
         logEffectiveSubtitleConfiguration()
@@ -523,6 +526,8 @@ extension MPVPlayerView {
     }
 
     private func destroyMPVHandleOnMPVQueue(reason: String, sendStopCommand: Bool) {
+        recordDiagnosticEvent("销毁解码配置", fields: ["原因": reason, "配置": activeProfileDescription])
+        if reason == "stop" || reason == "setup-failed" { finishPowerDiagnostics(reason: reason) }
         MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         setDecoderMode(.initializing)
         _ = nextBufferingSessionGeneration()

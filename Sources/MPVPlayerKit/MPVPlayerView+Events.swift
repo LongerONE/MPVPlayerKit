@@ -76,6 +76,7 @@ extension MPVPlayerView {
                     break
                 }
 
+                self.recordDiagnosticMPVEvent(event)
                 switch event.pointee.event_id {
                 case MPV_EVENT_PROPERTY_CHANGE:
                     self.handlePropertyChange(event)

@@ -31,6 +31,11 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public internal(set) var subtitleDelay: TimeInterval = 0
     public internal(set) var subtitleStyle = MPVSubtitleStyle.defaultStyle
 
+    public var diagnosticSessionID: UUID? { player.diagnosticSessionID }
+    public func diagnosticLogFiles() async throws -> [URL] {
+        try await player.diagnosticLogFiles()
+    }
+
     public var currentSubtitleFontCapability: MPVSubtitleFontCapability {
         player.currentSubtitleFontCapability
     }

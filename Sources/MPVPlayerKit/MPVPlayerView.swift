@@ -268,6 +268,10 @@ public final class MPVPlayerView: UIView {
     nonisolated let mediaTracksCacheLock = NSLock()
     nonisolated(unsafe) var mediaTracksCache: [[String: Any]] = []
     nonisolated(unsafe) var mpv: OpaquePointer?
+    // diagnosticProbe 与 mpv 一样只在 MPV 串行队列访问。
+    nonisolated(unsafe) var diagnosticProbe: MPVDiagnosticProbe?
+    var diagnosticMonitor: MPVDiagnosticMonitor?
+    @objc public internal(set) var diagnosticSessionID: UUID?
     // Queue-bound cache used when libmpv has already reported shutdown.
     nonisolated(unsafe) var lastMPVTimeSnapshot: MPVPlaybackTimeSnapshot?
     var timeTimer: DispatchSourceTimer?
@@ -516,6 +520,7 @@ public final class MPVPlayerView: UIView {
             isEnabled: boolValue(configuration["cacheEnabled"], default: true),
             duration: (configuration["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration
         )
+        configurePowerDiagnostics(configuration)
         lastCacheDiagnosticsLogTime = 0
         setDecoderMode(.initializing)
         setStopped(false)

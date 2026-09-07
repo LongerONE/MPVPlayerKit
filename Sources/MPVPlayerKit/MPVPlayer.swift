@@ -30,6 +30,11 @@ public final class MPVPlayer: NSObject {
     public weak var delegate: MPVPlayerDelegate?
     public let playbackView: MPVPlayerView
 
+    public var diagnosticSessionID: UUID? { playbackView.diagnosticSessionID }
+    public func diagnosticLogFiles() async throws -> [URL] {
+        try await playbackView.diagnosticLogFiles()
+    }
+
     public var isPlaying: Bool { playbackView.isPlaying }
     public var duration: TimeInterval { playbackView.duration }
     public var currentTime: TimeInterval { playbackView.currentTime }

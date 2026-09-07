@@ -130,6 +130,54 @@ Metal 层根据目标屏幕的 EDR headroom，在 SDR 输出（`bgra8Unorm_srgb`
 
 `MPVCacheConfiguration(isEnabled:duration:)` 配置 mpv 的 demuxer 内存缓冲，支持 10、30、60、120 秒时长（默认 30 秒）。
 
+## 功耗诊断日志
+
+诊断仅增加观测，不改变解码、画质、HDR 或热管理策略。Debug 默认开启，Release 默认关闭。
+
+```swift
+let configuration = MPVPlayerConfiguration(
+    url: videoURL,
+    diagnostics: .init(isEnabled: true, source: .automatic, host: .unspecified)
+)
+let controller = MPVQuickPlayerViewController(configuration: configuration)
+// 自定义界面的 MPVPlayer 和底层 MPVPlayerView 也提供相同接口。
+let sessionID = controller.diagnosticSessionID
+let files = try await controller.diagnosticLogFiles()
+// 获取 App 内尚未被容量淘汰的所有诊断文件：
+let allFiles = try await MPVDiagnostics.logFiles()
+```
+
+也可在 App 启动参数中加入 `-MPVPlayerKit.DiagnosticsEnabled YES`，在 Release 构建开启；使用 `NO` 关闭。参数在创建配置/调用桥接 configure 时读取，不会自动切换已经开始的会话。显式 `diagnostics.isEnabled` 优先于启动参数。Objective-C 桥接配置支持 `diagnosticsEnabled`、`diagnosticSource`、`diagnosticHost`；省略启用字段时使用构建默认值及启动参数。
+
+### 数据与事件
+
+- 每次 configure 分配独立随机会话 ID；解码降级不会更换 ID。停止后仍可用同一 ID 获取日志。
+- 每 5 秒快照：mpv 实际解码器、视频格式/像素格式/Profile、分辨率、帧率、HDR 参数、实际渲染选项、播放速度、缓存、丢帧累计及相邻快照增量。
+- 记录媒体加载、首帧就绪、解码配置尝试/销毁、参数变化、请求播放/暂停/停止、精确跳转、缓冲状态、热状态、低电量模式、充电、前后台、画中画等事件，以及停止时的会话汇总。
+- 主线程采集屏幕亮度、EDR 余量、原生分辨率、画布/视图尺寸和系统状态；MPV 属性仅在播放器串行队列采集。
+- 记录整个 App 进程的 CPU 与物理内存、快照采集耗时；设备使用型号标识，不记录设备名、序列号或账号。
+- Temby 标记宿主；LuWu 额外区分保险箱解密流。自动来源识别只输出本地文件、本机 HTTP、远程三种分类，不输出 URL。
+
+### 保存与开销边界
+
+文件位置：`Library/Caches/MPVPlayerKit/Diagnostics/<会话ID>_<分段序号>.jsonl`。控制台可按 subsystem `MPVPlayerKit`、category `功耗诊断` 筛选。每行含 `schemaVersion`、`sessionID`、`sequence`、UTC 时间、系统 uptime、会话经过秒数、中文事件和 `fields`。字段值为字符串，数字自带字段名单位或遵循 mpv 属性单位。
+
+JSON 编码、OSLog 输出和文件写入在 utility 异步消费任务中完成。写入等待队列最多 128 条，拥塞时淘汰旧记录；`sequence` 缺口与“此前日志队列丢弃累计”用于识别丢失。MPV 队列繁忙时不会积压多个周期快照。每段最多 2 MiB，整个 App 最多 20 MiB，按文件修改时间淘汰旧段，包含活跃会话的旧段。系统也可能清理 Caches，不能将它视为永久档案。
+
+`diagnosticLogFiles()` 返回当前可见文件列表，不是写入屏障或冻结的导出副本；刚停止时汇总可能仍在异步写入，建议看到“会话汇总”后复制文件。正常停止会收尾；崩溃、强杀或系统挂起不保证最后几条记录落盘。磁盘写入失败后仅报告一次固定格式错误，后续保留控制台输出。
+
+诊断期间启用电池监测，最后一个诊断会话结束时恢复原状态；如果宿主自行关闭监测，相应字段会显示不可用。暂停期间仍每 5 秒采样，便于观察空闲负载；停止/初始化失败后取消采样与通知监听。不要用模拟器数据推断真机功耗。
+
+### 解释与隐私
+
+- `hwdec-current=videotoolbox-copy` 与 `videotoolbox` 均可能被 UI 标为硬解，分析时必须看原始属性。
+- CPU 的 100% 表示占满一个逻辑核心，可超过 100%；它包含 App 网络、解密、UI 等工作，不是 MPV 独占值。CPU 与丢帧增量对应相邻快照区间，关键事件可能使区间短于 5 秒。首次采样、属性不可用或计数器重置时不伪装成零。
+- “首帧就绪近似值”使用 `MPV_PLAYBACK_RESTART`，不是屏幕实际呈现时间；“媒体结束”不等于播放器对象已停止，最终以“会话汇总”为准。
+- 缺失的位深/Profile/HDR/缓存属性标为“不可用”；可结合像素格式与选中轨道参数判断，不编造值。平均 bits-per-pixel 与单通道位深不可混用。
+- 不提供真实 GPU 瓦数、整机功耗或芯片温度。热状态是系统等级，精确功耗及 GPU 时间需结合 Instruments。
+- 白名单诊断不记录完整 URL、路径、请求头、Token、密码、媒体标题、字幕正文。不转储任意 metadata，也不上传日志。历史自由文本调试日志与 mpv 原始日志停止输出，以免绕过此边界；宿主 App 自己的其他日志不受本包控制。
+- 对比优化效果应使用同一片源/片段、固定亮度、相同充电/温度状态、1 倍速、同一构建类型；同时记录诊断开启/关闭的基线，评估采样自身开销。
+
 ## 画中画
 
 通过 `startPictureInPicture()`、`stopPictureInPicture()` 和 `togglePictureInPicture()` 使用画中画。内置快捷播放器只在点击画中画按钮后才进入画中画窗口，并会先激活播放音频会话。希望支持后台自动进入画中画的宿主可以设置 `allowsAutomaticPictureInPictureFromInline`；这需要声明 Audio、AirPlay 与画中画后台模式。
