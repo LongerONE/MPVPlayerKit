@@ -78,6 +78,7 @@ final class MPVDiagnosticMonitor {
     }
 
     func systemFields() -> [String: String] {
+        dispatchPrecondition(condition: .onQueue(.main))
         guard let playerView else { return [:] }
         let screen = playerView.window?.windowScene?.screen
         let thermal: String

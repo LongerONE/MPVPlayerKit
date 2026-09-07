@@ -228,12 +228,13 @@ extension MPVPlayerView {
         // 使用 PowerDiagnostics 的白名单事件，避免隐私泄漏和高频字符串构造。
     }
 
-    func notifyState(_ state: MPVPlayerState) {
-        requestDiagnosticSnapshot("播放状态变化", fields: ["状态": String(describing: state)])
-        mpvDebugLog(
-            "notify state=\(state) current=\(currentTime) duration=\(duration) playing=\(isPlaying)"
-        )
+    nonisolated func notifyState(_ state: MPVPlayerState) {
         notifyOnMain {
+            // 初始化和失败回调也会从 MPV 队列进入，系统诊断必须在主线程采集。
+            self.requestDiagnosticSnapshot("播放状态变化", fields: ["状态": String(describing: state)])
+            self.mpvDebugLog(
+                "notify state=\(state) current=\(self.currentTime) duration=\(self.duration) playing=\(self.isPlaying)"
+            )
             NotificationCenter.default.post(
                 name: MPVPlayerKitNotification.didChangeState,
                 object: self,

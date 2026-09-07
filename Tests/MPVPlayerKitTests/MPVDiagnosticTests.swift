@@ -156,6 +156,47 @@ final class MPVDiagnosticTests: XCTestCase {
     }
 
     @MainActor
+    func testMPVQueueStateNotificationCollectsDiagnosticsOnMainActor() async throws {
+        let player = makePlayer(enabled: true)
+        let view = player.playbackView
+        let notification = expectation(description: "后台状态通知返回主线程")
+        let observer = NotificationCenter.default.addObserver(
+            forName: MPVPlayerKitNotification.didChangeState, object: view, queue: nil
+        ) { _ in
+            XCTAssertTrue(Thread.isMainThread)
+            notification.fulfill()
+        }
+        defer {
+            NotificationCenter.default.removeObserver(observer)
+            player.stop()
+        }
+        // 对应真机 setupMPV 在 MPV 串行队列发出 buffering 状态的路径。
+        enqueueBufferingState(on: view)
+        await fulfillment(of: [notification], timeout: 3)
+        var fields: [String: String]?
+        for _ in 0..<100 {
+            for file in try await player.diagnosticLogFiles() {
+                for line in try Data(contentsOf: file).split(separator: 0x0A) {
+                    let object = try JSONSerialization.jsonObject(with: Data(line)) as? [String: Any]
+                    if object?["event"] as? String == "播放状态变化" {
+                        fields = object?["fields"] as? [String: String]
+                    }
+                }
+            }
+            if fields != nil { break }
+            try await Task.sleep(nanoseconds: 20_000_000)
+        }
+        XCTAssertEqual(fields?["状态"], String(describing: MPVPlayerState.buffering))
+        XCTAssertNotNil(fields?["热状态"])
+    }
+
+    nonisolated private func enqueueBufferingState(on view: MPVPlayerView) {
+        // 使用非隔离的 GCD 工作项模拟既有 MPV 回调，不继承测试方法的 MainActor。
+        let work = DispatchWorkItem { view.notifyState(.buffering) }
+        view.queue.async(execute: work)
+    }
+
+    @MainActor
     private func makePlayer(enabled: Bool) -> MPVPlayer {
         // 动态 Swift Package 的无宿主测试将资源放在测试 bundle 中。
         let key = "PACKAGE_RESOURCE_BUNDLE_PATH"

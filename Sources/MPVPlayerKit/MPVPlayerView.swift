@@ -9,7 +9,7 @@ import libmpv
 #error("MPVPlayerKit requires MPVKit's Libmpv module.")
 #endif
 
-@objc public enum MPVPlayerState: Int {
+@objc public enum MPVPlayerState: Int, Sendable {
     case buffering
     case readyToPlay
     case bufferFinished
