@@ -199,6 +199,10 @@ extension MPVPlayerView {
             }
             if shouldNotifyState {
                 self.notifyState(isBuffering ? .buffering : .bufferFinished)
+                MPVSystemPlaybackCoordinator.shared.updateTimeAdvancing(
+                    playerView: self,
+                    isTimeAdvancing: isBuffering == false && self.isPlaying
+                )
             }
         }
     }

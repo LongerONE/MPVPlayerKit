@@ -65,6 +65,7 @@ extension MPVPlayerView {
             }
 
             self.updateBufferingPlaybackIntent(.playing)
+            let isTimeAdvancing = self.bufferingStateMachine.state == .finished
             self.setFlag(MPVProperty.pause, false)
             self.startTimeTimer()
             let state: MPVPlayerState = self.hasReportedReadyToPlay ? .bufferFinished : .buffering
@@ -74,7 +75,10 @@ extension MPVPlayerView {
                 }
                 self.isPlaying = true
                 self.notifyState(state)
-                MPVSystemPlaybackCoordinator.shared.activate(playerView: self)
+                MPVSystemPlaybackCoordinator.shared.activate(
+                    playerView: self,
+                    isTimeAdvancing: isTimeAdvancing
+                )
             }
         }
     }
@@ -120,6 +124,18 @@ extension MPVPlayerView {
         diagnosticMonitor = nil
         MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         destroyMPVHandle(reason: "stop")
+    }
+
+    func stopSystemPlaybackProgress(keepingOwner: Bool) {
+        isPlaying = false
+        if keepingOwner {
+            MPVSystemPlaybackCoordinator.shared.updateTimeAdvancing(
+                playerView: self,
+                isTimeAdvancing: false
+            )
+        } else {
+            MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
+        }
     }
 
     @objc public func seek(_ options: NSDictionary) -> Bool {

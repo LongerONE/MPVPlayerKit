@@ -120,7 +120,7 @@ extension MPVPlayerView {
                     }
                     self.notifyOnMain {
                         self.stopTimeTimer()
-                        self.isPlaying = false
+                        self.stopSystemPlaybackProgress(keepingOwner: false)
                     }
                     break eventLoop
                 case MPV_EVENT_LOG_MESSAGE:
@@ -483,7 +483,7 @@ extension MPVPlayerView {
             }
             notifyOnMain {
                 self.stopTimeTimer()
-                self.isPlaying = false
+                self.stopSystemPlaybackProgress(keepingOwner: true)
                 self.notifyState(.error)
             }
             return
@@ -496,7 +496,7 @@ extension MPVPlayerView {
             }
             notifyOnMain {
                 self.stopTimeTimer()
-                self.isPlaying = false
+                self.stopSystemPlaybackProgress(keepingOwner: true)
                 self.notifyState(.error)
             }
             return
@@ -505,7 +505,7 @@ extension MPVPlayerView {
         if reason == MPV_END_FILE_REASON_EOF {
             notifyOnMain {
                 self.stopTimeTimer()
-                self.isPlaying = false
+                self.stopSystemPlaybackProgress(keepingOwner: true)
                 self.notifyState(.playedToTheEnd)
             }
             return
@@ -514,7 +514,7 @@ extension MPVPlayerView {
         if reason == MPV_END_FILE_REASON_STOP || reason == MPV_END_FILE_REASON_QUIT || reason == MPV_END_FILE_REASON_REDIRECT {
             notifyOnMain {
                 self.stopTimeTimer()
-                self.isPlaying = false
+                self.stopSystemPlaybackProgress(keepingOwner: false)
             }
             return
         }
@@ -524,7 +524,7 @@ extension MPVPlayerView {
         }
         notifyOnMain {
             self.stopTimeTimer()
-            self.isPlaying = false
+            self.stopSystemPlaybackProgress(keepingOwner: true)
             self.notifyState(.error)
         }
     }

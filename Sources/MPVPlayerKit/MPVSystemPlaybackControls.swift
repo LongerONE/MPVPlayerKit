@@ -62,16 +62,19 @@ final class MPVSystemPlaybackCoordinator {
     private weak var activePlayerView: MPVPlayerView?
     private var commandTargetsInstalled = false
     private var staticNowPlayingInfoCache: StaticNowPlayingInfoCache?
+    private var activePlayerIsAdvancing = false
 
     private init() {}
 
-    func activate(playerView: MPVPlayerView) {
+    func activate(playerView: MPVPlayerView, isTimeAdvancing: Bool) {
         guard playerView.systemPlaybackControlsEnabled else { return }
         installCommandTargetsIfNeeded()
-        if activePlayerView !== playerView {
+        let isNewActivePlayer = activePlayerView !== playerView
+        if isNewActivePlayer {
             invalidateStaticNowPlayingInfo()
         }
         activePlayerView = playerView
+        activePlayerIsAdvancing = isTimeAdvancing
         publish(playerView: playerView)
     }
 
@@ -84,14 +87,22 @@ final class MPVSystemPlaybackCoordinator {
             : 1.0
         var info = staticNowPlayingInfo(for: playerView)
         info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = max(0, playerView.currentTime)
-        info[MPNowPlayingInfoPropertyPlaybackRate] = playerView.isPlaying ? speed : 0.0
+        info[MPNowPlayingInfoPropertyPlaybackRate] = playerView.isPlaying && activePlayerIsAdvancing ? speed : 0.0
         info[MPNowPlayingInfoPropertyDefaultPlaybackRate] = speed
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
+    }
+
+    func updateTimeAdvancing(playerView: MPVPlayerView, isTimeAdvancing: Bool) {
+        guard playerView.systemPlaybackControlsEnabled,
+              activePlayerView === playerView else { return }
+        activePlayerIsAdvancing = isTimeAdvancing
+        publish(playerView: playerView)
     }
 
     func deactivate(playerView: MPVPlayerView) {
         guard activePlayerView === playerView else { return }
         activePlayerView = nil
+        activePlayerIsAdvancing = false
         invalidateStaticNowPlayingInfo()
         if MPNowPlayingInfoCenter.default().nowPlayingInfo?[Self.ownerKey] as? Bool == true {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil

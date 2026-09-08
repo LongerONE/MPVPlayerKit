@@ -17,7 +17,7 @@ public extension MPVPlayerView {
     }
 
     @objc func startPictureInPicture() {
-        MPVSystemPlaybackCoordinator.shared.activate(playerView: self)
+        activateSystemPlaybackControlsForPictureInPicture()
         pictureInPictureCoordinatorInstance?.start()
     }
 
@@ -31,6 +31,30 @@ public extension MPVPlayerView {
 }
 
 extension MPVPlayerView {
+    func activateSystemPlaybackControlsForPictureInPicture() {
+        let sessionGeneration = currentBufferingSessionGeneration()
+        let intentGeneration = currentPlaybackIntentGeneration()
+        queue.async { [weak self] in
+            guard let self,
+                  self.currentBufferingSessionGeneration() == sessionGeneration,
+                  self.currentPlaybackIntentGeneration() == intentGeneration,
+                  self.isStopped() == false
+            else { return }
+            let isTimeAdvancing = self.mpv != nil
+                && self.bufferingStateMachine.state == .finished
+            self.notifyOnMain {
+                guard self.currentBufferingSessionGeneration() == sessionGeneration,
+                      self.currentPlaybackIntentGeneration() == intentGeneration,
+                      self.isStopped() == false
+                else { return }
+                MPVSystemPlaybackCoordinator.shared.activate(
+                    playerView: self,
+                    isTimeAdvancing: isTimeAdvancing
+                )
+            }
+        }
+    }
+
     /// The window is shaped like the video, not like the inline view, which is
     /// usually a portrait container the video is letterboxed into.
     var pictureInPicturePreferredContentSize: CGSize {
