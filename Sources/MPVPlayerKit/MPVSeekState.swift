@@ -5,11 +5,34 @@ struct MPVPlaybackTimeSnapshot: Sendable {
     let duration: TimeInterval?
 }
 
+struct MPVPlaybackUpdate: Sendable {
+    let timeSnapshot: MPVPlaybackTimeSnapshot
+    let bufferedProgress: Int?
+    let bufferingSessionGeneration: UInt64
+    let playbackIntentGeneration: UInt64
+    let playbackPositionGeneration: UInt64
+}
+
 struct MPVSeekRequest: Equatable, Sendable {
     let requestID: String
     let targetTime: TimeInterval
     let autoPlay: Bool
     let playbackIntentGeneration: UInt64
+    let playbackPositionGeneration: UInt64
+
+    init(
+        requestID: String,
+        targetTime: TimeInterval,
+        autoPlay: Bool,
+        playbackIntentGeneration: UInt64,
+        playbackPositionGeneration: UInt64 = 0
+    ) {
+        self.requestID = requestID
+        self.targetTime = targetTime
+        self.autoPlay = autoPlay
+        self.playbackIntentGeneration = playbackIntentGeneration
+        self.playbackPositionGeneration = playbackPositionGeneration
+    }
 }
 
 struct MPVSeekReplyResolution: Equatable, Sendable {

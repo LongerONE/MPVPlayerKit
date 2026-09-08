@@ -26,6 +26,7 @@ func makeMPVTimeTimerHandler(_ playerView: MPVPlayerView) -> @Sendable () -> Voi
 
 extension MPVPlayerView {
     nonisolated func readMPVTimeSnapshot() -> MPVPlaybackTimeSnapshot? {
+        dispatchPrecondition(condition: .onQueue(queue))
         guard mpv != nil else { return nil }
         let current = getDouble(MPVProperty.timePosition)
         guard current.isFinite else { return nil }
@@ -49,22 +50,10 @@ extension MPVPlayerView {
     }
 
     nonisolated func publishTime() {
-        guard let snapshot = readMPVTimeSnapshot() else { return }
-        logCacheRuntimeStateIfNeeded(currentTime: snapshot.currentTime)
+        guard let update = readMPVPlaybackUpdate() else { return }
+        logCacheRuntimeStateIfNeeded(currentTime: update.timeSnapshot.currentTime)
         notifyOnMain {
-            guard self.mpv != nil else { return }
-            self.applyMPVTimeSnapshot(snapshot)
-            self.applyBufferedProgress(
-                self.readMPVBufferedProgress(
-                    currentTime: snapshot.currentTime,
-                    duration: snapshot.duration
-                )
-            )
-
-            if self.hasReportedReadyToPlay == false, self.duration > 0.0 {
-                self.hasReportedReadyToPlay = true
-                self.notifyState(.readyToPlay)
-            }
+            self.applyMPVTimeUpdate(update)
         }
     }
 
@@ -200,6 +189,7 @@ extension MPVPlayerView {
     ) {
         dispatchPrecondition(condition: .onQueue(queue))
         markBufferingSeekFinished()
+        let isCurrentPlaybackPosition = finishPlaybackPositionUpdate(request.playbackPositionGeneration)
         guard let resolution = MPVSeekReplyResolver.resolve(
             request: request,
             error: error
@@ -210,8 +200,10 @@ extension MPVPlayerView {
             "seek reply request=\(request.requestID) success=\(resolution.success) "
                 + "autoPlay=\(resolution.shouldAutoPlay) error=\(error)"
         )
-        let snapshot: MPVPlaybackTimeSnapshot?
-        if resolution.shouldRestoreTime {
+        let recoveryUpdate: MPVPlaybackUpdate?
+        if resolution.shouldRestoreTime,
+           let sourceSessionGeneration = currentMPVPlaybackUpdateSourceSession() {
+            let snapshot: MPVPlaybackTimeSnapshot?
             if let recoverySnapshot {
                 snapshot = recoverySnapshot
             } else if error == MPV_ERROR_UNINITIALIZED.rawValue {
@@ -220,13 +212,25 @@ extension MPVPlayerView {
             } else {
                 snapshot = readMPVTimeSnapshot()
             }
+            recoveryUpdate = snapshot.map { snapshot in
+                MPVPlaybackUpdate(
+                    timeSnapshot: snapshot, bufferedProgress: nil,
+                    bufferingSessionGeneration: sourceSessionGeneration,
+                    playbackIntentGeneration: currentPlaybackIntentGeneration(),
+                    playbackPositionGeneration: currentPlaybackPositionGeneration()
+                )
+            }
         } else {
-            snapshot = nil
+            recoveryUpdate = nil
         }
         notifyOnMain {
-            if let snapshot {
+            if let recoveryUpdate,
+               isCurrentPlaybackPosition,
+               self.currentBufferingSessionGeneration() == recoveryUpdate.bufferingSessionGeneration,
+               self.currentPlaybackIntentGeneration() == recoveryUpdate.playbackIntentGeneration,
+               self.isPlaybackPositionCurrent(request.playbackPositionGeneration) {
                 // The optimistic target must not remain visible after a failed seek.
-                self.applyMPVTimeSnapshot(snapshot)
+                self.applyMPVTimeSnapshot(recoveryUpdate.timeSnapshot)
             }
             if MPVSeekReplyResolver.shouldAutoPlay(
                    request: request,

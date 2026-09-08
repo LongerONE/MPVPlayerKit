@@ -23,6 +23,21 @@ extension MPVPlayerView {
         return bufferingSessionGeneration
     }
 
+    nonisolated func bindMPVPlaybackUpdateSourceSession(_ generation: UInt64) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        mpvPlaybackUpdateSourceSessionGeneration = generation
+    }
+
+    nonisolated func currentMPVPlaybackUpdateSourceSession() -> UInt64? {
+        dispatchPrecondition(condition: .onQueue(queue))
+        return mpvPlaybackUpdateSourceSessionGeneration
+    }
+
+    nonisolated func clearMPVPlaybackUpdateSourceSession() {
+        dispatchPrecondition(condition: .onQueue(queue))
+        mpvPlaybackUpdateSourceSessionGeneration = nil
+    }
+
     nonisolated func nextPlaybackIntentGeneration() -> UInt64 {
         playbackStateLock.lock()
         defer { playbackStateLock.unlock() }
@@ -40,6 +55,47 @@ extension MPVPlayerView {
         playbackStateLock.lock()
         defer { playbackStateLock.unlock() }
         return playbackIntentGeneration == generation
+    }
+
+    nonisolated func beginPlaybackPositionUpdate() -> UInt64 {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        playbackPositionGeneration &+= 1
+        pendingPlaybackPositionGeneration = playbackPositionGeneration
+        return playbackPositionGeneration
+    }
+
+    nonisolated func hasPendingPlaybackPositionUpdate() -> Bool {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return pendingPlaybackPositionGeneration != nil
+    }
+
+    nonisolated func currentPlaybackPositionGeneration() -> UInt64 {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return playbackPositionGeneration
+    }
+
+    nonisolated func isPlaybackPositionCurrent(_ generation: UInt64) -> Bool {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return playbackPositionGeneration == generation
+    }
+
+    @discardableResult
+    nonisolated func finishPlaybackPositionUpdate(_ generation: UInt64) -> Bool {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        guard pendingPlaybackPositionGeneration == generation else { return false }
+        pendingPlaybackPositionGeneration = nil
+        return true
+    }
+
+    nonisolated func clearPendingPlaybackPositionUpdate() {
+        playbackStateLock.lock()
+        pendingPlaybackPositionGeneration = nil
+        playbackStateLock.unlock()
     }
 
     nonisolated func isStopped() -> Bool {

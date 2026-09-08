@@ -250,24 +250,32 @@ extension MPVPlayerView {
     }
 
     func setupMPV(url: URL, profile: MPVSetupProfile) -> Bool {
+        var didSetup = false
+        performOnMPVQueueSync {
+            didSetup = setupMPVOnMPVQueue(url: url, profile: profile)
+        }
+        return didSetup
+    }
+
+    private func setupMPVOnMPVQueue(url: URL, profile: MPVSetupProfile) -> Bool {
+        dispatchPrecondition(condition: .onQueue(queue))
+        let playbackUpdateSourceSession = currentBufferingSessionGeneration()
         recordDiagnosticEvent("尝试解码配置", fields: ["配置": profile.name, "序号": String(activeSetupProfileIndex)])
         mpvDebugLog("setupMPV profile begin name=\(profile.name) index=\(activeSetupProfileIndex + 1)/\(setupProfiles.count)")
         mpvDebugLog(
             "setupMPV profile options name=\(profile.name) count=\(profile.options.count)"
         )
-        performOnMPVQueueSync {
-            resetBufferingStateOnMPVQueue(reason: "setup")
-            lastMPVTimeSnapshot = nil
-            currentSubtitleUsesOriginalStyle = false
-            loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)
-            pendingExternalSubtitleLoad = nil
-            canceledExternalSubtitleCommands.removeAll(keepingCapacity: true)
-            pendingSeekCommands.removeAll(keepingCapacity: true)
-            activeExternalSubtitleActivation = nil
-            committedSubtitleSelection = nil
-            nextMPVCommandUserdata = 1
-            subtitleSelectionEpoch = 0
-        }
+        resetBufferingStateOnMPVQueue(reason: "setup")
+        lastMPVTimeSnapshot = nil
+        currentSubtitleUsesOriginalStyle = false
+        loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)
+        pendingExternalSubtitleLoad = nil
+        canceledExternalSubtitleCommands.removeAll(keepingCapacity: true)
+        pendingSeekCommands.removeAll(keepingCapacity: true)
+        activeExternalSubtitleActivation = nil
+        committedSubtitleSelection = nil
+        nextMPVCommandUserdata = 1
+        subtitleSelectionEpoch = 0
         lastLoggedSubtitleText = ""
         hasLoggedSubtitleTextEvent = false
         repeatedMPVLogMessageCounts.removeAll(keepingCapacity: true)
@@ -276,6 +284,7 @@ extension MPVPlayerView {
             mpvDebugLog("setupMPV mpv_create returned nil profile=\(profile.name)")
             return false
         }
+        bindMPVPlaybackUpdateSourceSession(playbackUpdateSourceSession)
         mpvDebugLog("setupMPV created handle=\(mpv)")
 
         let loadURL = url.absoluteString
@@ -531,6 +540,8 @@ extension MPVPlayerView {
         MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         setDecoderMode(.initializing)
         _ = nextBufferingSessionGeneration()
+        clearMPVPlaybackUpdateSourceSession()
+        clearPendingPlaybackPositionUpdate()
         resetBufferingStateOnMPVQueue(reason: "destroy-\(reason)", notifyFinish: true)
         stopTimeTimer()
         clearMediaTracksCache()
@@ -547,9 +558,6 @@ extension MPVPlayerView {
             pendingExternalSubtitleLoad = nil
             let pendingSeekRequests = Array(pendingSeekCommands.values)
             pendingSeekCommands.removeAll(keepingCapacity: true)
-            if pendingSeekRequests.isEmpty == false, mpv != nil {
-                publishTime()
-            }
             pendingSeekRequests.forEach {
                 notifySeekCompletion(
                     request: $0.request,

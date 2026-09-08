@@ -105,6 +105,7 @@ extension MPVPlayerView {
 
     @objc public func stop() {
         _ = nextPlaybackIntentGeneration()
+        clearPendingPlaybackPositionUpdate()
         clientSubtitleController.clear()
         stopPictureInPictureForPlayerTeardown()
         setDecoderMode(.initializing)
@@ -132,11 +133,13 @@ extension MPVPlayerView {
             let string = String(value)
             return string.isEmpty ? nil : string
         } ?? UUID().uuidString
+        let playbackPositionGeneration = beginPlaybackPositionUpdate()
         let request = MPVSeekRequest(
             requestID: requestID,
             targetTime: max(0.0, time),
             autoPlay: autoPlay,
-            playbackIntentGeneration: currentPlaybackIntentGeneration()
+            playbackIntentGeneration: currentPlaybackIntentGeneration(),
+            playbackPositionGeneration: playbackPositionGeneration
         )
         publishSeekTarget(request.targetTime)
         mpvDebugLog(

@@ -268,6 +268,10 @@ public final class MPVPlayerView: UIView {
     nonisolated let mediaTracksCacheLock = NSLock()
     nonisolated(unsafe) var mediaTracksCache: [[String: Any]] = []
     nonisolated(unsafe) var mpv: OpaquePointer?
+    // Bound to the MPV handle on `queue`. Playback snapshots carry this value
+    // so a queued callback from a previous handle cannot inherit a newer
+    // main-thread buffering session while teardown is still pending.
+    nonisolated(unsafe) var mpvPlaybackUpdateSourceSessionGeneration: UInt64?
     // diagnosticProbe 与 mpv 一样只在 MPV 串行队列访问。
     nonisolated(unsafe) var diagnosticProbe: MPVDiagnosticProbe?
     var diagnosticMonitor: MPVDiagnosticMonitor?
@@ -282,6 +286,8 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var stopped = false
     nonisolated(unsafe) var setupFailed = false
     nonisolated(unsafe) var playbackIntentGeneration: UInt64 = 0
+    nonisolated(unsafe) var playbackPositionGeneration: UInt64 = 0
+    nonisolated(unsafe) var pendingPlaybackPositionGeneration: UInt64?
     var forceSoftwareDecode = false
     /// Host metadata hint retained for diagnostics. Frame metadata and display
     /// capability, not this value, control color mapping.
@@ -547,6 +553,7 @@ public final class MPVPlayerView: UIView {
         currentSubtitleFontCapability = .noSubtitle
         playbackSpeed = 1.0
         _ = nextPlaybackIntentGeneration()
+        clearPendingPlaybackPositionUpdate()
         _ = nextBufferingSessionGeneration()
         queue.async { [weak self] in
             self?.resetBufferingStateOnMPVQueue(reason: "configure")

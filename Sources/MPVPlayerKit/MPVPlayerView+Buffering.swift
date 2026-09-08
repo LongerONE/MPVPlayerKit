@@ -6,10 +6,47 @@ import libmpv
 #endif
 
 extension MPVPlayerView {
+    nonisolated func readMPVPlaybackUpdate(
+        allowsPendingPlaybackPosition: Bool = false
+    ) -> MPVPlaybackUpdate? {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard allowsPendingPlaybackPosition || hasPendingPlaybackPositionUpdate() == false,
+              let timeSnapshot = readMPVTimeSnapshot()
+        else {
+            return nil
+        }
+        let bufferedProgress = readMPVBufferedProgress(
+            currentTime: timeSnapshot.currentTime,
+            duration: timeSnapshot.duration
+        )
+        return makeMPVPlaybackUpdate(
+            timeSnapshot: timeSnapshot,
+            bufferedProgress: bufferedProgress
+        )
+    }
+
+    nonisolated func makeMPVPlaybackUpdate(
+        timeSnapshot: MPVPlaybackTimeSnapshot,
+        bufferedProgress: Int?
+    ) -> MPVPlaybackUpdate? {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard let bufferingSessionGeneration = currentMPVPlaybackUpdateSourceSession() else {
+            return nil
+        }
+        return MPVPlaybackUpdate(
+            timeSnapshot: timeSnapshot,
+            bufferedProgress: bufferedProgress,
+            bufferingSessionGeneration: bufferingSessionGeneration,
+            playbackIntentGeneration: currentPlaybackIntentGeneration(),
+            playbackPositionGeneration: currentPlaybackPositionGeneration()
+        )
+    }
+
     nonisolated func readMPVBufferedProgress(
         currentTime: TimeInterval,
         duration: TimeInterval?
     ) -> Int? {
+        dispatchPrecondition(condition: .onQueue(queue))
         guard currentTime.isFinite,
               let duration,
               duration.isFinite,
@@ -26,15 +63,37 @@ extension MPVPlayerView {
     }
 
     nonisolated func publishBufferedProgress() {
-        guard let snapshot = readMPVTimeSnapshot() else { return }
-        let progress = readMPVBufferedProgress(
-            currentTime: snapshot.currentTime,
-            duration: snapshot.duration
-        )
+        guard let update = readMPVPlaybackUpdate(allowsPendingPlaybackPosition: true) else { return }
         notifyOnMain {
-            guard self.mpv != nil else { return }
-            self.applyBufferedProgress(progress)
+            self.applyMPVBufferedProgressUpdate(update)
         }
+    }
+
+    func applyMPVTimeUpdate(_ update: MPVPlaybackUpdate) {
+        guard currentBufferingSessionGeneration() == update.bufferingSessionGeneration,
+              currentPlaybackIntentGeneration() == update.playbackIntentGeneration,
+              isPlaybackPositionCurrent(update.playbackPositionGeneration),
+              hasPendingPlaybackPositionUpdate() == false,
+              isStopped() == false
+        else {
+            return
+        }
+
+        applyMPVTimeSnapshot(update.timeSnapshot)
+        applyBufferedProgress(update.bufferedProgress)
+        if hasReportedReadyToPlay == false, duration > 0.0 {
+            hasReportedReadyToPlay = true
+            notifyState(.readyToPlay)
+        }
+    }
+
+    func applyMPVBufferedProgressUpdate(_ update: MPVPlaybackUpdate) {
+        guard currentBufferingSessionGeneration() == update.bufferingSessionGeneration,
+              isStopped() == false
+        else {
+            return
+        }
+        applyBufferedProgress(update.bufferedProgress)
     }
 
     func applyBufferedProgress(_ progress: Int?) {
