@@ -83,4 +83,14 @@ final class MPVDisplayGeometryTests: XCTestCase {
         XCTAssertEqual(customMapping.targetVideoRect.midY, targetBounds.midY, accuracy: 0.001)
         XCTAssertEqual(customMapping.scale, fitMapping.scale * 1.5, accuracy: 0.001)
     }
+
+    func testCustomScaleKeepsNativeTextSubtitleSize() {
+        XCTAssertEqual(
+            MPVContentModeSnapshot.custom(scale: 1.5).nativeTextSubtitleScale,
+            1.0 / 1.5,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(MPVContentModeSnapshot.fit.nativeTextSubtitleScale, 1.0)
+        XCTAssertEqual(MPVContentModeSnapshot.fill.nativeTextSubtitleScale, 1.0)
+    }
 }

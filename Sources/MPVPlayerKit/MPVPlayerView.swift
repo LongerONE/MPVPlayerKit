@@ -74,6 +74,7 @@ enum MPVProperty {
     static let subtitleText = "sub-text"
     static let subtitleDelay = "sub-delay"
     static let subtitleASSOverride = "sub-ass-override"
+    static let subtitleScale = "sub-scale"
     static let subtitleFont = "sub-font"
     static let subtitleFontProvider = "sub-font-provider"
     static let subtitleFontSize = "sub-font-size"

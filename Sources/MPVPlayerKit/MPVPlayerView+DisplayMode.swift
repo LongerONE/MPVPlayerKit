@@ -22,6 +22,13 @@ enum MPVContentModeSnapshot {
         case .custom: self = .custom(scale: min(max(customScale, 0.5), 3.0))
         }
     }
+
+    /// The Metal canvas is scaled after libmpv renders it. Compensate only
+    /// libmpv's text glyphs so their final on-screen size stays unchanged.
+    var nativeTextSubtitleScale: Double {
+        guard case let .custom(scale) = self, scale > 0 else { return 1.0 }
+        return 1.0 / Double(scale)
+    }
 }
 
 struct MPVDisplayModeState {

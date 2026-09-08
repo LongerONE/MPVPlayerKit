@@ -136,6 +136,7 @@ extension MPVPlayerView {
         case .fit, .custom:
             setDouble(MPVProperty.panscan, 0.0)
         }
+        setDouble(MPVProperty.subtitleScale, contentModeSnapshot.nativeTextSubtitleScale)
     }
 
     func applyVideoDisplayMode() {
@@ -271,6 +272,7 @@ extension MPVPlayerView {
             return
         }
         pendingPictureInPictureGeometryResynchronizationReason = nil
+        applyContentMode(currentContentModeSnapshot())
         updateDisplayPresentationMapping(reason: reason)
     }
 
