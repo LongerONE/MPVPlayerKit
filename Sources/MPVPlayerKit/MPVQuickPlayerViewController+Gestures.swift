@@ -3,6 +3,25 @@ import UIKit
 import UniformTypeIdentifiers
 
 extension MPVQuickPlayerViewController {
+    @objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
+        switch gesture.state {
+        case .began:
+            pinchStartScale = player.customVideoScale
+        case .changed:
+            player.customVideoScale = pinchStartScale * Double(gesture.scale)
+            let scale = player.customVideoScale
+            showGestureHUD(
+                icon: .zoom,
+                text: "\(Int((scale * 100).rounded()))%",
+                progress: Float((scale - 0.5) / 2.5)
+            )
+        case .ended, .cancelled, .failed:
+            finishPan()
+        default:
+            break
+        }
+    }
+
     @objc func handlePanGesture(_ gesture: UIPanGestureRecognizer) {
         let translation = gesture.translation(in: contentView)
 

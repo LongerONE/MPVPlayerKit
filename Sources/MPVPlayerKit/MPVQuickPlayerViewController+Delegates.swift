@@ -10,6 +10,9 @@ extension MPVQuickPlayerViewController: UIGestureRecognizerDelegate {
         if gestureRecognizer is UITapGestureRecognizer {
             return true
         }
+        if gestureRecognizer is UIPinchGestureRecognizer {
+            return gestureOptions.contains(.zoom) && player.videoDisplayMode == .custom
+        }
         guard gestureOptions.isEmpty == false else { return false }
         let location = gestureRecognizer.location(in: view)
         let controlsFrame = controlsView.convert(controlsView.bounds, to: view)

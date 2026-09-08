@@ -46,6 +46,15 @@ struct MPVDisplayGeometry: Equatable {
             sourceVideoRect = sourceBounds
             let canvasAspect = safeCanvas.width / max(safeCanvas.height, 1.0)
             targetVideoRect = aspectRect(canvasAspect, in: safeTarget, fill: true)
+        case let .custom(scale):
+            sourceVideoRect = aspectRect(aspect, in: sourceBounds, fill: false)
+            let fitRect = aspectRect(aspect, in: safeTarget, fill: false)
+            targetVideoRect = CGRect(
+                x: fitRect.midX - fitRect.width * scale / 2.0,
+                y: fitRect.midY - fitRect.height * scale / 2.0,
+                width: fitRect.width * scale,
+                height: fitRect.height * scale
+            )
         }
 
         let scale = max(
@@ -114,6 +123,9 @@ extension MPVPlayerView {
     func currentContentModeSnapshot() -> MPVContentModeSnapshot {
         contentModeSnapshotLock.lock()
         defer { contentModeSnapshotLock.unlock() }
+        if pictureInPictureCoordinator?.isActive == true {
+            return .fit
+        }
         return contentModeSnapshot
     }
 
@@ -121,9 +133,26 @@ extension MPVPlayerView {
         switch contentModeSnapshot {
         case .fill:
             setDouble(MPVProperty.panscan, 1.0)
-        case .fit:
+        case .fit, .custom:
             setDouble(MPVProperty.panscan, 0.0)
         }
+    }
+
+    func applyVideoDisplayMode() {
+        guard Thread.isMainThread else {
+            DispatchQueue.main.async { [weak self] in
+                self?.applyVideoDisplayMode()
+            }
+            return
+        }
+        contentMode = videoDisplayMode == .fill ? .scaleAspectFill : .scaleAspectFit
+        let contentModeSnapshot = MPVContentModeSnapshot(
+            displayMode: videoDisplayMode,
+            customScale: displayModeState.scale
+        )
+        setContentModeSnapshot(contentModeSnapshot)
+        applyContentMode(contentModeSnapshot)
+        updateDisplayPresentationMapping(reason: "display-mode")
     }
 
     func applyContentMode(_ contentMode: UIView.ContentMode) {

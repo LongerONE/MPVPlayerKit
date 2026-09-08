@@ -185,15 +185,6 @@ enum MPVVideoQualityPreset: Int {
     }
 }
 
-enum MPVContentModeSnapshot {
-    case fit
-    case fill
-
-    init(contentModeRawValue: Int) {
-        self = contentModeRawValue == UIView.ContentMode.scaleAspectFill.rawValue ? .fill : .fit
-    }
-}
-
 @objc(MPVPlayerView)
 public final class MPVPlayerView: UIView {
     @objc public internal(set) var isPlaying = false
@@ -226,10 +217,7 @@ public final class MPVPlayerView: UIView {
                 }
                 return
             }
-            contentMode = newValue
-            let contentModeSnapshot = MPVContentModeSnapshot(contentModeRawValue: newValue.rawValue)
-            setContentModeSnapshot(contentModeSnapshot)
-            applyContentMode(contentModeSnapshot)
+            videoDisplayMode = newValue == .scaleAspectFill ? .fill : .fit
         }
     }
 
@@ -265,6 +253,7 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var customSubtitleFontName: String?
     let contentModeSnapshotLock = NSLock()
     var contentModeSnapshot: MPVContentModeSnapshot = .fit
+    var displayModeState = MPVDisplayModeState()
     nonisolated let mediaTracksCacheLock = NSLock()
     nonisolated(unsafe) var mediaTracksCache: [[String: Any]] = []
     nonisolated(unsafe) var mpv: OpaquePointer?

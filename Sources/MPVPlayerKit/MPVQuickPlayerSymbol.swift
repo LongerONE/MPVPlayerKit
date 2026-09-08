@@ -20,6 +20,7 @@ enum MPVQuickPlayerSymbol: String, CaseIterable {
     case brightness = "sun.max"
     case volumeMuted = "speaker.slash"
     case volume = "speaker.wave.2"
+    case zoom = "arrow.up.left.and.arrow.down.right"
 
     static func image(
         _ symbol: Self,

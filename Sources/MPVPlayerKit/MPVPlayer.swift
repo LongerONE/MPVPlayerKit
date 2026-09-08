@@ -44,6 +44,17 @@ public final class MPVPlayer: NSObject {
         get { playbackView.playerContentMode }
         set { playbackView.playerContentMode = newValue }
     }
+    public var videoDisplayMode: MPVVideoDisplayMode {
+        get { playbackView.videoDisplayMode }
+        set { playbackView.videoDisplayMode = newValue }
+    }
+    public var customVideoScale: Double {
+        get { playbackView.customVideoScale }
+        set { playbackView.customVideoScale = newValue }
+    }
+    public func resetCustomVideoScale() {
+        playbackView.resetCustomVideoScale()
+    }
     public var isPictureInPictureSupported: Bool {
         playbackView.isPictureInPictureSupported
     }

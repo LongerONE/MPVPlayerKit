@@ -63,4 +63,24 @@ final class MPVDisplayGeometryTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(mapping.targetVideoRect.width, 393.0)
         XCTAssertGreaterThanOrEqual(mapping.targetVideoRect.height, 852.0)
     }
+
+    func testCustomScaleUsesAspectFitAsItsBaseline() {
+        let targetBounds = CGRect(x: 0, y: 0, width: 852, height: 393)
+        let fitMapping = MPVDisplayGeometry.make(
+            canvasSize: targetBounds.size,
+            videoAspectRatio: 16.0 / 9.0,
+            targetBounds: targetBounds,
+            contentMode: .fit
+        )
+        let customMapping = MPVDisplayGeometry.make(
+            canvasSize: targetBounds.size,
+            videoAspectRatio: 16.0 / 9.0,
+            targetBounds: targetBounds,
+            contentMode: .custom(scale: 1.5)
+        )
+
+        XCTAssertEqual(customMapping.targetVideoRect.midX, targetBounds.midX, accuracy: 0.001)
+        XCTAssertEqual(customMapping.targetVideoRect.midY, targetBounds.midY, accuracy: 0.001)
+        XCTAssertEqual(customMapping.scale, fitMapping.scale * 1.5, accuracy: 0.001)
+    }
 }

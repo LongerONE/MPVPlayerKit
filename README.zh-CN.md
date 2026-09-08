@@ -81,7 +81,13 @@ if let subtitle = subtitleTracks.first {
 | `debandEnabled` | 开启去色带（deband） |
 | `cacheConfiguration` | 内存缓冲设置，见[缓存](#缓存) |
 
-`player.playbackView` 的显示模式跟随 `player.contentMode`，等比缩放（aspect-fit）与等比填充（aspect-fill）分别映射到 mpv 的 fit 与 fill。
+`player.playbackView` 默认跟随 `player.contentMode`，等比缩放（aspect-fit）与等比填充（aspect-fill）分别映射到 mpv 的 fit 与 fill。需要自定义缩放时，使用以适应画面为 100% 基准的独立模式；比例会限制在 50% 到 300%：
+
+```swift
+player.videoDisplayMode = .custom
+player.customVideoScale = 1.5
+player.resetCustomVideoScale()
+```
 
 设置 `MPVPlayer.delegate` 接收回调；所有方法都有默认空实现：
 
@@ -278,6 +284,7 @@ iOS 16 及以上通过场景几何更新完成旋转；iOS 15 直接强制方向
 - **横向拖动** — 刮擦进度。满屏宽度的拖动覆盖媒体时长的 10%（钳制在 60–600 秒）；松手时才真正执行 seek，HUD 显示方向、目标时间与进度条。
 - **左半屏纵向拖动** — 屏幕亮度，HUD 显示百分比。
 - **右半屏纵向拖动** — 系统音量，通过隐藏的 `MPVolumeView` 调节。
+- **双指捏合** — 仅在“自定义缩放”模式下调整画面大小，范围为适应画面的 50%～300%，HUD 显示当前比例。
 
 宿主 App 自己持有某项交互时，可以单独关闭对应手势：
 
@@ -285,7 +292,7 @@ iOS 16 及以上通过场景几何更新完成旋转；iOS 15 直接强制方向
 playerViewController.gestureOptions = [.seeking, .volume]
 ```
 
-`MPVQuickPlayerGestureOptions` 是一个 `OptionSet`，包含 `.seeking`、`.brightness`、`.volume` 与 `.all`（默认）。空集时只保留单击。
+`MPVQuickPlayerGestureOptions` 是一个 `OptionSet`，包含 `.seeking`、`.brightness`、`.volume`、`.zoom` 与 `.all`（默认）。空集时只保留单击。
 
 ### 编程式设置
 

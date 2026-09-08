@@ -25,13 +25,29 @@ extension MPVQuickPlayerViewController {
             guard let self else { return }
             setDebandEnabled(debandEnabled == false)
         })
-        let contentModeTitle = mpvLocalized(
-            player.contentMode == .scaleAspectFill ? "settings.fit_video" : "settings.fill_screen"
-        )
-        options.append(.init(title: contentModeTitle) { [weak self] in
-            guard let self else { return }
-            player.contentMode = player.contentMode == .scaleAspectFill ? .scaleAspectFit : .scaleAspectFill
+        options.append(.init(
+            title: mpvLocalized("settings.fit_video"),
+            isSelected: player.videoDisplayMode == .fit
+        ) { [weak self] in
+            self?.setVideoDisplayMode(.fit)
         })
+        options.append(.init(
+            title: mpvLocalized("settings.fill_screen"),
+            isSelected: player.videoDisplayMode == .fill
+        ) { [weak self] in
+            self?.setVideoDisplayMode(.fill)
+        })
+        options.append(.init(
+            title: mpvLocalized("settings.custom_scale.value", Int((player.customVideoScale * 100).rounded())),
+            isSelected: player.videoDisplayMode == .custom
+        ) { [weak self] in
+            self?.setVideoDisplayMode(.custom)
+        })
+        if player.videoDisplayMode == .custom {
+            options.append(.init(title: mpvLocalized("settings.reset_custom_scale")) { [weak self] in
+                self?.resetCustomVideoScale()
+            })
+        }
         options.append(.init(title: mpvLocalized("subtitle.delay.value", Self.delayTitle(subtitleDelay))) {
             [weak self] in self?.presentAfterCurrentSheet { $0.showSubtitleDelayPicker() }
         })
@@ -51,6 +67,18 @@ extension MPVQuickPlayerViewController {
         playbackRate = normalizedRate
         player.setPlaybackRate(normalizedRate)
         updateStatusLabel()
+    }
+
+    public func setVideoDisplayMode(_ mode: MPVVideoDisplayMode) {
+        player.videoDisplayMode = mode
+    }
+
+    public func setCustomVideoScale(_ scale: Double) {
+        player.customVideoScale = scale
+    }
+
+    public func resetCustomVideoScale() {
+        player.resetCustomVideoScale()
     }
 
     public func setVideoQuality(_ quality: MPVVideoQuality) {

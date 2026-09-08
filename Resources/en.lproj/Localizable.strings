@@ -31,6 +31,8 @@
 "settings.disable_debanding" = "Disable Debanding";
 "settings.fit_video" = "Fit Video";
 "settings.fill_screen" = "Fill Screen";
+"settings.custom_scale.value" = "Custom Scale · %d%%";
+"settings.reset_custom_scale" = "Reset Scale";
 
 "cache.title" = "Cache Settings";
 "cache.enabled" = "Enable Cache";

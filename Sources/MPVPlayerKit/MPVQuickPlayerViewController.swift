@@ -14,7 +14,8 @@ public struct MPVQuickPlayerGestureOptions: OptionSet, Sendable {
     public static let seeking = Self(rawValue: 1 << 0)
     public static let brightness = Self(rawValue: 1 << 1)
     public static let volume = Self(rawValue: 1 << 2)
-    public static let all: Self = [.seeking, .brightness, .volume]
+    public static let zoom = Self(rawValue: 1 << 3)
+    public static let all: Self = [.seeking, .brightness, .volume, .zoom]
 }
 
 /// A ready-to-present UIKit player. Apps with their own controls can use `MPVPlayer` directly.
@@ -71,6 +72,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var panTargetTime: TimeInterval = 0
     var panStartBrightness: CGFloat = 0
     var panStartVolume: Float = 0
+    var pinchStartScale: Double = 1.0
     var playbackState = MPVPlaybackState.paused
     var idleTimerDisabledBeforePlayback: Bool?
     var decoderMode = MPVDecoderMode.initializing
@@ -490,9 +492,15 @@ public final class MPVQuickPlayerViewController: UIViewController {
         contentView.addGestureRecognizer(tapGesture)
 
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePanGesture(_:)))
+        panGesture.maximumNumberOfTouches = 1
         panGesture.cancelsTouchesInView = false
         panGesture.delegate = self
         contentView.addGestureRecognizer(panGesture)
+
+        let pinchGesture = UIPinchGestureRecognizer(target: self, action: #selector(handlePinchGesture(_:)))
+        pinchGesture.cancelsTouchesInView = false
+        pinchGesture.delegate = self
+        contentView.addGestureRecognizer(pinchGesture)
     }
 
     @objc private func handleContentTap() {
