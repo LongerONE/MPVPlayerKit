@@ -52,6 +52,11 @@ public struct MPVCacheConfiguration: Equatable, Sendable {
         } ?? defaultDuration
     }
 
+    var demuxerHysteresisSeconds: Int {
+        guard isEnabled else { return 0 }
+        return duration == 10 ? 3 : 10
+    }
+
     var bridgeDictionary: NSDictionary {
         [
             "cacheEnabled": NSNumber(value: isEnabled),

@@ -180,6 +180,7 @@ extension MPVPlayerView {
                     cacheConfiguration.duration
                 )
             ),
+            ("demuxer-hysteresis-secs", String(cacheConfiguration.demuxerHysteresisSeconds)),
             ("cache-on-disk", "no"),
             ("demuxer-max-bytes", Self.demuxerMaxBytes),
             ("demuxer-max-back-bytes", Self.demuxerMaxBackBytes),
@@ -197,6 +198,7 @@ extension MPVPlayerView {
                     configuration.duration
                 )
             ),
+            ("demuxer-hysteresis-secs", String(configuration.demuxerHysteresisSeconds)),
             ("cache-on-disk", "no"),
         ]
         options.forEach { option in

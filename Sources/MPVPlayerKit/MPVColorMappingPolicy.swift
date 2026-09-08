@@ -83,7 +83,6 @@ struct MPVColorMappingPolicy {
         ("sub-hdr-peak", "100"),
         ("image-subs-hdr-peak", "100"),
         ("gpu-shader-cache", "yes"),
-        ("demuxer-hysteresis-secs", "10"),
     ]
 
     /// Keep libplacebo's automatic mapping and peak-detection behavior.
