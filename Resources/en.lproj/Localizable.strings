@@ -67,6 +67,12 @@
 "track.audio" = "Audio Track";
 "track.subtitle" = "Subtitle Track";
 "track.none" = "No tracks are currently available.";
+"track.language.chinese" = "Chinese";
+"track.default" = "Default";
+"track.forced" = "Forced";
+"track.hearing_impaired" = "HI";
+"track.visual_impaired" = "VI";
+"track.id" = "Track%lld";
 
 "status.buffering" = "Buffering %d%%";
 "status.ready" = "Ready";

@@ -326,7 +326,7 @@ extension MPVPlayerView {
             return []
         }
 
-        var tracks: [[String: Any]] = []
+        var descriptors: [MPVMediaTrackDescriptor] = []
         for index in 0..<Int(count) {
             guard let mpvType = getString("track-list/\(index)/type") else {
                 continue
@@ -341,38 +341,72 @@ extension MPVPlayerView {
             let title = getString("track-list/\(index)/title")
             let languageCode = getString("track-list/\(index)/lang")
             let codec = getString("track-list/\(index)/codec")
-            let name = mediaTrackName(
+            descriptors.append(MPVMediaTrackDescriptor(
                 id: trackID,
                 mpvType: mpvType,
                 title: title,
                 languageCode: languageCode,
-                codec: codec
-            )
-            let selected = getFlag("track-list/\(index)/selected") ?? false
-            let bitRate = getInt64("track-list/\(index)/demux-bitrate")
-                ?? getInt64("track-list/\(index)/bitrate")
-                ?? 0
+                codec: codec,
+                codecDescription: getString("track-list/\(index)/codec-desc"),
+                externalFilename: getString("track-list/\(index)/external-filename"),
+                isDefault: getFlag("track-list/\(index)/default") ?? false,
+                isForced: getFlag("track-list/\(index)/forced") ?? false,
+                isHearingImpaired: getFlag("track-list/\(index)/hearing-impaired") ?? false,
+                isVisualImpaired: getFlag("track-list/\(index)/visual-impaired") ?? false,
+                isSelected: getFlag("track-list/\(index)/selected") ?? false,
+                bitRate: getInt64("track-list/\(index)/demux-bitrate")
+                    ?? getInt64("track-list/\(index)/bitrate")
+                    ?? 0
+            ))
+        }
+
+        let subtitleGroups = Dictionary(
+            grouping: descriptors.filter { $0.mpvType == "sub" },
+            by: { Self.subtitleTrackName(for: $0) }
+        )
+        var duplicateSubtitleIDs = Set<Int64>()
+        for group in subtitleGroups.values where group.count > 1 {
+            duplicateSubtitleIDs.formUnion(group.map(\.id))
+        }
+
+        return descriptors.map { descriptor in
+            let name: String
+            if descriptor.mpvType == "sub" {
+                name = Self.subtitleTrackName(
+                    for: descriptor,
+                    includeTrackID: duplicateSubtitleIDs.contains(descriptor.id)
+                        || Self.hasSubtitleIdentity(descriptor) == false
+                )
+            } else {
+                name = mediaTrackName(
+                    id: descriptor.id,
+                    mpvType: descriptor.mpvType,
+                    title: descriptor.title,
+                    languageCode: descriptor.languageCode,
+                    codec: descriptor.codec
+                )
+            }
 
             var track: [String: Any] = [
-                "trackID": NSNumber(value: Int32(clamping: trackID)),
-                "subtitleID": "mpv-\(mpvType)-\(trackID)",
+                "trackID": NSNumber(value: Int32(clamping: descriptor.id)),
+                "subtitleID": "mpv-\(descriptor.mpvType)-\(descriptor.id)",
                 "name": name,
-                "mediaType": avMediaTypeRawValue(for: mpvType),
-                "mpvType": mpvType,
-                "codec": codec ?? "",
-                "isEnabled": NSNumber(value: selected),
-                "isImageSubtitle": NSNumber(value: isImageSubtitleCodec(codec)),
+                "mediaType": avMediaTypeRawValue(for: descriptor.mpvType),
+                "mpvType": descriptor.mpvType,
+                "codec": descriptor.codec ?? "",
+                "isEnabled": NSNumber(value: descriptor.isSelected),
+                "isImageSubtitle": NSNumber(value: isImageSubtitleCodec(descriptor.codec)),
                 "nominalFrameRate": NSNumber(value: 0),
-                "bitRate": NSNumber(value: bitRate),
+                "bitRate": NSNumber(value: descriptor.bitRate),
                 "bitDepth": NSNumber(value: 0),
                 "rotation": NSNumber(value: 0),
             ]
-            if let languageCode {
+            if let languageCode = descriptor.languageCode?.trimmingCharacters(in: .whitespacesAndNewlines),
+               languageCode.isEmpty == false {
                 track["languageCode"] = languageCode
             }
-            tracks.append(track)
+            return track
         }
-        return tracks
     }
 
     nonisolated func mediaTrackName(

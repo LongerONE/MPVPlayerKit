@@ -67,6 +67,12 @@
 "track.audio" = "音频轨道";
 "track.subtitle" = "字幕轨道";
 "track.none" = "当前没有可用轨道。";
+"track.language.chinese" = "简体中文";
+"track.default" = "默认";
+"track.forced" = "强制";
+"track.hearing_impaired" = "听障";
+"track.visual_impaired" = "视障";
+"track.id" = "轨道%lld";
 
 "status.buffering" = "正在缓冲 %d%%";
 "status.ready" = "就绪";
