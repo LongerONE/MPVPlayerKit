@@ -338,11 +338,13 @@ extension MPVPlayerView {
                 continue
             }
 
+            let ffIndex = getInt64("track-list/\(index)/ff-index")
             let title = getString("track-list/\(index)/title")
             let languageCode = getString("track-list/\(index)/lang")
             let codec = getString("track-list/\(index)/codec")
             descriptors.append(MPVMediaTrackDescriptor(
                 id: trackID,
+                ffIndex: ffIndex,
                 mpvType: mpvType,
                 title: title,
                 languageCode: languageCode,
@@ -401,6 +403,9 @@ extension MPVPlayerView {
                 "bitDepth": NSNumber(value: 0),
                 "rotation": NSNumber(value: 0),
             ]
+            if let ffIndex = descriptor.ffIndex {
+                track["ffIndex"] = NSNumber(value: Int32(clamping: ffIndex))
+            }
             if let languageCode = descriptor.languageCode?.trimmingCharacters(in: .whitespacesAndNewlines),
                languageCode.isEmpty == false {
                 track["languageCode"] = languageCode

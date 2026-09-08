@@ -2,6 +2,7 @@ import Foundation
 
 struct MPVMediaTrackDescriptor {
     let id: Int64
+    let ffIndex: Int64?
     let mpvType: String
     let title: String?
     let languageCode: String?
@@ -34,6 +35,7 @@ extension MPVPlayerView {
         subtitleTrackName(
             for: MPVMediaTrackDescriptor(
                 id: id,
+                ffIndex: nil,
                 mpvType: "sub",
                 title: title,
                 languageCode: languageCode,
