@@ -299,7 +299,6 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var videoQualityPreset = MPVVideoQualityPreset.balanced
     nonisolated(unsafe) var debandEnabled = false
     nonisolated(unsafe) var cacheConfiguration = MPVCacheConfiguration.default
-    nonisolated(unsafe) var lastCacheDiagnosticsLogTime: CFTimeInterval = 0
     // Buffering state is reduced on the MPV queue. The work item is kept
     // queue-bound as well, so an obsolete core-idle fallback cannot publish
     // after a new playback intent or handle teardown.
@@ -363,8 +362,6 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var committedSubtitleSelection: SubtitleSelectionSnapshot?
     nonisolated(unsafe) var nextMPVCommandUserdata: UInt64 = 1
     nonisolated(unsafe) var subtitleSelectionEpoch: UInt64 = 0
-    nonisolated(unsafe) var lastLoggedSubtitleText = ""
-    nonisolated(unsafe) var hasLoggedSubtitleTextEvent = false
     nonisolated(unsafe) var repeatedMPVLogMessageCounts: [String: Int] = [:]
     /// The renderer surface is allocated once for the playback session. UIKit
     /// rotation only changes the presentation mapping applied to this surface.
@@ -527,7 +524,6 @@ public final class MPVPlayerView: UIView {
             duration: (configuration["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration
         )
         configurePowerDiagnostics(configuration)
-        lastCacheDiagnosticsLogTime = 0
         setDecoderMode(.initializing)
         setStopped(false)
         setSetupFailed(false)

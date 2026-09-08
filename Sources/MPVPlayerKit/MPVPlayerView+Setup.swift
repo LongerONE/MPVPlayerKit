@@ -207,7 +207,6 @@ extension MPVPlayerView {
             "cache options updated enabled=\(configuration.isEnabled) seconds=\(configuration.duration)"
         )
         recordDiagnosticSnapshot("缓存设置变化")
-        logEffectiveCacheSettings(reason: "runtime")
     }
 
     nonisolated func applyVideoRenderProperties() {
@@ -276,8 +275,6 @@ extension MPVPlayerView {
         committedSubtitleSelection = nil
         nextMPVCommandUserdata = 1
         subtitleSelectionEpoch = 0
-        lastLoggedSubtitleText = ""
-        hasLoggedSubtitleTextEvent = false
         repeatedMPVLogMessageCounts.removeAll(keepingCapacity: true)
         mpv = mpv_create()
         guard let mpv else {
@@ -364,8 +361,6 @@ extension MPVPlayerView {
         recordDiagnosticSnapshot("渲染初始化")
         _ = mpv_observe_property(mpv, 0, MPVProperty.hwdecCurrent, MPV_FORMAT_STRING)
         logEffectiveVideoSettings(reason: "setup")
-        logEffectiveCacheSettings(reason: "setup")
-        logEffectiveSubtitleConfiguration()
         checkError(
             mpv_observe_property(mpv, 0, MPVProperty.pausedForCache, MPV_FORMAT_FLAG),
             operation: "observe paused-for-cache",
@@ -414,11 +409,6 @@ extension MPVPlayerView {
         checkError(
             mpv_observe_property(mpv, 0, MPVProperty.videoOutputDisplayHeight, MPV_FORMAT_INT64),
             operation: "observe video-out-params/dh",
-            notifyOnFailure: false
-        )
-        checkError(
-            mpv_observe_property(mpv, 0, MPVProperty.subtitleText, MPV_FORMAT_STRING),
-            operation: "observe sub-text",
             notifyOnFailure: false
         )
         mpv_set_wakeup_callback(
@@ -545,8 +535,6 @@ extension MPVPlayerView {
         resetBufferingStateOnMPVQueue(reason: "destroy-\(reason)", notifyFinish: true)
         stopTimeTimer()
         clearMediaTracksCache()
-        lastLoggedSubtitleText = ""
-        hasLoggedSubtitleTextEvent = false
         notifyOnMain {
             self.updatePictureInPictureVideoDisplaySize(.zero)
         }

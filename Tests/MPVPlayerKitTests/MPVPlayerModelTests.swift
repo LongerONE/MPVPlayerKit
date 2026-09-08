@@ -434,35 +434,28 @@ final class MPVPlayerModelTests: XCTestCase {
         )
     }
 
-    @MainActor
-    func testDiagnosticsCanRunOnMPVQueue() async {
-        let playerView = MPVPlayerView(frame: .zero)
-        let transfer = TestUnsafeTransfer(value: playerView)
+    func testSubtitleTextUsesOnDemandReadInsteadOfObservation() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let setupSource = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/MPVPlayerKit/MPVPlayerView+Setup.swift"),
+            encoding: .utf8
+        )
+        let eventsSource = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/MPVPlayerKit/MPVPlayerView+Events.swift"),
+            encoding: .utf8
+        )
+        let playbackSource = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/MPVPlayerKit/MPVPlayerView+Playback.swift"),
+            encoding: .utf8
+        )
 
-        let shouldPrint = await withCheckedContinuation { continuation in
-            playerView.queue.async {
-                transfer.value.logSubtitleTextChange()
-                let shouldPrint = transfer.value.shouldPrintMPVLogMessage(
-                    prefix: "subtitle",
-                    level: "info",
-                    text: "glyph rendered"
-                )
-                let shouldPrintRenderer = transfer.value.shouldPrintMPVLogMessage(
-                    prefix: "vo/gpu-next/libplacebo",
-                    level: "verbose",
-                    text: "frame upload"
-                )
-                let shouldPrintDecoder = transfer.value.shouldPrintMPVLogMessage(
-                    prefix: "vd/ffmpeg",
-                    level: "verbose",
-                    text: "decoder frame"
-                )
-                continuation.resume(
-                    returning: shouldPrint && shouldPrintRenderer && shouldPrintDecoder
-                )
-            }
-        }
-        XCTAssertTrue(shouldPrint)
+        XCTAssertFalse(setupSource.contains("mpv_observe_property(mpv, 0, MPVProperty.subtitleText"))
+        XCTAssertFalse(eventsSource.contains("case MPVProperty.subtitleText:"))
+        XCTAssertTrue(playbackSource.contains("func currentSubtitleText()"))
+        XCTAssertTrue(playbackSource.contains("getString(MPVProperty.subtitleText)"))
     }
 
     @MainActor

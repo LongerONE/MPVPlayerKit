@@ -1,6 +1,4 @@
 import AVFoundation
-import QuartzCore
-import UIKit
 #if canImport(Libmpv)
 import Libmpv
 #elseif canImport(libmpv)
@@ -10,56 +8,6 @@ import libmpv
 #endif
 
 extension MPVPlayerView {
-    nonisolated func logEffectiveSubtitleConfiguration() {
-        #if DEBUG
-        let optionNames = [
-            "sub-font-provider",
-            "sub-font",
-            "sub-fonts-dir",
-            "sub-ass-override",
-            "sub-shaper",
-            "embeddedfonts",
-            "sub-auto",
-            "blend-subtitles",
-            "sub-hdr-peak",
-            "image-subs-hdr-peak",
-            "gpu-shader-cache",
-            "gpu-shader-cache-dir",
-        ]
-        let options = optionNames.map { name in
-            "\(name)=\(getString("options/\(name)") ?? "<unavailable>")"
-        }.joined(separator: " ")
-        mpvDebugLog("subtitle diagnostics options \(options)")
-        DispatchQueue.main.async {
-            let systemFont = UIFont(name: "PingFangSC-Regular", size: 20)
-            let resolvedFont = systemFont.map { "fontName=\($0.fontName) family=\($0.familyName)" } ?? "unavailable"
-            self.mpvDebugLog("subtitle diagnostics CoreText font \(resolvedFont)")
-        }
-        #endif
-    }
-
-    nonisolated func logSubtitleTextChange() {
-        dispatchPrecondition(condition: .onQueue(queue))
-        #if DEBUG
-        let text = getString(MPVProperty.subtitleText) ?? ""
-        guard hasLoggedSubtitleTextEvent == false || text != lastLoggedSubtitleText else { return }
-        hasLoggedSubtitleTextEvent = true
-        lastLoggedSubtitleText = text
-
-        let codepoints = text.unicodeScalars.prefix(24).map { scalar in
-            String(format: "U+%04X", scalar.value)
-        }.joined(separator: ",")
-        let truncated = text.unicodeScalars.count > 24 ? ",..." : ""
-        let time = String(format: "%.3f", getDouble(MPVProperty.timePosition))
-        let subtitleID = getInt64(MPVProperty.subtitleID).map(String.init) ?? "<none>"
-        let visible = getFlag(MPVProperty.subtitleVisibility).map { $0 ? "yes" : "no" } ?? "<unknown>"
-        mpvDebugLog(
-            "subtitle text changed time=\(time) sid=\(subtitleID) visible=\(visible) "
-                + "utf16=\(text.utf16.count) scalars=\(text.unicodeScalars.count) codepoints=[\(codepoints)\(truncated)]"
-        )
-        #endif
-    }
-
     nonisolated func logMessage(_ event: UnsafeMutablePointer<mpv_event>) {
         dispatchPrecondition(condition: .onQueue(queue))
         guard let data = event.pointee.data else { return }

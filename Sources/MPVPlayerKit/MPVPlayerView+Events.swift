@@ -51,7 +51,6 @@ extension MPVPlayerView {
 
     nonisolated func publishTime() {
         guard let update = readMPVPlaybackUpdate() else { return }
-        logCacheRuntimeStateIfNeeded(currentTime: update.timeSnapshot.currentTime)
         notifyOnMain {
             self.applyMPVTimeUpdate(update)
         }
@@ -572,8 +571,6 @@ extension MPVPlayerView {
             handleBufferingPropertyChange(property)
         case MPVProperty.demuxerCacheTime:
             publishBufferedProgress()
-        case MPVProperty.subtitleText:
-            logSubtitleTextChange()
         default:
             break
         }
