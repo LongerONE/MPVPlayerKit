@@ -64,7 +64,7 @@ final class MPVDisplayGeometryTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(mapping.targetVideoRect.height, 852.0)
     }
 
-    func testCustomScaleUsesAspectFitAsItsBaseline() {
+    func testCustomScaleKeepsAspectFitPresentationMapping() {
         let targetBounds = CGRect(x: 0, y: 0, width: 852, height: 393)
         let fitMapping = MPVDisplayGeometry.make(
             canvasSize: targetBounds.size,
@@ -79,18 +79,18 @@ final class MPVDisplayGeometryTests: XCTestCase {
             contentMode: .custom(scale: 1.5)
         )
 
-        XCTAssertEqual(customMapping.targetVideoRect.midX, targetBounds.midX, accuracy: 0.001)
-        XCTAssertEqual(customMapping.targetVideoRect.midY, targetBounds.midY, accuracy: 0.001)
-        XCTAssertEqual(customMapping.scale, fitMapping.scale * 1.5, accuracy: 0.001)
+        XCTAssertEqual(customMapping.targetVideoRect, fitMapping.targetVideoRect)
+        XCTAssertEqual(customMapping.scale, fitMapping.scale, accuracy: 0.001)
     }
 
-    func testCustomScaleKeepsNativeTextSubtitleSize() {
+    func testCustomScaleUsesMPVVideoZoom() {
         XCTAssertEqual(
-            MPVContentModeSnapshot.custom(scale: 1.5).nativeTextSubtitleScale,
-            1.0 / 1.5,
+            MPVContentModeSnapshot.custom(scale: 2).nativeVideoZoom,
+            1.0,
             accuracy: 0.001
         )
-        XCTAssertEqual(MPVContentModeSnapshot.fit.nativeTextSubtitleScale, 1.0)
-        XCTAssertEqual(MPVContentModeSnapshot.fill.nativeTextSubtitleScale, 1.0)
+        XCTAssertEqual(MPVContentModeSnapshot.custom(scale: 0.5).nativeVideoZoom, -1.0, accuracy: 0.001)
+        XCTAssertEqual(MPVContentModeSnapshot.fit.nativeVideoZoom, 0.0)
+        XCTAssertEqual(MPVContentModeSnapshot.fill.nativeVideoZoom, 0.0)
     }
 }

@@ -65,6 +65,7 @@ enum MPVProperty {
     static let timePosition = "time-pos"
     static let duration = "duration"
     static let panscan = "panscan"
+    static let videoZoom = "video-zoom"
     static let speed = "speed"
     static let subtitleVisibility = "sub-visibility"
     static let subtitleID = "sid"

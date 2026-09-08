@@ -23,11 +23,12 @@ enum MPVContentModeSnapshot {
         }
     }
 
-    /// The Metal canvas is scaled after libmpv renders it. Compensate only
-    /// libmpv's text glyphs so their final on-screen size stays unchanged.
-    var nativeTextSubtitleScale: Double {
-        guard case let .custom(scale) = self, scale > 0 else { return 1.0 }
-        return 1.0 / Double(scale)
+    /// `video-zoom` uses a base-2 logarithm. Applying zoom inside libmpv keeps
+    /// text subtitles in the OSD window while bitmap subtitles stay in video
+    /// coordinates.
+    var nativeVideoZoom: Double {
+        guard case let .custom(scale) = self, scale > 0 else { return 0.0 }
+        return log2(Double(scale))
     }
 }
 

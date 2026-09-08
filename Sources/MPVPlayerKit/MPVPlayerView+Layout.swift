@@ -46,15 +46,11 @@ struct MPVDisplayGeometry: Equatable {
             sourceVideoRect = sourceBounds
             let canvasAspect = safeCanvas.width / max(safeCanvas.height, 1.0)
             targetVideoRect = aspectRect(canvasAspect, in: safeTarget, fill: true)
-        case let .custom(scale):
+        case .custom:
             sourceVideoRect = aspectRect(aspect, in: sourceBounds, fill: false)
-            let fitRect = aspectRect(aspect, in: safeTarget, fill: false)
-            targetVideoRect = CGRect(
-                x: fitRect.midX - fitRect.width * scale / 2.0,
-                y: fitRect.midY - fitRect.height * scale / 2.0,
-                width: fitRect.width * scale,
-                height: fitRect.height * scale
-            )
+            // Zoom is applied by libmpv. Keeping this presentation mapping at
+            // aspect-fit prevents UIKit from scaling the subtitle OSD again.
+            targetVideoRect = aspectRect(aspect, in: safeTarget, fill: false)
         }
 
         let scale = max(
@@ -136,7 +132,7 @@ extension MPVPlayerView {
         case .fit, .custom:
             setDouble(MPVProperty.panscan, 0.0)
         }
-        setDouble(MPVProperty.subtitleScale, contentModeSnapshot.nativeTextSubtitleScale)
+        setDouble(MPVProperty.videoZoom, contentModeSnapshot.nativeVideoZoom)
     }
 
     func applyVideoDisplayMode() {
