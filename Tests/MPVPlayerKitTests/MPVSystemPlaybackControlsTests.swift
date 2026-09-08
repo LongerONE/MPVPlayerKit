@@ -1,4 +1,5 @@
 import CoreMedia
+import MediaPlayer
 import XCTest
 @testable import MPVPlayerKit
 
@@ -28,6 +29,37 @@ final class MPVSystemPlaybackControlsTests: XCTestCase {
             MPVSystemPlaybackControls.seekTarget(currentTime: 5, duration: .infinity, offset: -15),
             0
         )
+    }
+
+    func testStaticNowPlayingMetadataRefreshesWhenDurationBecomesKnown() {
+        let url = URL(string: "https://example.com/media/Example%20Movie.mp4")!
+        let liveMetadata = MPVNowPlayingStaticMetadata(url: url, duration: 0)
+        let durationMetadata = MPVNowPlayingStaticMetadata(url: url, duration: 120)
+
+        XCTAssertEqual(liveMetadata.title, "Example Movie.mp4")
+        XCTAssertNil(liveMetadata.duration)
+        XCTAssertNotEqual(liveMetadata, durationMetadata)
+        XCTAssertNotEqual(
+            durationMetadata,
+            MPVNowPlayingStaticMetadata(
+                url: URL(string: "https://example.com/media/Replacement.mp4"),
+                duration: 120
+            )
+        )
+        XCTAssertEqual(durationMetadata.duration, 120)
+
+        let liveInfo = liveMetadata.nowPlayingInfo(ownerKey: "owner")
+        XCTAssertEqual(liveInfo["owner"] as? Bool, true)
+        XCTAssertEqual(liveInfo[MPMediaItemPropertyTitle] as? String, "Example Movie.mp4")
+        XCTAssertEqual(liveInfo[MPNowPlayingInfoPropertyIsLiveStream] as? Bool, true)
+        XCTAssertNil(liveInfo[MPMediaItemPropertyPlaybackDuration])
+        XCTAssertNil(liveInfo[MPNowPlayingInfoPropertyElapsedPlaybackTime])
+        XCTAssertNil(liveInfo[MPNowPlayingInfoPropertyPlaybackRate])
+        XCTAssertNil(liveInfo[MPNowPlayingInfoPropertyDefaultPlaybackRate])
+
+        let durationInfo = durationMetadata.nowPlayingInfo(ownerKey: "owner")
+        XCTAssertEqual(durationInfo[MPMediaItemPropertyPlaybackDuration] as? TimeInterval, 120)
+        XCTAssertNil(durationInfo[MPNowPlayingInfoPropertyIsLiveStream])
     }
 
     func testSeekReplyAllowsAutoPlayOnlyAfterSuccessfulReply() {

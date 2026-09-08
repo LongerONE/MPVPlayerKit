@@ -14,20 +14,63 @@ enum MPVSystemPlaybackControls {
     }
 }
 
+struct MPVNowPlayingStaticMetadata: Equatable {
+    let sourceURL: URL?
+    let title: String
+    let duration: TimeInterval?
+
+    init(url: URL?, duration: TimeInterval) {
+        self.init(url: url, normalizedDuration: Self.normalizedDuration(duration))
+    }
+
+    static func normalizedDuration(_ duration: TimeInterval) -> TimeInterval? {
+        duration.isFinite && duration > 0 ? duration : nil
+    }
+
+    private init(url: URL?, normalizedDuration: TimeInterval?) {
+        sourceURL = url
+        let title = url?.lastPathComponent.removingPercentEncoding ?? ""
+        self.title = title.isEmpty ? "MPVPlayerKit" : title
+        duration = normalizedDuration
+    }
+
+    func nowPlayingInfo(ownerKey: String) -> [String: Any] {
+        var info: [String: Any] = [
+            ownerKey: true,
+            MPMediaItemPropertyTitle: title,
+        ]
+        if let duration {
+            info[MPMediaItemPropertyPlaybackDuration] = duration
+        } else {
+            info[MPNowPlayingInfoPropertyIsLiveStream] = true
+        }
+        return info
+    }
+}
+
 @MainActor
 final class MPVSystemPlaybackCoordinator {
     static let shared = MPVSystemPlaybackCoordinator()
 
     private static let ownerKey = "MPVPlayerKit.nowPlaying.owner"
 
+    private struct StaticNowPlayingInfoCache {
+        let metadata: MPVNowPlayingStaticMetadata
+        let info: [String: Any]
+    }
+
     private weak var activePlayerView: MPVPlayerView?
     private var commandTargetsInstalled = false
+    private var staticNowPlayingInfoCache: StaticNowPlayingInfoCache?
 
     private init() {}
 
     func activate(playerView: MPVPlayerView) {
         guard playerView.systemPlaybackControlsEnabled else { return }
         installCommandTargetsIfNeeded()
+        if activePlayerView !== playerView {
+            invalidateStaticNowPlayingInfo()
+        }
         activePlayerView = playerView
         publish(playerView: playerView)
     }
@@ -39,24 +82,17 @@ final class MPVSystemPlaybackCoordinator {
         let speed = playerView.playbackSpeed.isFinite && playerView.playbackSpeed > 0
             ? playerView.playbackSpeed
             : 1.0
-        var info: [String: Any] = [
-            Self.ownerKey: true,
-            MPMediaItemPropertyTitle: displayTitle(for: playerView),
-            MPNowPlayingInfoPropertyElapsedPlaybackTime: max(0, playerView.currentTime),
-            MPNowPlayingInfoPropertyPlaybackRate: playerView.isPlaying ? speed : 0.0,
-            MPNowPlayingInfoPropertyDefaultPlaybackRate: speed,
-        ]
-        if playerView.duration.isFinite, playerView.duration > 0 {
-            info[MPMediaItemPropertyPlaybackDuration] = playerView.duration
-        } else {
-            info[MPNowPlayingInfoPropertyIsLiveStream] = true
-        }
+        var info = staticNowPlayingInfo(for: playerView)
+        info[MPNowPlayingInfoPropertyElapsedPlaybackTime] = max(0, playerView.currentTime)
+        info[MPNowPlayingInfoPropertyPlaybackRate] = playerView.isPlaying ? speed : 0.0
+        info[MPNowPlayingInfoPropertyDefaultPlaybackRate] = speed
         MPNowPlayingInfoCenter.default().nowPlayingInfo = info
     }
 
     func deactivate(playerView: MPVPlayerView) {
         guard activePlayerView === playerView else { return }
         activePlayerView = nil
+        invalidateStaticNowPlayingInfo()
         if MPNowPlayingInfoCenter.default().nowPlayingInfo?[Self.ownerKey] as? Bool == true {
             MPNowPlayingInfoCenter.default().nowPlayingInfo = nil
         }
@@ -170,8 +206,24 @@ final class MPVSystemPlaybackCoordinator {
         return .success
     }
 
-    private func displayTitle(for playerView: MPVPlayerView) -> String {
-        let title = playerView.url?.lastPathComponent.removingPercentEncoding ?? ""
-        return title.isEmpty ? "MPVPlayerKit" : title
+    private func staticNowPlayingInfo(for playerView: MPVPlayerView) -> [String: Any] {
+        let sourceURL = playerView.url
+        let duration = MPVNowPlayingStaticMetadata.normalizedDuration(playerView.duration)
+        if let cache = staticNowPlayingInfoCache,
+           cache.metadata.sourceURL == sourceURL,
+           cache.metadata.duration == duration {
+            return cache.info
+        }
+        let metadata = MPVNowPlayingStaticMetadata(
+            url: sourceURL,
+            duration: duration ?? 0
+        )
+        let info = metadata.nowPlayingInfo(ownerKey: Self.ownerKey)
+        staticNowPlayingInfoCache = StaticNowPlayingInfoCache(metadata: metadata, info: info)
+        return info
+    }
+
+    private func invalidateStaticNowPlayingInfo() {
+        staticNowPlayingInfoCache = nil
     }
 }
