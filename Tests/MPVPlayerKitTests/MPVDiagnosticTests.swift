@@ -45,6 +45,35 @@ final class MPVDiagnosticTests: XCTestCase {
         XCTAssertEqual(counter.update(5), "不可用")
     }
 
+    func testStaticMPVFieldsCacheSuccessfulReadsPerHandleAndRetryUnavailableValues() {
+        let probe = MPVDiagnosticProbe(channel: MPVDiagnosticChannel())
+        let firstHandle = try! XCTUnwrap(OpaquePointer(bitPattern: 1))
+        let secondHandle = try! XCTUnwrap(OpaquePointer(bitPattern: 2))
+        var firstHandleReads = 0
+
+        XCTAssertNil(probe.staticMPVField("mpv-version", handle: firstHandle) {
+            firstHandleReads += 1
+            return nil
+        })
+        XCTAssertEqual(probe.staticMPVField("mpv-version", handle: firstHandle) {
+            firstHandleReads += 1
+            return "0.40.0"
+        }, "0.40.0")
+        XCTAssertEqual(probe.staticMPVField("mpv-version", handle: firstHandle) {
+            firstHandleReads += 1
+            return "should-not-read"
+        }, "0.40.0")
+        XCTAssertEqual(firstHandleReads, 2)
+
+        XCTAssertEqual(probe.staticMPVField("mpv-version", handle: secondHandle) {
+            "0.41.0"
+        }, "0.41.0")
+        probe.clearStaticMPVFieldCache()
+        XCTAssertEqual(probe.staticMPVField("mpv-version", handle: secondHandle) {
+            "0.42.0"
+        }, "0.42.0")
+    }
+
     func testProcessSamplerDoesNotInventFirstCPUValue() {
         var sampler = MPVDiagnosticProcessSampler()
         let first = sampler.sample()

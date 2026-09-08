@@ -282,6 +282,7 @@ extension MPVPlayerView {
             return false
         }
         bindMPVPlaybackUpdateSourceSession(playbackUpdateSourceSession)
+        diagnosticProbe?.bindStaticMPVFieldCache(to: mpv)
         mpvDebugLog("setupMPV created handle=\(mpv)")
 
         let loadURL = url.absoluteString
@@ -527,6 +528,7 @@ extension MPVPlayerView {
     private func destroyMPVHandleOnMPVQueue(reason: String, sendStopCommand: Bool) {
         recordDiagnosticEvent("销毁解码配置", fields: ["原因": reason, "配置": activeProfileDescription])
         if reason == "stop" || reason == "setup-failed" { finishPowerDiagnostics(reason: reason) }
+        diagnosticProbe?.clearStaticMPVFieldCache()
         MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         setDecoderMode(.initializing)
         _ = nextBufferingSessionGeneration()

@@ -7,13 +7,43 @@ import libmpv
 
 /// 仅在 MPV 队列访问，生命周期与一次 configure 对应，而不是与降级 profile 对应。
 final class MPVDiagnosticProbe {
+    static let cachedMPVPropertyNames = [
+        "mpv-version", "ffmpeg-version", "libass-version",
+        "vo", "gpu-api", "gpu-context",
+    ]
+
     let channel: MPVDiagnosticChannel
     var process = MPVDiagnosticProcessSampler()
     var decoderDrops = MPVDiagnosticCounter()
     var outputDrops = MPVDiagnosticCounter()
     var reportedFirstFrame = false
+    private var staticMPVFieldCache: [String: String] = [:]
+    private var staticMPVFieldCacheHandle: OpaquePointer?
 
     init(channel: MPVDiagnosticChannel) { self.channel = channel }
+
+    func bindStaticMPVFieldCache(to handle: OpaquePointer) {
+        guard staticMPVFieldCacheHandle != handle else { return }
+        staticMPVFieldCacheHandle = handle
+        staticMPVFieldCache.removeAll(keepingCapacity: true)
+    }
+
+    func clearStaticMPVFieldCache() {
+        staticMPVFieldCacheHandle = nil
+        staticMPVFieldCache.removeAll(keepingCapacity: true)
+    }
+
+    func staticMPVField(
+        _ property: String,
+        handle: OpaquePointer,
+        load: () -> String?
+    ) -> String? {
+        bindStaticMPVFieldCache(to: handle)
+        if let value = staticMPVFieldCache[property] { return value }
+        guard let value = load() else { return nil }
+        staticMPVFieldCache[property] = value
+        return value
+    }
 }
 
 extension MPVPlayerView {
@@ -85,7 +115,6 @@ extension MPVPlayerView {
         values["实际去色带策略"] = String(effectiveDebandEnabled)
         // 只读取固定白名单；不读取 path、filename、metadata、track title、headers 或 sub-text。
         let properties = [
-            "mpv-version", "ffmpeg-version", "libass-version",
             "video-codec", "video-format", "video-params/w", "video-params/h",
             "video-params/pixelformat", "video-params/hw-pixelformat",
             "video-params/colormatrix", "video-params/primaries", "video-params/gamma",
@@ -94,7 +123,7 @@ extension MPVPlayerView {
             "video-params/dolby-vision-profile", "video-params/light", "video-params/average-bpp",
             "video-out-params/primaries", "video-out-params/gamma",
             "container-fps", "estimated-vf-fps", "estimated-display-fps", "video-bitrate", "audio-codec",
-            "hwdec", "hwdec-current", "vd-lavc-dr", "vo", "gpu-api", "gpu-context",
+            "hwdec", "hwdec-current", "vd-lavc-dr",
             "fbo-format", "target-trc", "target-prim", "target-colorspace-hint",
             "scale", "cscale", "dscale", "correct-downscaling", "linear-downscaling",
             "sigmoid-upscaling", "dither", "dither-depth", "deband", "hdr-compute-peak",
@@ -106,6 +135,17 @@ extension MPVPlayerView {
             "decoder-frame-drop-count", "frame-drop-count", "mistimed-frame-count",
             "vo-delayed-frame-count", "avsync",
         ]
+        if let mpv {
+            for property in MPVDiagnosticProbe.cachedMPVPropertyNames {
+                values[property] = probe.staticMPVField(property, handle: mpv) {
+                    getString(property).map { String($0.prefix(160)) }
+                } ?? "不可用"
+            }
+        } else {
+            for property in MPVDiagnosticProbe.cachedMPVPropertyNames {
+                values[property] = "不可用"
+            }
+        }
         for property in properties {
             // 防止意外超长属性放大日志负担；不可用不伪装成数值零。
             values[property] = getString(property).map { String($0.prefix(160)) } ?? "不可用"
