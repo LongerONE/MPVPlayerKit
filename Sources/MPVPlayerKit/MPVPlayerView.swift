@@ -260,12 +260,16 @@ public final class MPVPlayerView: UIView {
     nonisolated let subtitleTextCacheLock = NSLock()
     nonisolated(unsafe) var cachedSubtitleText: String?
     nonisolated(unsafe) var mpv: OpaquePointer?
+    // mpv 句柄与 wakeup 上下文的取出/置空需互斥，避免 stop 与 deinit 并发销毁。
+    let mpvHandleLock = NSLock()
     // Bound to the MPV handle on `queue`. Playback snapshots carry this value
     // so a queued callback from a previous handle cannot inherit a newer
     // main-thread buffering session while teardown is still pending.
     nonisolated(unsafe) var mpvPlaybackUpdateSourceSessionGeneration: UInt64?
     // diagnosticProbe 与 mpv 一样只在 MPV 串行队列访问。
     nonisolated(unsafe) var diagnosticProbe: MPVDiagnosticProbe?
+    // wakeup 回调 userdata：retain 到 handle 销毁，避免 passUnretained UAF。
+    nonisolated(unsafe) var wakeupContextTransfer: Unmanaged<MPVWakeupContext>?
     var diagnosticMonitor: MPVDiagnosticMonitor?
     @objc public internal(set) var diagnosticSessionID: UUID?
     // Queue-bound cache used when libmpv has already reported shutdown.
@@ -498,7 +502,8 @@ public final class MPVPlayerView: UIView {
     }
 
     deinit {
-        stop()
+        // deinit 不得经 stop() → queue.async { [self] } 复活对象。
+        _ = detachHandleForDeinitTeardown()
     }
 
     @objc public func configure(_ configuration: NSDictionary) {

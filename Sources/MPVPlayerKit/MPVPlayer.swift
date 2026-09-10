@@ -94,8 +94,13 @@ public final class MPVPlayer: NSObject {
     isolated deinit {
         let center = NotificationCenter.default
         observers.forEach(center.removeObserver)
-        pendingSubtitleLoads.values.forEach { $0.timeout.cancel() }
+        // 取消超时的同时必须结束 pending completion，避免调用方永久等待。
+        let pending = pendingSubtitleLoads
         pendingSubtitleLoads.removeAll()
+        pending.values.forEach { load in
+            load.timeout.cancel()
+            load.completion(false)
+        }
         playbackView.stop()
     }
 

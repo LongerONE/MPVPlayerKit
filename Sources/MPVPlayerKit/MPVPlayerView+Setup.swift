@@ -9,12 +9,6 @@ import libmpv
 #error("MPVPlayerKit requires MPVKit's Libmpv module.")
 #endif
 
-func mpvPlayerWakeupCallback(_ context: UnsafeMutableRawPointer?) {
-    guard let context else { return }
-    let playerView = Unmanaged<MPVPlayerView>.fromOpaque(context).takeUnretainedValue()
-    playerView.readEvents()
-}
-
 extension MPVPlayerView {
     /// Keep decoded VideoToolbox surfaces on the GPU path first. The copy
     /// profile remains available because some libmpv/MoltenVK combinations
@@ -419,10 +413,13 @@ extension MPVPlayerView {
             operation: "observe video-out-params/dh",
             notifyOnFailure: false
         )
+        let wakeupContext = MPVWakeupContext(self)
+        let wakeupUnmanaged = Unmanaged.passRetained(wakeupContext)
+        wakeupContextTransfer = wakeupUnmanaged
         mpv_set_wakeup_callback(
             mpv,
             mpvPlayerWakeupCallback,
-            Unmanaged.passUnretained(self).toOpaque()
+            wakeupUnmanaged.toOpaque()
         )
         mpvDebugLog("setupMPV wakeup callback installed profile=\(profile.name)")
 
@@ -507,91 +504,4 @@ extension MPVPlayerView {
         pictureInPictureRendererRuntimeState.reset()
         notifyState(.error)
     }
-
-    func destroyMPVHandle(reason: String, sendStopCommand: Bool = true) {
-        if Thread.isMainThread {
-            MainActor.assumeIsolated {
-                self.stopPictureInPictureForPlayerTeardown()
-            }
-        } else {
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    self.stopPictureInPictureForPlayerTeardown()
-                }
-            }
-        }
-
-        if DispatchQueue.getSpecific(key: queueSpecificKey) != nil {
-            destroyMPVHandleOnMPVQueue(reason: reason, sendStopCommand: sendStopCommand)
-        } else {
-            // mpv_terminate_destroy may wait for decoder/rendering work. The
-            // caller must not synchronously wait for the MPV queue here.
-            queue.async { [self] in
-                destroyMPVHandleOnMPVQueue(reason: reason, sendStopCommand: sendStopCommand)
-            }
-        }
-    }
-
-    private func destroyMPVHandleOnMPVQueue(reason: String, sendStopCommand: Bool) {
-        recordDiagnosticEvent("销毁解码配置", fields: ["原因": reason, "配置": activeProfileDescription])
-        if reason == "stop" || reason == "setup-failed" { finishPowerDiagnostics(reason: reason) }
-        diagnosticProbe?.clearStaticMPVFieldCache()
-        MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
-        setDecoderMode(.initializing)
-        _ = nextBufferingSessionGeneration()
-        clearMPVPlaybackUpdateSourceSession()
-        clearPendingPlaybackPositionUpdate()
-        resetBufferingStateOnMPVQueue(reason: "destroy-\(reason)", notifyFinish: true)
-        stopTimeTimer()
-        clearMediaTracksCache()
-        clearSubtitleTextCache()
-        notifyOnMain {
-            self.updatePictureInPictureVideoDisplaySize(.zero)
-        }
-        performOnMPVQueueSync {
-            let pendingRequestIDs = pendingExternalSubtitleLoad?.requestIDs ?? []
-            if let mpv, let pending = pendingExternalSubtitleLoad {
-                mpv_abort_async_command(mpv, pending.userdata)
-            }
-            pendingExternalSubtitleLoad = nil
-            let pendingSeekRequests = Array(pendingSeekCommands.values)
-            pendingSeekCommands.removeAll(keepingCapacity: true)
-            pendingSeekRequests.forEach {
-                notifySeekCompletion(
-                    request: $0.request,
-                    success: false,
-                    error: MPV_ERROR_UNINITIALIZED.rawValue
-                )
-            }
-            loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)
-            canceledExternalSubtitleCommands.removeAll(keepingCapacity: true)
-            activeExternalSubtitleActivation = nil
-            committedSubtitleSelection = nil
-            nextMPVCommandUserdata = 1
-            subtitleSelectionEpoch = 0
-            currentSubtitleUsesOriginalStyle = false
-            pendingRequestIDs.forEach { notifySubtitleLoad(requestID: $0, success: false) }
-            guard let mpv else {
-                lastMPVTimeSnapshot = nil
-                markColorOutputRendererStopped()
-                mpvDebugLog("destroyMPVHandle skipped reason=\(reason) handle=nil")
-                return
-            }
-            mpvDebugLog("destroyMPVHandle begin reason=\(reason) handle=\(mpv)")
-            mpv_set_wakeup_callback(mpv, nil, nil)
-            mpvDebugLog("destroyMPVHandle stage=wakeup-cleared reason=\(reason)")
-            self.mpv = nil
-            mpvDebugLog("destroyMPVHandle stage=handle-detached reason=\(reason)")
-            if sendStopCommand {
-                let stopStatus = command("stop", handle: mpv, checkForErrors: false)
-                mpvDebugLog("destroyMPVHandle stop command status=\(stopStatus)")
-            }
-            mpvDebugLog("destroyMPVHandle stage=terminate-begin reason=\(reason)")
-            mpv_terminate_destroy(mpv)
-            markColorOutputRendererStopped()
-            mpvDebugLog("destroyMPVHandle stage=terminate-end reason=\(reason)")
-            lastMPVTimeSnapshot = nil
-        }
-    }
-
 }
