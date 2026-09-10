@@ -77,6 +77,7 @@ extension MPVPlayerView {
                     self.refreshMediaTracksCache()
                     self.refreshPictureInPictureVideoDisplaySize()
                     self.refreshVideoDisplayAspectRatio()
+                    self.publishDurationIfNewlyKnown()
                 case MPV_EVENT_PLAYBACK_RESTART:
                     self.mpvDebugLog(
                         "event playback-restart stage=begin "

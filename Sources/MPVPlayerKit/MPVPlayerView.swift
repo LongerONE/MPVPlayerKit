@@ -24,30 +24,31 @@ import libmpv
     case software
 }
 
-enum MPVPlayerKitNotification {
-    static let didChangeState = Notification.Name("MPVPlayerViewDidChangeState")
-    static let didUpdateTime = Notification.Name("MPVPlayerViewDidUpdateTime")
-    static let didUpdateBufferingProgress = Notification.Name("MPVPlayerViewDidUpdateBufferingProgress")
-    static let didUpdateBufferedProgress = Notification.Name("MPVPlayerViewDidUpdateBufferedProgress")
-    static let didUpdateDecoderMode = Notification.Name("MPVPlayerViewDidUpdateDecoderMode")
-    static let didLoadSubtitle = Notification.Name("MPVPlayerViewDidLoadSubtitle")
-    static let didCompleteSeek = Notification.Name("MPVPlayerViewDidCompleteSeek")
-    static let didChangePictureInPicture = Notification.Name(
+/// 公共通知名与 payload key。字符串与现网一致，供宿主（含 Temby 桥接）直接引用。
+public enum MPVPlayerKitNotification {
+    public static let didChangeState = Notification.Name("MPVPlayerViewDidChangeState")
+    public static let didUpdateTime = Notification.Name("MPVPlayerViewDidUpdateTime")
+    public static let didUpdateBufferingProgress = Notification.Name("MPVPlayerViewDidUpdateBufferingProgress")
+    public static let didUpdateBufferedProgress = Notification.Name("MPVPlayerViewDidUpdateBufferedProgress")
+    public static let didUpdateDecoderMode = Notification.Name("MPVPlayerViewDidUpdateDecoderMode")
+    public static let didLoadSubtitle = Notification.Name("MPVPlayerViewDidLoadSubtitle")
+    public static let didCompleteSeek = Notification.Name("MPVPlayerViewDidCompleteSeek")
+    public static let didChangePictureInPicture = Notification.Name(
         "MPVPlayerViewDidChangePictureInPicture"
     )
 }
 
-enum MPVPlayerKitNotificationKey {
-    static let state = "state"
-    static let currentTime = "currentTime"
-    static let duration = "duration"
-    static let bufferingProgress = "bufferingProgress"
-    static let bufferedProgress = "bufferedProgress"
-    static let decoderMode = "decoderMode"
-    static let requestID = "requestID"
-    static let success = "success"
-    static let targetTime = "targetTime"
-    static let errorCode = "errorCode"
+public enum MPVPlayerKitNotificationKey {
+    public static let state = "state"
+    public static let currentTime = "currentTime"
+    public static let duration = "duration"
+    public static let bufferingProgress = "bufferingProgress"
+    public static let bufferedProgress = "bufferedProgress"
+    public static let decoderMode = "decoderMode"
+    public static let requestID = "requestID"
+    public static let success = "success"
+    public static let targetTime = "targetTime"
+    public static let errorCode = "errorCode"
 }
 
 enum MPVProperty {
@@ -200,11 +201,18 @@ public final class MPVPlayerView: UIView {
 
     /// Hosts with their own remote command coordinator can disable MPV's
     /// built-in system playback controls to avoid duplicate command handlers.
+    /// `false→true` 且当前正在播放时会重新 activate；`true→false` 会 deactivate。
     @objc public var systemPlaybackControlsEnabled = true {
         didSet {
-            guard oldValue != systemPlaybackControlsEnabled,
-                  systemPlaybackControlsEnabled == false else { return }
-            MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
+            guard oldValue != systemPlaybackControlsEnabled else { return }
+            if systemPlaybackControlsEnabled == false {
+                MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
+            } else if isPlaying {
+                MPVSystemPlaybackCoordinator.shared.activate(
+                    playerView: self,
+                    isTimeAdvancing: true
+                )
+            }
         }
     }
 

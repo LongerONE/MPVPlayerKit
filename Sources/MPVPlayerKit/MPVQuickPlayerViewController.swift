@@ -103,6 +103,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
         case volume
     }
 
+    /// 初始化时**始终**用 `MPVCachePreferences.configuration`（UserDefaults：
+    /// `mpv_cache_enabled` / `mpv_cache_duration`）覆盖传入配置中的
+    /// `cacheConfiguration`。直接使用 `MPVPlayer` 的宿主不受此覆盖影响。
+    /// 用户在缓存面板中的修改会写回 UserDefaults。
     public init(
         configuration: MPVPlayerConfiguration,
         autoplay: Bool = true,

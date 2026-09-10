@@ -16,8 +16,13 @@ public extension MPVPlayerView {
         set { pictureInPictureCoordinatorInstance?.allowsAutomaticStartFromInline = newValue }
     }
 
+    /// 进入画中画时，仅当宿主允许库内系统播放控制才激活 Now Playing。
+    /// 宿主自行管理远程命令时（`systemPlaybackControlsEnabled == false`），
+    /// 库不在 PiP 时抢占 owner；画中画窗口本身仍可用。
     @objc func startPictureInPicture() {
-        activateSystemPlaybackControlsForPictureInPicture()
+        if systemPlaybackControlsEnabled {
+            activateSystemPlaybackControlsForPictureInPicture()
+        }
         pictureInPictureCoordinatorInstance?.start()
     }
 

@@ -9,6 +9,8 @@ extension MPVPlayerView {
         clientSubtitleController.useRenderer(renderer)
     }
 
+    /// 选择宿主自备的客户端字幕文档进行自定义 UI 渲染。
+    /// 会把当前原生/libmpv 字幕轨设为不可见，避免双重绘制。
     public func selectClientSubtitle(_ document: MPVSubtitleDocument?) {
         clientSubtitleController.select(document)
         clientSubtitleController.update(at: currentTime, force: true)
@@ -30,6 +32,8 @@ extension MPVPlayerView {
         clientSubtitleController.clear()
     }
 
+    /// 兼容入口：加载外挂字幕并由 **libmpv** 渲染（与 `loadSubtitle` 相同路径）。
+    /// 若需客户端自绘，请改用 `selectClientSubtitle(document:)`。
     @objc public func loadClientSubtitle(_ options: NSDictionary) {
         guard let requestID = options["requestID"] as? String,
               let urlString = options["url"] as? String,
@@ -45,6 +49,7 @@ extension MPVPlayerView {
         ] as NSDictionary)
     }
 
+    /// 同时取消 client/libmpv 两条路径上以该 requestID 挂起的加载。
     @objc public func cancelClientSubtitleLoad(_ options: NSDictionary) {
         cancelSubtitleLoad(options)
     }

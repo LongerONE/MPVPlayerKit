@@ -136,6 +136,14 @@ Metal 层根据目标屏幕的 EDR headroom，在 SDR 输出（`bgra8Unorm_srgb`
 
 `MPVCacheConfiguration(isEnabled:duration:)` 配置 mpv 的 demuxer 内存缓冲，支持 10、30、60、120 秒时长（默认 30 秒）。
 
+边界与行为：
+
+- 前向缓存有 **256 MiB** 硬上限（`demuxer-max-bytes`），时长目标不是无保证的绝对值。
+- 不保留回看缓存（`demuxer-max-back-bytes=0`），且始终关闭磁盘缓存（`cache-on-disk=no`）。
+- 预读阈值按配置时长做 hysteresis（约 10s→3、其他→10）。
+- `isEnabled == false` 时下发 `cache=no`，且 `cache-secs` 为 `0`。
+- **QuickPlayer 缓存优先级**：`MPVQuickPlayerViewController` 初始化时**始终**用 UserDefaults（`mpv_cache_enabled` / `mpv_cache_duration`）覆盖传入配置中的 `cacheConfiguration`。直接使用 `MPVPlayer` 的宿主不受此覆盖影响；用户在快捷播放器缓存面板中的修改会写回 UserDefaults。Temby 等宿主使用自有 MMKV 缓存键，与上述 UserDefaults 键无运行时共享。
+
 ## 功耗诊断日志
 
 诊断仅增加观测，不改变解码、画质、HDR 或热管理策略。Debug 默认开启，Release 默认关闭。
@@ -204,12 +212,25 @@ JSON 编码、OSLog 输出和文件写入在 utility 异步消费任务中完成
 
 ## 客户端渲染字幕
 
-未启用原始样式的 SRT 与 WebVTT 文件走框架字幕管线。`MPVSubtitleDocument` 处理 UTF-8、UTF-16 与 GB18030 文本，归一化内嵌 ASS 覆盖标签，并提供按时间查询 cue 的能力。内置的 `MPVDefaultSubtitleRenderer` 会自动安装：
+字幕有两条能力路径：
+
+1. **libmpv 渲染（默认）**：`loadSubtitle` / `loadClientSubtitle(from:)` 实际都走 libmpv 加载外挂轨并由 mpv 绘制；ASS 可选用 `usesOriginalStyle` 保留原始样式。
+2. **客户端渲染（可选）**：宿主自备 `MPVSubtitleDocument` + `MPVSubtitleRenderer` 用于自定义 UI。`selectClientSubtitle(document:)` 会把当前原生轨设为不可见，避免双重绘制。
+
+`MPVSubtitleDocument` 处理 UTF-8、UTF-16 与 GB18030 文本，归一化内嵌 ASS 覆盖标签，并提供按时间查询 cue 的能力。内置的 `MPVDefaultSubtitleRenderer` 会自动安装。
 
 ```swift
+// 兼容入口：加载外挂字幕并由 libmpv 渲染（与 loadSubtitle 相同路径）。
 player.loadClientSubtitle(from: subtitleURL) { success in
     print("Subtitle loaded:", success)
 }
+```
+
+若需真正客户端自绘，在解析/选好文档后使用：
+
+```swift
+player.useClientSubtitleRenderer(AppSubtitleRenderer())
+player.selectClientSubtitle(document)
 ```
 
 解析与时间轴留在框架内，应用可以提供自己的渲染器：
@@ -227,9 +248,9 @@ final class AppSubtitleRenderer: MPVSubtitleRenderer {
         // 移除当前字幕。
     }
 }
-
-player.useClientSubtitleRenderer(AppSubtitleRenderer())
 ```
+
+`cancelExternalSubtitleLoad` / `cancelClientSubtitleLoad` 会同时取消 client 与 libmpv 两条路径上以该 requestID 挂起的加载。
 
 ## 字幕字体
 
@@ -310,7 +331,7 @@ playerViewController.gestureOptions = [.seeking, .volume]
 - 画中画：`isPictureInPictureSupported`、`isPictureInPictureActive`、`startPictureInPicture()`、`stopPictureInPicture()`、`togglePictureInPicture()`、`allowsAutomaticPictureInPictureFromInline`
 - 系统媒体控制：`systemPlaybackControlsEnabled`
 
-状态变化同时以 `NSNotification` 广播：`MPVPlayerViewDidChangeState`、`MPVPlayerViewDidUpdateTime`、`MPVPlayerViewDidUpdateBufferingProgress`、`MPVPlayerViewDidUpdateBufferedProgress`、`MPVPlayerViewDidUpdateDecoderMode`、`MPVPlayerViewDidLoadSubtitle`、`MPVPlayerViewDidCompleteSeek` 与 `MPVPlayerViewDidChangePictureInPicture`。
+状态变化同时以 `NSNotification` 广播。优先使用公共常量 `MPVPlayerKitNotification` / `MPVPlayerKitNotificationKey`：`MPVPlayerViewDidChangeState`、`MPVPlayerViewDidUpdateTime`、`MPVPlayerViewDidUpdateBufferingProgress`、`MPVPlayerViewDidUpdateBufferedProgress`、`MPVPlayerViewDidUpdateDecoderMode`、`MPVPlayerViewDidLoadSubtitle`、`MPVPlayerViewDidCompleteSeek` 与 `MPVPlayerViewDidChangePictureInPicture`。
 
 ## Demo
 

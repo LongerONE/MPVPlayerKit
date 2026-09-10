@@ -84,6 +84,8 @@ extension MPVPlayerView {
         if isReadyToPlayReported() == false, duration > 0.0 {
             setReadyToPlayReported(true)
             notifyState(.readyToPlay)
+            // 暂停期间也可能首次得知 duration；补一次系统播放信息。
+            MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
         }
     }
 
@@ -101,6 +103,25 @@ extension MPVPlayerView {
         guard bufferedProgress != value else { return }
         bufferedProgress = value
         notifyBufferedProgress(progress)
+    }
+
+    /// duration 可能仅在暂停时可知；首次有效时补发系统播放信息。
+    nonisolated func publishDurationIfNewlyKnown() {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard mpv != nil, duration <= 0.0 else { return }
+        let total = getDouble(MPVProperty.duration)
+        guard total.isFinite, total > 0.0 else { return }
+        let sessionGeneration = currentBufferingSessionGeneration()
+        let intentGeneration = currentPlaybackIntentGeneration()
+        notifyOnMain {
+            guard self.currentBufferingSessionGeneration() == sessionGeneration,
+                  self.currentPlaybackIntentGeneration() == intentGeneration,
+                  self.isStopped() == false,
+                  self.duration <= 0.0
+            else { return }
+            self.duration = total
+            MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
+        }
     }
 
     private nonisolated func readMPVBufferedEndTime(currentTime: TimeInterval) -> TimeInterval? {

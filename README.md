@@ -130,6 +130,18 @@ State transitions are driven by a pure state machine (`MPVBufferingStateMachine`
 
 `MPVCacheConfiguration(isEnabled:duration:)` configures mpv's demuxer memory buffer. Supported durations are 10, 30, 60, and 120 seconds (default 30).
 
+Boundaries and behavior:
+
+- Forward cache is capped at **256 MiB** (`demuxer-max-bytes`); the duration target is not an unlimited guarantee.
+- No look-back cache (`demuxer-max-back-bytes=0`) and disk cache is always off (`cache-on-disk=no`).
+- Prefetch uses hysteresis around the configured duration (about 10s→3, other values→10).
+- When `isEnabled == false`, `cache=no` is applied and `cache-secs` is `0`.
+- **QuickPlayer cache priority:** `MPVQuickPlayerViewController` init **always** overwrites the incoming `cacheConfiguration` with `MPVCachePreferences.configuration` (UserDefaults keys `mpv_cache_enabled` / `mpv_cache_duration`). Hosts that use `MPVPlayer` directly are not affected. Cache-panel changes in the quick player are written back to UserDefaults. Temby and similar hosts use their own MMKV keys and do not share these UserDefaults keys at runtime.
+
+## Power diagnostics
+
+Optional JSONL power/diagnostics logging is off by default in Release and on in Debug. Full field lists, privacy boundaries and export steps are documented in the [Simplified Chinese README](README.zh-CN.md#功耗诊断日志). Prefer that chapter as the authoritative reference.
+
 ## Picture in Picture
 
 Picture in Picture is available through `startPictureInPicture()`,
@@ -172,19 +184,29 @@ Hosts that drive their own Remote Command Center can opt out with
 
 ## Client-rendered subtitles
 
-SRT and WebVTT files loaded without original styling use the framework subtitle
-pipeline. `MPVSubtitleDocument` handles UTF-8, UTF-16 and GB18030 text, normalizes
-embedded ASS overrides, and provides time-based cue lookup. The built-in
-`MPVDefaultSubtitleRenderer` is installed automatically:
+Subtitle support has two paths:
+
+1. **libmpv rendering (default):** `loadSubtitle` and `loadClientSubtitle(from:)` both load external tracks through libmpv and let mpv draw them. ASS can keep original styling via `usesOriginalStyle`.
+2. **Client rendering (optional):** hosts supply an `MPVSubtitleDocument` and `MPVSubtitleRenderer` for custom UI. `selectClientSubtitle(document:)` hides the current native track to avoid double drawing.
+
+`MPVSubtitleDocument` handles UTF-8, UTF-16 and GB18030 text, normalizes embedded ASS overrides, and provides time-based cue lookup. The built-in `MPVDefaultSubtitleRenderer` is installed automatically.
 
 ```swift
+// Compatibility entry: loads an external subtitle and renders it with libmpv
+// (same path as loadSubtitle).
 player.loadClientSubtitle(from: subtitleURL) { success in
     print("Subtitle loaded:", success)
 }
 ```
 
-Applications can supply their own renderer while leaving parsing and timing in
-the framework:
+For true client-side drawing, select the document after parsing:
+
+```swift
+player.useClientSubtitleRenderer(AppSubtitleRenderer())
+player.selectClientSubtitle(document)
+```
+
+Applications can supply their own renderer while leaving parsing and timing in the framework:
 
 ```swift
 @MainActor
@@ -199,9 +221,9 @@ final class AppSubtitleRenderer: MPVSubtitleRenderer {
         // Remove the current subtitle.
     }
 }
-
-player.useClientSubtitleRenderer(AppSubtitleRenderer())
 ```
+
+`cancelExternalSubtitleLoad` / `cancelClientSubtitleLoad` cancel pending loads on both the client and libmpv paths for that request ID.
 
 ## Subtitle fonts
 
@@ -288,7 +310,7 @@ It is optional; `MPVPlayer` does not depend on it at runtime.
 - Picture in Picture: `isPictureInPictureSupported`, `isPictureInPictureActive`, `startPictureInPicture()`, `stopPictureInPicture()`, `togglePictureInPicture()`, `allowsAutomaticPictureInPictureFromInline`
 - System controls: `systemPlaybackControlsEnabled`
 
-State changes are also broadcast as `NSNotification` objects: `MPVPlayerViewDidChangeState`, `MPVPlayerViewDidUpdateTime`, `MPVPlayerViewDidUpdateBufferingProgress`, `MPVPlayerViewDidUpdateBufferedProgress`, `MPVPlayerViewDidUpdateDecoderMode`, `MPVPlayerViewDidLoadSubtitle`, `MPVPlayerViewDidCompleteSeek` and `MPVPlayerViewDidChangePictureInPicture`.
+State changes are also broadcast as `NSNotification` objects. Prefer the public constants `MPVPlayerKitNotification` / `MPVPlayerKitNotificationKey` (names: `MPVPlayerViewDidChangeState`, `MPVPlayerViewDidUpdateTime`, `MPVPlayerViewDidUpdateBufferingProgress`, `MPVPlayerViewDidUpdateBufferedProgress`, `MPVPlayerViewDidUpdateDecoderMode`, `MPVPlayerViewDidLoadSubtitle`, `MPVPlayerViewDidCompleteSeek` and `MPVPlayerViewDidChangePictureInPicture`).
 
 ## Demo
 

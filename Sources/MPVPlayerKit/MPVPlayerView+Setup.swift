@@ -168,12 +168,13 @@ extension MPVPlayerView {
     nonisolated var cacheOptions: [(String, String)] {
         [
             (MPVProperty.cache, cacheConfiguration.isEnabled ? "yes" : "no"),
+            // 禁用缓存时下发 0，避免 cache=no 仍携带正数 duration。
             (
                 MPVProperty.cacheSeconds,
                 String(
                     format: "%.3f",
                     locale: Locale(identifier: "en_US_POSIX"),
-                    cacheConfiguration.duration
+                    cacheConfiguration.isEnabled ? cacheConfiguration.duration : 0
                 )
             ),
             ("demuxer-hysteresis-secs", String(cacheConfiguration.demuxerHysteresisSeconds)),
@@ -191,7 +192,7 @@ extension MPVPlayerView {
                 String(
                     format: "%.3f",
                     locale: Locale(identifier: "en_US_POSIX"),
-                    configuration.duration
+                    configuration.isEnabled ? configuration.duration : 0
                 )
             ),
             ("demuxer-hysteresis-secs", String(configuration.demuxerHysteresisSeconds)),
