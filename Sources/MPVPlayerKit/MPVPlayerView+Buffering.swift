@@ -81,8 +81,8 @@ extension MPVPlayerView {
 
         applyMPVTimeSnapshot(update.timeSnapshot)
         applyBufferedProgress(update.bufferedProgress)
-        if hasReportedReadyToPlay == false, duration > 0.0 {
-            hasReportedReadyToPlay = true
+        if isReadyToPlayReported() == false, duration > 0.0 {
+            setReadyToPlayReported(true)
             notifyState(.readyToPlay)
         }
     }

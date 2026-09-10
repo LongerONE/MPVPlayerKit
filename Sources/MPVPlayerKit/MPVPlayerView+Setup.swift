@@ -50,27 +50,28 @@ extension MPVPlayerView {
             return
         }
 
-        activeSetupProfileIndex = 0
+        setActiveSetupProfileIndex(0)
         // Playback setup runs on `queue`, so UIKit geometry must be sampled on
         // the main thread before it is included in diagnostics. Reading
         // `UIView.bounds` here triggers Main Thread Checker and can terminate a
         // debug session while libmpv is starting.
         let boundsSnapshot = currentViewBoundsSnapshot()
-        mpvDebugLog("setupMPV begin url=\(redactedURLDescription(url)) bounds=\(boundsSnapshot) headers=\(headers.count) profiles=\(setupProfiles.map(\.name).joined(separator: ","))")
+        mpvDebugLog("setupMPV begin url=\(redactedURLDescription(url)) bounds=\(boundsSnapshot) headers=\(headers.count)")
         // Allocate the renderer surface before libmpv receives `wid`. The
         // surface remains fixed while UIKit animates portrait/landscape.
         prepareStableMetalCanvasForRendererSetup()
 
         while true {
             prepareProfilesForNextRenderer()
-            guard activeSetupProfileIndex < setupProfiles.count else { break }
-            let profile = setupProfiles[activeSetupProfileIndex]
-            if setupMPV(url: url, profile: profile) {
+            let profile = activeSetupProfileSnapshot()
+            guard profile.index < profile.count,
+                  let currentProfile = setupProfile(at: profile.index) else { break }
+            if setupMPV(url: url, profile: currentProfile) {
                 return
             }
-            activeSetupProfileIndex += 1
+            setActiveSetupProfileIndex(profile.index + 1)
             pictureInPictureRendererRuntimeState.setActiveProfileIndex(
-                activeSetupProfileIndex
+                profile.index + 1
             )
         }
 
@@ -83,12 +84,14 @@ extension MPVPlayerView {
         // after this point become pending instead of mutating CAMetalLayer
         // during profile or handle construction.
         prepareColorOutputForRendererSetup()
-        setupProfiles = makeSetupProfiles()
+        let profiles = makeSetupProfiles()
+        let index = activeSetupProfileSnapshot().index
+        replaceSetupProfiles(profiles, activeIndex: index)
         pictureInPictureRendererRuntimeState.store(
-            profiles: setupProfiles.map(
+            profiles: profiles.map(
                 MPVPictureInPictureRendererInvariantSnapshot.SetupProfile.init
             ),
-            activeProfileIndex: activeSetupProfileIndex
+            activeProfileIndex: index
         )
     }
 
@@ -261,8 +264,9 @@ extension MPVPlayerView {
     private func setupMPVOnMPVQueue(url: URL, profile: MPVSetupProfile) -> Bool {
         dispatchPrecondition(condition: .onQueue(queue))
         let playbackUpdateSourceSession = currentBufferingSessionGeneration()
-        recordDiagnosticEvent("尝试解码配置", fields: ["配置": profile.name, "序号": String(activeSetupProfileIndex)])
-        mpvDebugLog("setupMPV profile begin name=\(profile.name) index=\(activeSetupProfileIndex + 1)/\(setupProfiles.count)")
+        let profileIndex = activeSetupProfileSnapshot().index
+        recordDiagnosticEvent("尝试解码配置", fields: ["配置": profile.name, "序号": String(profileIndex)])
+        mpvDebugLog("setupMPV profile begin name=\(profile.name) index=\(profileIndex + 1)")
         mpvDebugLog(
             "setupMPV profile options name=\(profile.name) count=\(profile.options.count)"
         )

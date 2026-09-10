@@ -83,7 +83,7 @@ extension MPVPlayerView {
                             + "profile=\(self.activeProfileDescription)"
                     )
                     self.handleBufferingPlaybackRestart()
-                    self.hasPlaybackRestarted = true
+                    self.setPlaybackRestarted(true)
                     self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-begin")
                     self.refreshDecoderModeAfterPlaybackRestart()
                     self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-end")
@@ -484,59 +484,42 @@ extension MPVPlayerView {
         let generation = currentPlaybackIntentGeneration()
         guard let reason else {
             mpvDebugLog("event end-file missing reason error=\(errorCode) message=\(errorMessage) profile=\(activeProfileDescription)")
-            if retryNextProfileAfterPlaybackFailure(errorCode: errorCode) {
-                return
-            }
-            notifyOnMain {
-                self.requestStopTimeTimer(generation: generation)
-                self.stopSystemPlaybackProgress(keepingOwner: true)
-                self.notifyState(.error)
-            }
+            if retryNextProfileAfterPlaybackFailure(errorCode: errorCode) { return }
+            finishEndFile(generation: generation, keepingOwner: true, state: .error)
             return
         }
-        mpvDebugLog("event end-file reason=\(String(describing: reason)) error=\(errorCode) message=\(errorMessage) profile=\(activeProfileDescription) hasReady=\(hasReportedReadyToPlay) hasRestarted=\(hasPlaybackRestarted)")
+        mpvDebugLog("event end-file reason=\(String(describing: reason)) error=\(errorCode) message=\(errorMessage) profile=\(activeProfileDescription) hasReady=\(isReadyToPlayReported()) hasRestarted=\(isPlaybackRestarted())")
 
-        if reason == MPV_END_FILE_REASON_ERROR {
-            if retryNextProfileAfterPlaybackFailure(errorCode: errorCode) {
-                return
-            }
-            notifyOnMain {
-                self.requestStopTimeTimer(generation: generation)
-                self.stopSystemPlaybackProgress(keepingOwner: true)
-                self.notifyState(.error)
-            }
-            return
+        switch reason {
+        case MPV_END_FILE_REASON_ERROR:
+            if retryNextProfileAfterPlaybackFailure(errorCode: errorCode) { return }
+            finishEndFile(generation: generation, keepingOwner: true, state: .error)
+        case MPV_END_FILE_REASON_EOF:
+            finishEndFile(generation: generation, keepingOwner: true, state: .playedToTheEnd)
+        case MPV_END_FILE_REASON_STOP, MPV_END_FILE_REASON_QUIT, MPV_END_FILE_REASON_REDIRECT:
+            finishEndFile(generation: generation, keepingOwner: false, state: nil)
+        default:
+            if retryNextProfileAfterPlaybackFailure(errorCode: errorCode) { return }
+            finishEndFile(generation: generation, keepingOwner: true, state: .error)
         }
+    }
 
-        if reason == MPV_END_FILE_REASON_EOF {
-            notifyOnMain {
-                self.requestStopTimeTimer(generation: generation)
-                self.stopSystemPlaybackProgress(keepingOwner: true)
-                self.notifyState(.playedToTheEnd)
-            }
-            return
-        }
-
-        if reason == MPV_END_FILE_REASON_STOP || reason == MPV_END_FILE_REASON_QUIT || reason == MPV_END_FILE_REASON_REDIRECT {
-            notifyOnMain {
-                self.requestStopTimeTimer(generation: generation)
-                self.stopSystemPlaybackProgress(keepingOwner: false)
-            }
-            return
-        }
-
-        if retryNextProfileAfterPlaybackFailure(errorCode: errorCode) {
-            return
-        }
+    private func finishEndFile(
+        generation: UInt64,
+        keepingOwner: Bool,
+        state: MPVPlayerState?
+    ) {
         notifyOnMain {
             self.requestStopTimeTimer(generation: generation)
-            self.stopSystemPlaybackProgress(keepingOwner: true)
-            self.notifyState(.error)
+            self.stopSystemPlaybackProgress(keepingOwner: keepingOwner)
+            if let state {
+                self.notifyState(state)
+            }
         }
     }
 
     func retryNextProfileAfterPlaybackFailure(errorCode: CInt) -> Bool {
-        guard hasReportedReadyToPlay == false, hasPlaybackRestarted == false else {
+        guard isReadyToPlayReported() == false, isPlaybackRestarted() == false else {
             mpvDebugLog("profile retry skipped playback already started profile=\(activeProfileDescription) error=\(errorCode)")
             return false
         }
@@ -544,21 +527,26 @@ extension MPVPlayerView {
             mpvDebugLog("profile retry skipped missing url error=\(errorCode)")
             return false
         }
-        let nextIndex = activeSetupProfileIndex + 1
-        guard nextIndex < setupProfiles.count else {
+        let profile = activeSetupProfileSnapshot()
+        let nextIndex = profile.index + 1
+        guard nextIndex < profile.count else {
             mpvDebugLog("profile retry skipped no more profiles current=\(activeProfileDescription) error=\(errorCode)")
             return false
         }
 
         let oldProfile = activeProfileDescription
         destroyMPVHandle(reason: "profile-\(oldProfile)-end-file-error-\(errorCode)", sendStopCommand: false)
-        activeSetupProfileIndex = nextIndex
+        setActiveSetupProfileIndex(nextIndex)
         prepareProfilesForNextRenderer()
-        hasReportedReadyToPlay = false
-        hasPlaybackRestarted = false
+        setReadyToPlayReported(false)
+        setPlaybackRestarted(false)
         resetPictureInPictureVideoDisplaySize()
+        guard let nextProfile = setupProfile(at: nextIndex) else {
+            mpvDebugLog("profile retry skipped missing rebuilt profile next=\(nextIndex) error=\(errorCode)")
+            return false
+        }
         mpvDebugLog("profile retry next old=\(oldProfile) next=\(activeProfileDescription) error=\(errorCode)")
-        return setupMPV(url: url, profile: setupProfiles[activeSetupProfileIndex])
+        return setupMPV(url: url, profile: nextProfile)
     }
 
     nonisolated func handlePropertyChange(_ event: UnsafeMutablePointer<mpv_event>) {

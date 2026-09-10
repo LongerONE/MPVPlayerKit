@@ -130,6 +130,56 @@ extension MPVPlayerView {
         return true
     }
 
+    nonisolated func isReadyToPlayReported() -> Bool {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return hasReportedReadyToPlay
+    }
+
+    nonisolated func setReadyToPlayReported(_ value: Bool) {
+        playbackStateLock.lock()
+        hasReportedReadyToPlay = value
+        playbackStateLock.unlock()
+    }
+
+    nonisolated func isPlaybackRestarted() -> Bool {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return hasPlaybackRestarted
+    }
+
+    nonisolated func setPlaybackRestarted(_ value: Bool) {
+        playbackStateLock.lock()
+        hasPlaybackRestarted = value
+        playbackStateLock.unlock()
+    }
+
+    nonisolated func activeSetupProfileSnapshot() -> (index: Int, count: Int) {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        return (activeSetupProfileIndex, setupProfiles.count)
+    }
+
+    nonisolated func setActiveSetupProfileIndex(_ index: Int) {
+        playbackStateLock.lock()
+        activeSetupProfileIndex = index
+        playbackStateLock.unlock()
+    }
+
+    nonisolated func replaceSetupProfiles(_ profiles: [MPVSetupProfile], activeIndex: Int) {
+        playbackStateLock.lock()
+        setupProfiles = profiles
+        activeSetupProfileIndex = activeIndex
+        playbackStateLock.unlock()
+    }
+
+    nonisolated func setupProfile(at index: Int) -> MPVSetupProfile? {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        guard setupProfiles.indices.contains(index) else { return nil }
+        return setupProfiles[index]
+    }
+
     @discardableResult
     nonisolated func command(
         _ command: String,
@@ -263,10 +313,11 @@ extension MPVPlayerView {
     }
 
     nonisolated var activeProfileDescription: String {
-        guard setupProfiles.indices.contains(activeSetupProfileIndex) else {
+        let snapshot = activeSetupProfileSnapshot()
+        guard let profile = setupProfile(at: snapshot.index) else {
             return "none"
         }
-        return setupProfiles[activeSetupProfileIndex].name
+        return profile.name
     }
 
     func boolValue(_ value: Any?, default defaultValue: Bool = false) -> Bool {

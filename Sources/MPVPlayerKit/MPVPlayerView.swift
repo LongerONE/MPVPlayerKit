@@ -245,7 +245,6 @@ public final class MPVPlayerView: UIView {
     // The host configures it before playback starts, so it must not inherit
     // UIView's main-actor isolation when the queue prepares HTTP headers.
     nonisolated(unsafe) var headers: [String: String] = [:]
-    var userAgent: String?
     nonisolated let queue = DispatchQueue(label: "com.mpvplayerkit.player", qos: .userInitiated)
     let queueSpecificKey = DispatchSpecificKey<Void>()
     // Resolve the resource bundle while the UIView is created on the main
@@ -273,7 +272,8 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var lastMPVTimeSnapshot: MPVPlaybackTimeSnapshot?
     // 仅在 MPV 串行队列上创建/取消；主线程只提交启停意图。
     nonisolated(unsafe) var timeTimer: DispatchSourceTimer?
-    var hasReportedReadyToPlay = false
+    // Ready 上报与 profile 回退可跨主线程/MPV 队列读写，统一走 playbackStateLock。
+    nonisolated(unsafe) var hasReportedReadyToPlay = false
     nonisolated(unsafe) var hasPlaybackRestarted = false
     nonisolated(unsafe) var hasLoggedVideoColorParameters = false
     let playbackStateLock = NSLock()
@@ -282,10 +282,12 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var playbackIntentGeneration: UInt64 = 0
     nonisolated(unsafe) var playbackPositionGeneration: UInt64 = 0
     nonisolated(unsafe) var pendingPlaybackPositionGeneration: UInt64?
-    var forceSoftwareDecode = false
+    // 配置快照字段：主线程 configure 写入，MPV 队列 setup 读取。
+    nonisolated(unsafe) var forceSoftwareDecode = false
     /// Host metadata hint retained for diagnostics. Frame metadata and display
     /// capability, not this value, control color mapping.
-    var isDolbyVisionPlayback = false
+    nonisolated(unsafe) var isDolbyVisionPlayback = false
+    nonisolated(unsafe) var userAgent: String?
     nonisolated(unsafe) var currentSubtitleUsesOriginalStyle = false
     // Runtime playback updates are serialized on `queue`, not the UIView's
     // main-actor executor. Keep these snapshots available to those queue-bound
@@ -500,9 +502,8 @@ public final class MPVPlayerView: UIView {
     }
 
     @objc public func configure(_ configuration: NSDictionary) {
-        if mpv != nil {
-            stop()
-        }
+        // 不在主线程读取 mpv 指针；stop 自身带 generation/stopped 守卫。
+        stop()
 
         let urlString = configuration["url"] as? String
         url = urlString.flatMap(URL.init(string:))
@@ -521,12 +522,11 @@ public final class MPVPlayerView: UIView {
         setDecoderMode(.initializing)
         setStopped(false)
         setSetupFailed(false)
-        hasReportedReadyToPlay = false
+        setReadyToPlayReported(false)
         resetPictureInPictureVideoDisplaySize()
-        hasPlaybackRestarted = false
+        setPlaybackRestarted(false)
         hasLoggedVideoColorParameters = false
-        setupProfiles = []
-        activeSetupProfileIndex = 0
+        replaceSetupProfiles([], activeIndex: 0)
         pictureInPictureRendererRuntimeState.reset()
         stableMetalCanvas = nil
         videoDisplayAspectRatioLock.lock()

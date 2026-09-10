@@ -68,7 +68,7 @@ extension MPVPlayerView {
             let isTimeAdvancing = self.bufferingStateMachine.state == .finished
             self.setFlag(MPVProperty.pause, false)
             self.startTimeTimer()
-            let state: MPVPlayerState = self.hasReportedReadyToPlay ? .bufferFinished : .buffering
+            let state: MPVPlayerState = self.isReadyToPlayReported() ? .bufferFinished : .buffering
             self.notifyOnMain {
                 guard self.isPlaybackIntentCurrent(generation), self.isStopped() == false else {
                     return
