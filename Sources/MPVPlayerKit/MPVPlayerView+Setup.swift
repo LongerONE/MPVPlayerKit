@@ -154,7 +154,6 @@ extension MPVPlayerView {
         }
         mpvDebugLog("video quality updated preset=\(preset) options=\(preset.options)")
         recordDiagnosticSnapshot("画质设置变化")
-        logEffectiveVideoSettings(reason: "quality-runtime")
     }
 
     nonisolated var videoRenderOptions: [(String, String)] {
@@ -216,35 +215,6 @@ extension MPVPlayerView {
             "video render options updated deband=\(effectiveDebandEnabled) requested=\(debandEnabled)"
         )
         recordDiagnosticSnapshot("渲染设置变化")
-        logEffectiveVideoSettings(reason: "render-runtime")
-    }
-
-    nonisolated func logEffectiveVideoSettings(reason: String) {
-        let propertyNames = [
-            "scale",
-            "cscale",
-            "dscale",
-            "scaler-resizes-only",
-            "scale-antiring",
-            "cscale-antiring",
-            "dscale-antiring",
-            "correct-downscaling",
-            "linear-downscaling",
-            "sigmoid-upscaling",
-            "dither",
-            "dither-depth",
-            "hdr-compute-peak",
-            "allow-delayed-peak-detect",
-            "interpolation",
-            "deband",
-        ]
-        let properties = propertyNames.map { name in
-            "\(name)=\(getString(name) ?? "<unavailable>")"
-        }
-        .joined(separator: " ")
-        mpvDebugLog(
-            "video settings effective reason=\(reason) requestedQuality=\(videoQualityPreset) requestedDeband=\(debandEnabled) properties=[\(properties)]"
-        )
     }
 
     func setupMPV(url: URL, profile: MPVSetupProfile) -> Bool {
@@ -276,7 +246,6 @@ extension MPVPlayerView {
         committedSubtitleSelection = nil
         nextMPVCommandUserdata = 1
         subtitleSelectionEpoch = 0
-        repeatedMPVLogMessageCounts.removeAll(keepingCapacity: true)
         mpv = mpv_create()
         guard let mpv else {
             mpvDebugLog("setupMPV mpv_create returned nil profile=\(profile.name)")
@@ -356,13 +325,8 @@ extension MPVPlayerView {
         }
         applyContentModeOnMPVQueue(currentContentModeSnapshot())
         mpvDebugLog("setupMPV initialized profile=\(profile.name)")
-        mpvDebugLog(
-            "render diagnostics reason=setup "
-                + renderingDiagnosticDescription()
-        )
         recordDiagnosticSnapshot("渲染初始化")
         _ = mpv_observe_property(mpv, 0, MPVProperty.hwdecCurrent, MPV_FORMAT_STRING)
-        logEffectiveVideoSettings(reason: "setup")
         checkError(
             mpv_observe_property(mpv, 0, MPVProperty.pausedForCache, MPV_FORMAT_FLAG),
             operation: "observe paused-for-cache",

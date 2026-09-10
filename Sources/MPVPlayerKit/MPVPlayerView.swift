@@ -279,7 +279,6 @@ public final class MPVPlayerView: UIView {
     // Ready 上报与 profile 回退可跨主线程/MPV 队列读写，统一走 playbackStateLock。
     nonisolated(unsafe) var hasReportedReadyToPlay = false
     nonisolated(unsafe) var hasPlaybackRestarted = false
-    nonisolated(unsafe) var hasLoggedVideoColorParameters = false
     let playbackStateLock = NSLock()
     nonisolated(unsafe) var stopped = false
     nonisolated(unsafe) var setupFailed = false
@@ -362,7 +361,6 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var committedSubtitleSelection: SubtitleSelectionSnapshot?
     nonisolated(unsafe) var nextMPVCommandUserdata: UInt64 = 1
     nonisolated(unsafe) var subtitleSelectionEpoch: UInt64 = 0
-    nonisolated(unsafe) var repeatedMPVLogMessageCounts: [String: Int] = [:]
     /// The renderer surface is allocated once for the playback session. UIKit
     /// rotation only changes the presentation mapping applied to this surface.
     var stableMetalCanvas: MPVStableMetalCanvas?
@@ -530,7 +528,6 @@ public final class MPVPlayerView: UIView {
         setReadyToPlayReported(false)
         resetPictureInPictureVideoDisplaySize()
         setPlaybackRestarted(false)
-        hasLoggedVideoColorParameters = false
         replaceSetupProfiles([], activeIndex: 0)
         pictureInPictureRendererRuntimeState.reset()
         stableMetalCanvas = nil

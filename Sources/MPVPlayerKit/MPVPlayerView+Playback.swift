@@ -32,7 +32,7 @@ extension MPVPlayerView {
 
     @objc public func play() {
         refreshColorOutputForTargetScreen(reason: "play")
-        requestDiagnosticSnapshot("请求播放")
+        recordDiagnosticEvent("请求播放")
         let generation = nextPlaybackIntentGeneration()
         mpvDebugLog("play requested stopped=\(isStopped()) setupFailed=\(isSetupFailed())")
         guard isStopped() == false, isSetupFailed() == false else {
@@ -85,7 +85,7 @@ extension MPVPlayerView {
 
     @objc public func pause() {
         let generation = nextPlaybackIntentGeneration()
-        requestDiagnosticSnapshot("请求暂停")
+        recordDiagnosticEvent("请求暂停")
         mpvDebugLog("pause")
         queue.async { [weak self] in
             guard let self,
@@ -119,7 +119,7 @@ extension MPVPlayerView {
             return
         }
         isPlaying = false
-        requestDiagnosticSnapshot("请求停止")
+        recordDiagnosticEvent("请求停止")
         diagnosticMonitor?.stop()
         diagnosticMonitor = nil
         MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)

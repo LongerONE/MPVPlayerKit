@@ -87,12 +87,6 @@ extension MPVPlayerView {
                     self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-begin")
                     self.refreshDecoderModeAfterPlaybackRestart()
                     self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-end")
-                    if self.hasLoggedVideoColorParameters == false {
-                        self.hasLoggedVideoColorParameters = true
-                        self.mpvDebugLog("event playback-restart stage=color-diagnostics-begin")
-                        self.logVideoColorParameters()
-                        self.mpvDebugLog("event playback-restart stage=color-diagnostics-end")
-                    }
                     self.refreshPictureInPictureVideoDisplaySize()
                     self.refreshVideoDisplayAspectRatio()
                     self.mpvDebugLog("event playback-restart stage=end")
@@ -129,8 +123,6 @@ extension MPVPlayerView {
                         self.stopSystemPlaybackProgress(keepingOwner: false)
                     }
                     break eventLoop
-                case MPV_EVENT_LOG_MESSAGE:
-                    self.logMessage(event)
                 case MPV_EVENT_COMMAND_REPLY:
                     self.handleCommandReply(event)
                 default:

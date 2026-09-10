@@ -8,80 +8,6 @@ import libmpv
 #endif
 
 extension MPVPlayerView {
-    nonisolated func logMessage(_ event: UnsafeMutablePointer<mpv_event>) {
-        dispatchPrecondition(condition: .onQueue(queue))
-        guard let data = event.pointee.data else { return }
-        let message = data.assumingMemoryBound(to: mpv_event_log_message.self)
-        let prefix = String(cString: message.pointee.prefix)
-        let level = String(cString: message.pointee.level)
-        let text = String(cString: message.pointee.text).trimmingCharacters(in: .whitespacesAndNewlines)
-        #if DEBUG
-        guard shouldPrintMPVLogMessage(prefix: prefix, level: level, text: text) else { return }
-        let repetitionKey = "\(prefix)\u{0}\(level)\u{0}\(text)"
-        let repetitionCount = (repeatedMPVLogMessageCounts[repetitionKey] ?? 0) + 1
-        repeatedMPVLogMessageCounts[repetitionKey] = repetitionCount
-        guard repetitionCount <= 3 || repetitionCount.isMultiple(of: 100) else { return }
-        let repetitionSuffix = repetitionCount > 1 ? " repeated=\(repetitionCount)" : ""
-        mpvDebugLog(
-            "mpv log prefix=\(prefix) level=\(level) "
-                + "text=\(text)\(repetitionSuffix)"
-        )
-        #endif
-    }
-
-    nonisolated func shouldPrintMPVLogMessage(prefix: String, level: String, text: String) -> Bool {
-        switch level {
-        case "fatal", "error", "warn":
-            return true
-        default:
-            break
-        }
-
-        let normalizedPrefix = prefix.lowercased()
-        if normalizedPrefix.contains("libass")
-            || normalizedPrefix.contains("subtitle")
-            || normalizedPrefix.hasPrefix("sub")
-            || normalizedPrefix.hasPrefix("vo/gpu")
-            || normalizedPrefix.hasPrefix("vd/")
-            || normalizedPrefix.contains("libplacebo")
-            || normalizedPrefix == "ffmpeg/video" {
-            return true
-        }
-
-        let normalizedText = text.lowercased()
-        let diagnosticKeywords = [
-            "libass",
-            "fontselect",
-            "font provider",
-            "glyph",
-            "subtitle",
-            "shader",
-            "pipeline",
-            "spir-v",
-        ]
-        return diagnosticKeywords.contains { normalizedText.contains($0) }
-    }
-
-    nonisolated func renderingDiagnosticDescription() -> String {
-        let propertyNames = [
-            "vo",
-            "gpu-api",
-            "gpu-context",
-            "hwdec",
-            "hwdec-current",
-            "vd-lavc-dr",
-            "fbo-format",
-            "target-colorspace-hint",
-            "target-colorspace-hint-mode",
-            "blend-subtitles",
-            "sub-hdr-peak",
-            "image-subs-hdr-peak",
-        ]
-        return propertyNames.map { name in
-            "\(name)=\(getString(name) ?? "<unavailable>")"
-        }.joined(separator: " ")
-    }
-
     nonisolated func getDouble(_ name: String) -> Double {
         guard let mpv else { return 0.0 }
         var data = Double()
@@ -143,44 +69,6 @@ extension MPVPlayerView {
             : .hardware
         mpvDebugLog("decoder mode confirmed activeHWDec=\(activeHWDec) mode=\(decoderMode) profile=\(activeProfileDescription)")
         setDecoderMode(decoderMode)
-    }
-
-    nonisolated func logVideoColorParameters() {
-        let inputProperties = [
-            "video-params/pixelformat",
-            "video-params/colormatrix",
-            "video-params/colorlevels",
-            "video-params/primaries",
-            "video-params/gamma",
-            "video-params/sig-peak"
-        ]
-        let filterOutputProperties = [
-            "video-out-params/pixelformat",
-            "video-out-params/colormatrix",
-            "video-out-params/colorlevels",
-            "video-out-params/primaries",
-            "video-out-params/gamma",
-            "video-out-params/sig-peak"
-        ]
-        let targetProperties = [
-            "video-target-params/pixelformat",
-            "video-target-params/colormatrix",
-            "video-target-params/colorlevels",
-            "video-target-params/primaries",
-            "video-target-params/gamma",
-            "video-target-params/sig-peak"
-        ]
-        mpvDebugLog(
-            "video color params input=[\(videoColorParameterDescription(inputProperties))] filters=[\(videoColorParameterDescription(filterOutputProperties))] target=[\(videoColorParameterDescription(targetProperties))]"
-        )
-    }
-
-    nonisolated func videoColorParameterDescription(_ properties: [String]) -> String {
-        properties.map { property in
-            let name = property.split(separator: "/").last.map(String.init) ?? property
-            return "\(name)=\(getString(property) ?? "unavailable")"
-        }
-        .joined(separator: " ")
     }
 
     nonisolated func setDouble(_ name: String, _ value: Double) {

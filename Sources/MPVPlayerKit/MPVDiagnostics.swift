@@ -49,6 +49,15 @@ public enum MPVDiagnostics {
         #endif
     }
 
+    /// Debug 默认开控制台；Release 即使显式开启文件诊断，控制台默认关。
+    static var isConsoleLoggingEnabledByDefault: Bool {
+        #if DEBUG
+        return true
+        #else
+        return false
+        #endif
+    }
+
     /// 文件位于 Caches/MPVPlayerKit/Diagnostics。返回的文件可能仍在追加或被容量淘汰。
     public static func logFiles(sessionID: UUID? = nil) async throws -> [URL] {
         try await MPVDiagnosticStore.shared.files(sessionID: sessionID)
@@ -94,7 +103,10 @@ final class MPVDiagnosticChannel: @unchecked Sendable {
         sequence += 1
         if event == "周期快照" { snapshots += 1 }
         var values = fields
-        values["此前日志队列丢弃累计"] = String(dropped)
+        let droppedCount = dropped
+        if droppedCount > 0 || finish {
+            values["此前日志队列丢弃累计"] = String(droppedCount)
+        }
         if finish {
             values["事件累计"] = String(sequence)
             values["周期快照累计"] = String(snapshots)
@@ -130,7 +142,7 @@ actor MPVDiagnosticStore {
             .appendingPathComponent("MPVPlayerKit/Diagnostics", isDirectory: true),
         segmentLimit: Int = 2 * 1_024 * 1_024,
         totalLimit: Int = 20 * 1_024 * 1_024,
-        consoleEnabled: Bool = true
+        consoleEnabled: Bool = MPVDiagnostics.isConsoleLoggingEnabledByDefault
     ) {
         self.directory = directory
         self.segmentLimit = segmentLimit
@@ -155,7 +167,13 @@ actor MPVDiagnosticStore {
             var data = try encoder.encode(record)
             data.append(0x0A)
             if consoleEnabled, let line = String(data: data, encoding: .utf8) {
+                #if DEBUG
                 logger.info("\(line, privacy: .public)")
+                #else
+                // Release 下即使显式开启文件诊断，控制台也默认走 private，
+                // 避免媒体路径/轨道信息进入系统日志。
+                logger.info("\(line, privacy: .private)")
+                #endif
             }
             guard !failed else { return }
             // 单条过大时不允许突破文件上限；正常快照远小于此限制。
@@ -181,6 +199,8 @@ actor MPVDiagnosticStore {
             }.sorted { $0.2 < $1.2 }
             var total = oldest.reduce(0) { $0 + $1.1 }
             for (url, bytes, _) in oldest where total + data.count > totalLimit {
+                // 不淘汰正在写入的当前目标文件。
+                if url.standardizedFileURL == destination.standardizedFileURL { continue }
                 try FileManager.default.removeItem(at: url)
                 total -= bytes
             }

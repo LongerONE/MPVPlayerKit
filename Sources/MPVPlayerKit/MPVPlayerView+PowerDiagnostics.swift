@@ -146,9 +146,20 @@ extension MPVPlayerView {
                 values[property] = "不可用"
             }
         }
+        let decoderDropCount = getInt64("decoder-frame-drop-count")
+        let outputDropCount = getInt64("frame-drop-count")
         for property in properties {
             // 防止意外超长属性放大日志负担；不可用不伪装成数值零。
-            values[property] = getString(property).map { String($0.prefix(160)) } ?? "不可用"
+            let raw: String?
+            switch property {
+            case "decoder-frame-drop-count":
+                raw = decoderDropCount.map(String.init)
+            case "frame-drop-count":
+                raw = outputDropCount.map(String.init)
+            default:
+                raw = getString(property)
+            }
+            values[property] = raw.map { String($0.prefix(160)) } ?? "不可用"
         }
         if let count = getInt64("track-list/count"), count > 0 {
             for index in 0..<min(count, 64) {
@@ -160,8 +171,11 @@ extension MPVPlayerView {
                 }
             }
         }
-        values["解码丢帧增量"] = probe.decoderDrops.update(getInt64("decoder-frame-drop-count"))
-        values["输出丢帧增量"] = probe.outputDrops.update(getInt64("frame-drop-count"))
+        values["解码丢帧增量"] = probe.decoderDrops.update(decoderDropCount)
+        values["输出丢帧增量"] = probe.outputDrops.update(outputDropCount)
+        if isDolbyVisionPlayback {
+            values["内容色彩提示"] = MPVColorMappingPolicy.contentHint(isDolbyVisionPlayback: true).rawValue
+        }
         values.merge(probe.process.sample()) { _, new in new }
         values["采集耗时毫秒"] = String(format: "%.3f", (ProcessInfo.processInfo.systemUptime - sampleStarted) * 1_000)
         probe.channel.record(event, fields: values, finish: finish)
