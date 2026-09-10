@@ -120,7 +120,12 @@ extension MPVPlayerView {
                         )
                     }
                     self.stopTimeTimer()
+                    let shutdownGeneration = self.currentPlaybackIntentGeneration()
                     self.notifyOnMain {
+                        guard self.isPlaybackIntentCurrent(shutdownGeneration),
+                              self.isStopped() == false else {
+                            return
+                        }
                         self.stopSystemPlaybackProgress(keepingOwner: false)
                     }
                     break eventLoop

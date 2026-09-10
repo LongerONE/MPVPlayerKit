@@ -351,11 +351,20 @@ extension MPVPlayerView {
     }
 
     nonisolated func setDecoderMode(_ decoderMode: MPVPlayerDecoderMode) {
-        NotificationCenter.default.post(
-            name: MPVPlayerKitNotification.didUpdateDecoderMode,
-            object: self,
-            userInfo: [MPVPlayerKitNotificationKey.decoderMode: decoderMode.rawValue]
-        )
+        let sessionGeneration = currentBufferingSessionGeneration()
+        let intentGeneration = currentPlaybackIntentGeneration()
+        notifyOnMain {
+            guard self.currentBufferingSessionGeneration() == sessionGeneration,
+                  self.currentPlaybackIntentGeneration() == intentGeneration
+            else {
+                return
+            }
+            NotificationCenter.default.post(
+                name: MPVPlayerKitNotification.didUpdateDecoderMode,
+                object: self,
+                userInfo: [MPVPlayerKitNotificationKey.decoderMode: decoderMode.rawValue]
+            )
+        }
     }
 
     func notifyTime(currentTime: TimeInterval, duration: TimeInterval) {

@@ -25,6 +25,7 @@ public final class MPVPlayer: NSObject {
     private struct PendingSubtitleLoad {
         let completion: (Bool) -> Void
         let timeout: DispatchWorkItem
+        let generation: UInt64
     }
 
     public weak var delegate: MPVPlayerDelegate?
@@ -71,6 +72,7 @@ public final class MPVPlayer: NSObject {
 
     private var observers: [NSObjectProtocol] = []
     private var pendingSubtitleLoads: [String: PendingSubtitleLoad] = [:]
+    private var subtitleLoadGeneration: UInt64 = 0
 
     public init(configuration: MPVPlayerConfiguration) {
         playbackView = MPVPlayerView(frame: .zero)
@@ -207,12 +209,19 @@ public final class MPVPlayer: NSObject {
         completion: @escaping (Bool) -> Void
     ) -> UUID {
         let requestID = UUID()
+        subtitleLoadGeneration &+= 1
+        let generation = subtitleLoadGeneration
         let timeout = DispatchWorkItem { [weak self] in
-            self?.finishSubtitleLoad(requestID: requestID.uuidString, success: false)
+            self?.finishSubtitleLoad(
+                requestID: requestID.uuidString,
+                success: false,
+                generation: generation
+            )
         }
         pendingSubtitleLoads[requestID.uuidString] = PendingSubtitleLoad(
             completion: completion,
-            timeout: timeout
+            timeout: timeout,
+            generation: generation
         )
         let options = [
             "requestID": requestID.uuidString,
@@ -231,12 +240,19 @@ public final class MPVPlayer: NSObject {
         completion: @escaping (Bool) -> Void
     ) -> UUID {
         let requestID = UUID()
+        subtitleLoadGeneration &+= 1
+        let generation = subtitleLoadGeneration
         let timeout = DispatchWorkItem { [weak self] in
-            self?.finishSubtitleLoad(requestID: requestID.uuidString, success: false)
+            self?.finishSubtitleLoad(
+                requestID: requestID.uuidString,
+                success: false,
+                generation: generation
+            )
         }
         pendingSubtitleLoads[requestID.uuidString] = PendingSubtitleLoad(
             completion: completion,
-            timeout: timeout
+            timeout: timeout,
+            generation: generation
         )
         playbackView.loadSubtitle([
             "requestID": requestID.uuidString,
@@ -372,8 +388,16 @@ public final class MPVPlayer: NSObject {
         })
     }
 
-    private func finishSubtitleLoad(requestID: String, success: Bool) {
-        guard let pending = pendingSubtitleLoads.removeValue(forKey: requestID) else { return }
+    private func finishSubtitleLoad(
+        requestID: String,
+        success: Bool,
+        generation: UInt64? = nil
+    ) {
+        guard let pending = pendingSubtitleLoads[requestID] else { return }
+        if let generation, pending.generation != generation {
+            return
+        }
+        pendingSubtitleLoads.removeValue(forKey: requestID)
         pending.timeout.cancel()
         pending.completion(success)
     }

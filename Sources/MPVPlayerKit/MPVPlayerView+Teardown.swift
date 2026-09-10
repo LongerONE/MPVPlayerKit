@@ -93,8 +93,8 @@ extension MPVPlayerView {
         if reason == "stop" || reason == "setup-failed" { finishPowerDiagnostics(reason: reason) }
         diagnosticProbe?.clearStaticMPVFieldCache()
         MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
-        setDecoderMode(.initializing)
         _ = nextBufferingSessionGeneration()
+        setDecoderMode(.initializing)
         clearMPVPlaybackUpdateSourceSession()
         clearPendingPlaybackPositionUpdate()
         resetBufferingStateOnMPVQueue(reason: "destroy-\(reason)", notifyFinish: true)
