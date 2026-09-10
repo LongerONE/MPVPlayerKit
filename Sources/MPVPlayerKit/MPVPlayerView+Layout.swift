@@ -407,7 +407,8 @@ extension MPVPlayerView {
         }
     }
 
-    func startTimeTimer() {
+    nonisolated func startTimeTimer() {
+        dispatchPrecondition(condition: .onQueue(queue))
         guard timeTimer == nil else { return }
         let timer = DispatchSource.makeTimerSource(queue: queue)
         timer.schedule(
@@ -420,9 +421,24 @@ extension MPVPlayerView {
         timer.resume()
     }
 
-    func stopTimeTimer() {
+    nonisolated func stopTimeTimer() {
+        dispatchPrecondition(condition: .onQueue(queue))
         timeTimer?.setEventHandler {}
         timeTimer?.cancel()
         timeTimer = nil
+    }
+
+    /// 主线程或跨会话回调只提交停止意图；由队列校验 generation 后再取消。
+    nonisolated func requestStopTimeTimer(generation: UInt64) {
+        if DispatchQueue.getSpecific(key: queueSpecificKey) != nil {
+            if isPlaybackIntentCurrent(generation) {
+                stopTimeTimer()
+            }
+            return
+        }
+        queue.async { [weak self] in
+            guard let self, self.isPlaybackIntentCurrent(generation) else { return }
+            self.stopTimeTimer()
+        }
     }
 }

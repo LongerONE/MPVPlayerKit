@@ -119,8 +119,8 @@ extension MPVPlayerView {
                             recoverySnapshot: recoverySnapshot
                         )
                     }
+                    self.stopTimeTimer()
                     self.notifyOnMain {
-                        self.stopTimeTimer()
                         self.stopSystemPlaybackProgress(keepingOwner: false)
                     }
                     break eventLoop
@@ -481,13 +481,14 @@ extension MPVPlayerView {
 
     func handleEndFileOnMain(reason: mpv_end_file_reason?, errorCode: CInt) {
         let errorMessage = errorCode == 0 ? "none" : String(cString: mpv_error_string(errorCode))
+        let generation = currentPlaybackIntentGeneration()
         guard let reason else {
             mpvDebugLog("event end-file missing reason error=\(errorCode) message=\(errorMessage) profile=\(activeProfileDescription)")
             if retryNextProfileAfterPlaybackFailure(errorCode: errorCode) {
                 return
             }
             notifyOnMain {
-                self.stopTimeTimer()
+                self.requestStopTimeTimer(generation: generation)
                 self.stopSystemPlaybackProgress(keepingOwner: true)
                 self.notifyState(.error)
             }
@@ -500,7 +501,7 @@ extension MPVPlayerView {
                 return
             }
             notifyOnMain {
-                self.stopTimeTimer()
+                self.requestStopTimeTimer(generation: generation)
                 self.stopSystemPlaybackProgress(keepingOwner: true)
                 self.notifyState(.error)
             }
@@ -509,7 +510,7 @@ extension MPVPlayerView {
 
         if reason == MPV_END_FILE_REASON_EOF {
             notifyOnMain {
-                self.stopTimeTimer()
+                self.requestStopTimeTimer(generation: generation)
                 self.stopSystemPlaybackProgress(keepingOwner: true)
                 self.notifyState(.playedToTheEnd)
             }
@@ -518,7 +519,7 @@ extension MPVPlayerView {
 
         if reason == MPV_END_FILE_REASON_STOP || reason == MPV_END_FILE_REASON_QUIT || reason == MPV_END_FILE_REASON_REDIRECT {
             notifyOnMain {
-                self.stopTimeTimer()
+                self.requestStopTimeTimer(generation: generation)
                 self.stopSystemPlaybackProgress(keepingOwner: false)
             }
             return
@@ -528,7 +529,7 @@ extension MPVPlayerView {
             return
         }
         notifyOnMain {
-            self.stopTimeTimer()
+            self.requestStopTimeTimer(generation: generation)
             self.stopSystemPlaybackProgress(keepingOwner: true)
             self.notifyState(.error)
         }

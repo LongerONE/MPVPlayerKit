@@ -271,7 +271,8 @@ public final class MPVPlayerView: UIView {
     @objc public internal(set) var diagnosticSessionID: UUID?
     // Queue-bound cache used when libmpv has already reported shutdown.
     nonisolated(unsafe) var lastMPVTimeSnapshot: MPVPlaybackTimeSnapshot?
-    var timeTimer: DispatchSourceTimer?
+    // 仅在 MPV 串行队列上创建/取消；主线程只提交启停意图。
+    nonisolated(unsafe) var timeTimer: DispatchSourceTimer?
     var hasReportedReadyToPlay = false
     nonisolated(unsafe) var hasPlaybackRestarted = false
     nonisolated(unsafe) var hasLoggedVideoColorParameters = false
