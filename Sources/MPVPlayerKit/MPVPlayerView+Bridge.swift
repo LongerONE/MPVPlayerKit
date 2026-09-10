@@ -351,6 +351,7 @@ extension MPVPlayerView {
     }
 
     nonisolated func setDecoderMode(_ decoderMode: MPVPlayerDecoderMode) {
+        let rawValue = decoderMode.rawValue
         let sessionGeneration = currentBufferingSessionGeneration()
         let intentGeneration = currentPlaybackIntentGeneration()
         notifyOnMain {
@@ -362,7 +363,7 @@ extension MPVPlayerView {
             NotificationCenter.default.post(
                 name: MPVPlayerKitNotification.didUpdateDecoderMode,
                 object: self,
-                userInfo: [MPVPlayerKitNotificationKey.decoderMode: decoderMode.rawValue]
+                userInfo: [MPVPlayerKitNotificationKey.decoderMode: rawValue]
             )
         }
     }
