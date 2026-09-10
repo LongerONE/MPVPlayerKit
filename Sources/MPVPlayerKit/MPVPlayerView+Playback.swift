@@ -211,7 +211,17 @@ extension MPVPlayerView {
         guard value.isFinite, value > 0.0 else { return }
         mpvDebugLog("updatePlayRate value=\(value)")
         playbackSpeed = value
-        setDouble(MPVProperty.speed, value)
+        let generation = currentPlaybackIntentGeneration()
+        queue.async { [weak self] in
+            guard let self,
+                  self.isPlaybackIntentCurrent(generation),
+                  self.isStopped() == false,
+                  self.mpv != nil
+            else {
+                return
+            }
+            self.setDouble(MPVProperty.speed, value)
+        }
         requestDiagnosticSnapshot("倍速设置变化")
         MPVSystemPlaybackCoordinator.shared.publish(playerView: self)
     }
@@ -499,7 +509,7 @@ extension MPVPlayerView {
     }
 
     @objc public func currentSubtitleText() -> NSString? {
-        guard let text = getString(MPVProperty.subtitleText),
+        guard let text = cachedSubtitleTextValue(),
               text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false else {
             return nil
         }

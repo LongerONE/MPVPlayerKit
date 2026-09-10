@@ -28,6 +28,7 @@ extension MPVPlayerView {
     nonisolated func readMPVTimeSnapshot() -> MPVPlaybackTimeSnapshot? {
         dispatchPrecondition(condition: .onQueue(queue))
         guard mpv != nil else { return nil }
+        refreshSubtitleTextCache()
         let current = getDouble(MPVProperty.timePosition)
         guard current.isFinite else { return nil }
         let total = getDouble(MPVProperty.duration)
@@ -177,6 +178,7 @@ extension MPVPlayerView {
                 requestIDs: Set(pending.requestIDs)
             )
         }
+        refreshSubtitleTextCache()
         mpvDebugLog("loadSubtitle reply requests=\(pending.requestIDs) userdata=\(userdata) sid=\(subtitleID.map(String.init) ?? "nil") success=\(success) error=\(event.pointee.error)")
         pending.requestIDs.forEach { notifySubtitleLoad(requestID: $0, success: success) }
     }
@@ -353,6 +355,7 @@ extension MPVPlayerView {
             subtitleID: targetSubtitleID,
             isVisible: targetVisibility
         )
+        refreshSubtitleTextCache()
         return true
     }
 
@@ -373,6 +376,7 @@ extension MPVPlayerView {
         guard hideSucceeded, styleSucceeded, sidSucceeded, visibilitySucceeded else { return false }
         currentSubtitleUsesOriginalStyle = snapshot.usesOriginalStyle
         committedSubtitleSelection = snapshot
+        refreshSubtitleTextCache()
         return true
     }
 
@@ -391,6 +395,7 @@ extension MPVPlayerView {
         } else {
             committedSubtitleSelection = nil
         }
+        refreshSubtitleTextCache()
         mpvDebugLog("subtitle entered safe state reason=\(reason) hidden=\(hidden) disabled=\(disabled)")
         // Subtitle recovery failures are non-fatal to video playback. Keep the
         // video running with subtitles disabled instead of publishing the

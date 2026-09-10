@@ -126,6 +126,14 @@ extension MPVPlayerView {
     }
 
     func applyContentMode(_ contentModeSnapshot: MPVContentModeSnapshot) {
+        queue.async { [weak self] in
+            self?.applyContentModeOnMPVQueue(contentModeSnapshot)
+        }
+    }
+
+    nonisolated func applyContentModeOnMPVQueue(_ contentModeSnapshot: MPVContentModeSnapshot) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard mpv != nil else { return }
         switch contentModeSnapshot {
         case .fill:
             setDouble(MPVProperty.panscan, 1.0)

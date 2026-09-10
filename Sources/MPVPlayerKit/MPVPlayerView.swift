@@ -258,6 +258,8 @@ public final class MPVPlayerView: UIView {
     var displayModeState = MPVDisplayModeState()
     nonisolated let mediaTracksCacheLock = NSLock()
     nonisolated(unsafe) var mediaTracksCache: [[String: Any]] = []
+    nonisolated let subtitleTextCacheLock = NSLock()
+    nonisolated(unsafe) var cachedSubtitleText: String?
     nonisolated(unsafe) var mpv: OpaquePointer?
     // Bound to the MPV handle on `queue`. Playback snapshots carry this value
     // so a queued callback from a previous handle cannot inherit a newer

@@ -321,6 +321,28 @@ extension MPVPlayerView {
         mediaTracksCacheLock.unlock()
     }
 
+    nonisolated func refreshSubtitleTextCache() {
+        dispatchPrecondition(condition: .onQueue(queue))
+        let raw = getString(MPVProperty.subtitleText)
+        let cleaned = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let value = (cleaned?.isEmpty == false) ? raw : nil
+        subtitleTextCacheLock.lock()
+        cachedSubtitleText = value
+        subtitleTextCacheLock.unlock()
+    }
+
+    nonisolated func cachedSubtitleTextValue() -> String? {
+        subtitleTextCacheLock.lock()
+        defer { subtitleTextCacheLock.unlock() }
+        return cachedSubtitleText
+    }
+
+    nonisolated func clearSubtitleTextCache() {
+        subtitleTextCacheLock.lock()
+        cachedSubtitleText = nil
+        subtitleTextCacheLock.unlock()
+    }
+
     nonisolated func readMediaTracks(mediaType requestedType: String?) -> [[String: Any]] {
         guard let count = getInt64("track-list/count"), count > 0 else {
             return []

@@ -269,6 +269,7 @@ extension MPVPlayerView {
         resetBufferingStateOnMPVQueue(reason: "setup")
         lastMPVTimeSnapshot = nil
         currentSubtitleUsesOriginalStyle = false
+        clearSubtitleTextCache()
         loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)
         pendingExternalSubtitleLoad = nil
         canceledExternalSubtitleCommands.removeAll(keepingCapacity: true)
@@ -355,7 +356,7 @@ extension MPVPlayerView {
         if applyUserSubtitleStyleProperties() == false {
             mpvDebugLog("setupMPV could not apply runtime subtitle style profile=\(profile.name)")
         }
-        applyContentMode(currentContentModeSnapshot())
+        applyContentModeOnMPVQueue(currentContentModeSnapshot())
         mpvDebugLog("setupMPV initialized profile=\(profile.name)")
         mpvDebugLog(
             "render diagnostics reason=setup "
@@ -539,6 +540,7 @@ extension MPVPlayerView {
         resetBufferingStateOnMPVQueue(reason: "destroy-\(reason)", notifyFinish: true)
         stopTimeTimer()
         clearMediaTracksCache()
+        clearSubtitleTextCache()
         notifyOnMain {
             self.updatePictureInPictureVideoDisplaySize(.zero)
         }
