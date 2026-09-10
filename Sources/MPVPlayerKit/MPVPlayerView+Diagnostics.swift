@@ -307,7 +307,7 @@ extension MPVPlayerView {
                 "mpvType": descriptor.mpvType,
                 "codec": descriptor.codec ?? "",
                 "isEnabled": NSNumber(value: descriptor.isSelected),
-                "isImageSubtitle": NSNumber(value: isImageSubtitleCodec(descriptor.codec)),
+                "isImageSubtitle": NSNumber(value: Self.isImageSubtitleCodec(descriptor.codec)),
                 "nominalFrameRate": NSNumber(value: 0),
                 "bitRate": NSNumber(value: descriptor.bitRate),
                 "bitDepth": NSNumber(value: 0),
@@ -384,7 +384,7 @@ extension MPVPlayerView {
         }
     }
 
-    nonisolated func isImageSubtitleCodec(_ codec: String?) -> Bool {
+    nonisolated static func isImageSubtitleCodec(_ codec: String?) -> Bool {
         guard let codec = codec?.lowercased() else {
             return false
         }

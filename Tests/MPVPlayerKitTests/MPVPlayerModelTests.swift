@@ -434,7 +434,7 @@ final class MPVPlayerModelTests: XCTestCase {
         )
     }
 
-    func testSubtitleTextUsesOnDemandReadInsteadOfObservation() throws {
+    func testSubtitleTextUsesQueueCacheInsteadOfMainThreadObservation() throws {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
             .deletingLastPathComponent()
@@ -451,11 +451,17 @@ final class MPVPlayerModelTests: XCTestCase {
             contentsOf: packageRoot.appendingPathComponent("Sources/MPVPlayerKit/MPVPlayerView+Playback.swift"),
             encoding: .utf8
         )
+        let diagnosticsSource = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/MPVPlayerKit/MPVPlayerView+Diagnostics.swift"),
+            encoding: .utf8
+        )
 
         XCTAssertFalse(setupSource.contains("mpv_observe_property(mpv, 0, MPVProperty.subtitleText"))
         XCTAssertFalse(eventsSource.contains("case MPVProperty.subtitleText:"))
         XCTAssertTrue(playbackSource.contains("func currentSubtitleText()"))
-        XCTAssertTrue(playbackSource.contains("getString(MPVProperty.subtitleText)"))
+        XCTAssertTrue(playbackSource.contains("cachedSubtitleTextValue()"))
+        XCTAssertTrue(diagnosticsSource.contains("refreshSubtitleTextCache()"))
+        XCTAssertTrue(diagnosticsSource.contains("getString(MPVProperty.subtitleText)"))
     }
 
     @MainActor
@@ -510,21 +516,26 @@ final class MPVPlayerModelTests: XCTestCase {
     func testMPVWakeupCanEnterEventReaderOffMainThread() async {
         let playerView = MPVPlayerView(frame: .zero)
         let transfer = TestUnsafeTransfer(value: playerView)
-        let context = TestUnsafeTransfer(
-            value: Unmanaged.passUnretained(playerView).toOpaque()
+        let context = MPVWakeupContext(playerView)
+        let wakeup = TestUnsafeTransfer(
+            value: Unmanaged.passUnretained(context).toOpaque()
         )
         let timerHandler = makeMPVTimeTimerHandler(playerView)
 
         await withCheckedContinuation { continuation in
             DispatchQueue.global(qos: .userInitiated).async {
-                mpvPlayerWakeupCallback(context.value)
-                timerHandler()
-                transfer.value.notifyOnMain {
-                    XCTAssertTrue(Thread.isMainThread)
-                    continuation.resume()
+                mpvPlayerWakeupCallback(wakeup.value)
+                // 时间定时器 handler 固定跑在 MPV queue；后台线程只验证 wakeup 入口。
+                transfer.value.queue.async {
+                    timerHandler()
+                    transfer.value.notifyOnMain {
+                        XCTAssertTrue(Thread.isMainThread)
+                        continuation.resume()
+                    }
                 }
             }
         }
+        withExtendedLifetime(context) {}
     }
 
     @MainActor
@@ -571,7 +582,8 @@ final class MPVPlayerModelTests: XCTestCase {
             $0.name == "metal-software"
         }
         let options = Dictionary(
-            uniqueKeysWithValues: softwareProfile?.options ?? []
+            softwareProfile?.options ?? [],
+            uniquingKeysWith: { _, replacement in replacement }
         )
 
         XCTAssertEqual(options["vo"], "gpu-next")

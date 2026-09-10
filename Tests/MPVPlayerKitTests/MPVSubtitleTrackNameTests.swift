@@ -20,8 +20,8 @@ final class MPVSubtitleTrackNameTests: XCTestCase {
         XCTAssertEqual(
             MPVPlayerView.subtitleTrackName(
                 id: 5,
-                externalFilename: "/tmp/Movie.zh-Hans.ass",
                 codec: "ass",
+                externalFilename: "/tmp/Movie.zh-Hans.ass",
                 includeTrackID: true,
                 localization: "zh-Hans"
             ),
@@ -31,8 +31,8 @@ final class MPVSubtitleTrackNameTests: XCTestCase {
             MPVPlayerView.subtitleTrackName(
                 id: 6,
                 title: "导演评论",
-                externalFilename: "/tmp/ignored.srt",
                 codec: "subrip",
+                externalFilename: "/tmp/ignored.srt",
                 localization: "zh-Hans"
             ),
             "导演评论·SRT"

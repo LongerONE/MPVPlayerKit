@@ -34,8 +34,8 @@ final class MPVCacheConfigurationTests: XCTestCase {
         XCTAssertTrue(setupSource.contains("(\"demuxer-max-bytes\", Self.demuxerMaxBytes)"))
         XCTAssertTrue(setupSource.contains("(\"demuxer-max-back-bytes\", Self.demuxerMaxBackBytes)"))
         XCTAssertTrue(setupSource.contains("(\"cache-on-disk\", \"no\")"))
-        XCTAssertTrue(setupSource.contains("(\"demuxer-hysteresis-secs\", String(cacheConfiguration.demuxerHysteresisSeconds))"))
-        XCTAssertTrue(setupSource.contains("(\"demuxer-hysteresis-secs\", String(configuration.demuxerHysteresisSeconds))"))
+        XCTAssertTrue(setupSource.contains("cacheConfiguration.isEnabled ? cacheConfiguration.duration : 0"))
+        XCTAssertTrue(setupSource.contains("configuration.isEnabled ? configuration.duration : 0"))
         XCTAssertTrue(setupSource.contains("nonisolated static let demuxerMaxBytes = \"256MiB\""))
         XCTAssertTrue(setupSource.contains("nonisolated static let demuxerMaxBackBytes = \"0\""))
         let colorPolicySource = try String(
