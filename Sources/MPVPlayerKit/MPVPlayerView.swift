@@ -241,14 +241,14 @@ public final class MPVPlayerView: UIView {
         }
     }
 
-    var metalLayer = MPVPlayerMetalLayer()
+    nonisolated(unsafe) var metalLayer = MPVPlayerMetalLayer()
     var pictureInPictureCoordinator: MPVPictureInPictureCoordinator?
     /// Shapes the Picture in Picture window, which hosts this view.
     var pictureInPictureVideoDisplaySize: CGSize = .zero
     var usesExtendedDynamicRangeOutput = false
     let colorOutputStateLock = NSLock()
     nonisolated(unsafe) var colorOutputState = MPVColorOutputState()
-    var url: URL?
+    nonisolated(unsafe) var url: URL?
     // libmpv setup consumes this immutable request snapshot on `queue`.
     // The host configures it before playback starts, so it must not inherit
     // UIView's main-actor isolation when the queue prepares HTTP headers.
@@ -372,7 +372,7 @@ public final class MPVPlayerView: UIView {
     /// The renderer surface is allocated once for the playback session. UIKit
     /// rotation only changes the presentation mapping applied to this surface.
     var stableMetalCanvas: MPVStableMetalCanvas?
-    var videoDisplayAspectRatio = MPVDisplayGeometry.defaultVideoAspectRatio
+    nonisolated(unsafe) var videoDisplayAspectRatio = MPVDisplayGeometry.defaultVideoAspectRatio
     let videoDisplayAspectRatioLock = NSLock()
     /// A Picture in Picture hierarchy callback can arrive before UIKit has
     /// assigned the view a size in its destination hierarchy. Keep the

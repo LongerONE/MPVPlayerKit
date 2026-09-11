@@ -37,7 +37,7 @@ extension MPVPlayerView {
         ]
     }
 
-    func setupMPV() {
+    nonisolated func setupMPV() {
         guard let url else {
             mpvDebugLog("setupMPV failed missing url")
             failSetup()
@@ -73,7 +73,7 @@ extension MPVPlayerView {
         failSetup()
     }
 
-    func prepareProfilesForNextRenderer() {
+    nonisolated func prepareProfilesForNextRenderer() {
         // Reserve the renderer slot before reading options. Screen changes
         // after this point become pending instead of mutating CAMetalLayer
         // during profile or handle construction.
@@ -89,7 +89,7 @@ extension MPVPlayerView {
         )
     }
 
-    func makeSetupProfiles() -> [MPVSetupProfile] {
+    nonisolated func makeSetupProfiles() -> [MPVSetupProfile] {
         #if targetEnvironment(simulator)
         let hardwareDecode = "no"
         #else
@@ -129,10 +129,10 @@ extension MPVPlayerView {
         ]
     }
 
-    var metalVideoOutputOptions: [(String, String)] {
-        let outputMode = MPVColorMappingPolicy.outputMode(
-            usesExtendedDynamicRangeOutput: usesExtendedDynamicRangeOutput
-        )
+    nonisolated var metalVideoOutputOptions: [(String, String)] {
+        colorOutputStateLock.lock()
+        let outputMode = colorOutputState.currentMode
+        colorOutputStateLock.unlock()
         let colorOptions = MPVColorMappingPolicy.options(for: outputMode)
         #if targetEnvironment(simulator)
         return colorOptions + [
@@ -218,7 +218,7 @@ extension MPVPlayerView {
         recordDiagnosticSnapshot("渲染设置变化")
     }
 
-    func setupMPV(url: URL, profile: MPVSetupProfile) -> Bool {
+    nonisolated func setupMPV(url: URL, profile: MPVSetupProfile) -> Bool {
         var didSetup = false
         performOnMPVQueueSync {
             didSetup = setupMPVOnMPVQueue(url: url, profile: profile)
@@ -226,7 +226,7 @@ extension MPVPlayerView {
         return didSetup
     }
 
-    private func setupMPVOnMPVQueue(url: URL, profile: MPVSetupProfile) -> Bool {
+    private nonisolated func setupMPVOnMPVQueue(url: URL, profile: MPVSetupProfile) -> Bool {
         dispatchPrecondition(condition: .onQueue(queue))
         let playbackUpdateSourceSession = currentBufferingSessionGeneration()
         let profileIndex = activeSetupProfileSnapshot().index
@@ -324,7 +324,7 @@ extension MPVPlayerView {
         if applyUserSubtitleStyleProperties() == false {
             mpvDebugLog("setupMPV could not apply runtime subtitle style profile=\(profile.name)")
         }
-        applyContentModeOnMPVQueue(currentContentModeSnapshot())
+        applyContentModeOnMPVQueue(currentContentModeSnapshotForRendererSetup())
         mpvDebugLog("setupMPV initialized profile=\(profile.name)")
         recordDiagnosticSnapshot("渲染初始化")
         _ = mpv_observe_property(mpv, 0, MPVProperty.hwdecCurrent, MPV_FORMAT_STRING)
@@ -399,7 +399,7 @@ extension MPVPlayerView {
         return true
     }
 
-    func configureGPUShaderCache(for handle: OpaquePointer) {
+    nonisolated func configureGPUShaderCache(for handle: OpaquePointer) {
         guard let cachesDirectory = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first else {
             mpvDebugLog("gpu shader cache skipped missing caches directory")
             return
@@ -422,7 +422,7 @@ extension MPVPlayerView {
         }
     }
 
-    func configureSystemSubtitleFont(for handle: OpaquePointer) {
+    nonisolated func configureSystemSubtitleFont(for handle: OpaquePointer) {
         if let fontDirectory = systemSubtitleFontDirectory {
             checkError(
                 mpv_set_option_string(handle, MPVProperty.subtitleFontProvider, "auto"),
@@ -446,7 +446,7 @@ extension MPVPlayerView {
         mpvDebugLog("subtitle font configured default=\(fontName)")
     }
 
-    func ensureMPVReady() -> Bool {
+    nonisolated func ensureMPVReady() -> Bool {
         if mpv != nil {
             return true
         }
@@ -458,12 +458,12 @@ extension MPVPlayerView {
         return mpv != nil
     }
 
-    private func currentViewBoundsSnapshot() -> CGRect {
+    private nonisolated func currentViewBoundsSnapshot() -> CGRect {
         guard Thread.isMainThread else { return .zero }
-        return bounds
+        return MainActor.assumeIsolated { bounds }
     }
 
-    func failSetup() {
+    nonisolated func failSetup() {
         setSetupFailed(true)
         destroyMPVHandle(reason: "setup-failed")
         pictureInPictureRendererRuntimeState.reset()

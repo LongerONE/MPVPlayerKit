@@ -296,7 +296,7 @@ extension MPVPlayerView {
         return true
     }
 
-    func performOnMPVQueueSync(_ body: () -> Void) {
+    nonisolated func performOnMPVQueueSync(_ body: () -> Void) {
         if DispatchQueue.getSpecific(key: queueSpecificKey) != nil {
             body()
         } else {
@@ -304,7 +304,7 @@ extension MPVPlayerView {
         }
     }
 
-    func redactedURLDescription(_ url: URL?) -> String {
+    nonisolated func redactedURLDescription(_ url: URL?) -> String {
         guard let url else { return "nil" }
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let queryItemCount = components?.queryItems?.count ?? 0

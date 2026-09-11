@@ -77,7 +77,7 @@ extension MPVPlayerView {
         mpv_set_property(mpv, name, MPV_FORMAT_DOUBLE, &data)
     }
 
-    func setFlag(_ name: String, _ flag: Bool) {
+    nonisolated func setFlag(_ name: String, _ flag: Bool) {
         guard let mpv else { return }
         var data: Int32 = flag ? 1 : 0
         mpv_set_property(mpv, name, MPV_FORMAT_FLAG, &data)
@@ -99,7 +99,7 @@ extension MPVPlayerView {
         ]
     }
 
-    func decimalString(_ value: Any?, fallback: Double) -> String {
+    nonisolated func decimalString(_ value: Any?, fallback: Double) -> String {
         let number = (value as? NSNumber)?.doubleValue ?? fallback
         return String(format: "%.3f", locale: Locale(identifier: "en_US_POSIX"), number.isFinite ? number : fallback)
     }
@@ -122,7 +122,7 @@ extension MPVPlayerView {
         return true
     }
 
-    func applyUserSubtitleStyleOptions(to handle: OpaquePointer) {
+    nonisolated func applyUserSubtitleStyleOptions(to handle: OpaquePointer) {
         for property in subtitleStylePropertyNames {
             guard let value = subtitleStyleValues[property] else { continue }
             checkError(

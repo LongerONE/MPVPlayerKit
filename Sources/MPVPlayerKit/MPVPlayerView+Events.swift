@@ -92,9 +92,13 @@ extension MPVPlayerView {
                     self.refreshVideoDisplayAspectRatio()
                     self.mpvDebugLog("event playback-restart stage=end")
                 case MPV_EVENT_VIDEO_RECONFIG:
+                    let timeSnapshot = self.lastMPVTimeSnapshot
+                    let currentTime = timeSnapshot?.currentTime ?? 0.0
+                    let duration = timeSnapshot?.duration ?? 0.0
+                    let isPlaying = self.bufferingStateMachine.snapshot.playbackIntent == .playing
                     self.mpvDebugLog(
-                        "event video-reconfig current=\(self.currentTime) duration=\(self.duration) "
-                            + "playing=\(self.isPlaying)"
+                        "event video-reconfig current=\(currentTime) duration=\(duration) "
+                            + "playing=\(isPlaying)"
                     )
                     self.refreshPictureInPictureVideoDisplaySize()
                     self.refreshVideoDisplayAspectRatio()

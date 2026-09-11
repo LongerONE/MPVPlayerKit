@@ -125,6 +125,18 @@ extension MPVPlayerView {
         return contentModeSnapshot
     }
 
+    nonisolated func currentContentModeSnapshotForRendererSetup() -> MPVContentModeSnapshot {
+        let readSnapshot = { @MainActor [self] in
+            currentContentModeSnapshot()
+        }
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated(readSnapshot)
+        }
+        return DispatchQueue.main.sync {
+            MainActor.assumeIsolated(readSnapshot)
+        }
+    }
+
     func applyContentMode(_ contentModeSnapshot: MPVContentModeSnapshot) {
         queue.async { [weak self] in
             self?.applyContentModeOnMPVQueue(contentModeSnapshot)

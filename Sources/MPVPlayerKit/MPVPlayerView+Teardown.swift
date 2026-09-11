@@ -63,7 +63,7 @@ extension MPVPlayerView {
         return handle
     }
 
-    func destroyMPVHandle(reason: String, sendStopCommand: Bool = true) {
+    nonisolated func destroyMPVHandle(reason: String, sendStopCommand: Bool = true) {
         if Thread.isMainThread {
             MainActor.assumeIsolated {
                 self.stopPictureInPictureForPlayerTeardown()
@@ -88,11 +88,13 @@ extension MPVPlayerView {
         }
     }
 
-    private func destroyMPVHandleOnMPVQueue(reason: String, sendStopCommand: Bool) {
+    private nonisolated func destroyMPVHandleOnMPVQueue(reason: String, sendStopCommand: Bool) {
         recordDiagnosticEvent("销毁解码配置", fields: ["原因": reason, "配置": activeProfileDescription])
         if reason == "stop" || reason == "setup-failed" { finishPowerDiagnostics(reason: reason) }
         diagnosticProbe?.clearStaticMPVFieldCache()
-        MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
+        notifyOnMain {
+            MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
+        }
         _ = nextBufferingSessionGeneration()
         setDecoderMode(.initializing)
         clearMPVPlaybackUpdateSourceSession()

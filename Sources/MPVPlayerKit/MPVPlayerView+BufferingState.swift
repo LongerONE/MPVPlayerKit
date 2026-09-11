@@ -170,9 +170,10 @@ extension MPVPlayerView {
     ) {
         dispatchPrecondition(condition: .onQueue(queue))
         let isBuffering = decision.state == .buffering
+        let isPlaybackIntentPlaying = bufferingStateMachine.snapshot.playbackIntent == .playing
         if isBuffering {
             stopTimeTimer()
-        } else if isPlaying {
+        } else if isPlaybackIntentPlaying {
             startTimeTimer()
         }
 

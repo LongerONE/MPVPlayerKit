@@ -108,7 +108,7 @@ extension MPVPlayerView {
     /// duration 可能仅在暂停时可知；首次有效时补发系统播放信息。
     nonisolated func publishDurationIfNewlyKnown() {
         dispatchPrecondition(condition: .onQueue(queue))
-        guard mpv != nil, duration <= 0.0 else { return }
+        guard mpv != nil else { return }
         let total = getDouble(MPVProperty.duration)
         guard total.isFinite, total > 0.0 else { return }
         let sessionGeneration = currentBufferingSessionGeneration()
