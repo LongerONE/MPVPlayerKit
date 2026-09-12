@@ -135,9 +135,15 @@ extension MPVPlayerView {
         colorOutputStateLock.unlock()
         let colorOptions = MPVColorMappingPolicy.options(for: outputMode)
         #if targetEnvironment(simulator)
+        // 模拟器仅有软件解码；4K/HEVC 帧经 libplacebo PBO 上传时，
+        // MoltenVK 的 host-visible MTLBuffer 分配会撞上 XPC shmem 限制。
+        // 限制解码输出并降到省电缩放器，避免 vo_thread 内 vkAllocateMemory 崩溃。
         return colorOptions + [
             ("gpu-dumb-mode", "yes"),
-        ] + videoQualityPreset.options + videoRenderOptions
+            ("video-max-x", "1920"),
+            ("video-max-y", "1080"),
+            ("vd-lavc-threads", "2"),
+        ] + MPVVideoQualityPreset.powerSaving.options + videoRenderOptions
         #else
         return colorOptions + videoQualityPreset.options + videoRenderOptions
         #endif
@@ -161,12 +167,23 @@ extension MPVPlayerView {
     }
 
     nonisolated var effectiveDebandEnabled: Bool {
+        #if targetEnvironment(simulator)
+        // 模拟器固定走省电渲染路径；额外 deband pass 会放大 vo_thread 内存压力。
+        return false
+        #else
         // Keep the power-saving tier free of the optional debanding pass.
-        debandEnabled && videoQualityPreset != .powerSaving
+        return debandEnabled && videoQualityPreset != .powerSaving
+        #endif
     }
 
     nonisolated var cacheOptions: [(String, String)] {
-        [
+        #if targetEnvironment(simulator)
+        // 模拟器内存与 XPC shmem 更紧，前向缓存压到 64MiB。
+        let demuxerMaxBytes = "64MiB"
+        #else
+        let demuxerMaxBytes = Self.demuxerMaxBytes
+        #endif
+        return [
             (MPVProperty.cache, cacheConfiguration.isEnabled ? "yes" : "no"),
             // 禁用缓存时下发 0，避免 cache=no 仍携带正数 duration。
             (
@@ -179,7 +196,7 @@ extension MPVPlayerView {
             ),
             ("demuxer-hysteresis-secs", String(cacheConfiguration.demuxerHysteresisSeconds)),
             ("cache-on-disk", "no"),
-            ("demuxer-max-bytes", Self.demuxerMaxBytes),
+            ("demuxer-max-bytes", demuxerMaxBytes),
             ("demuxer-max-back-bytes", Self.demuxerMaxBackBytes),
         ]
     }

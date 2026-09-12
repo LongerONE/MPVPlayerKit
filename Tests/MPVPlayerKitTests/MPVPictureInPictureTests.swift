@@ -489,9 +489,17 @@ final class MPVPictureInPictureTests: XCTestCase {
                 MPVPictureInPictureRendererInvariantSnapshot.optionMap($0.options)
             }
             XCTAssertFalse(highQualityProfileOptions.isEmpty)
+            #if targetEnvironment(simulator)
+            // 模拟器固定使用省电缩放器，避免 MoltenVK 大 buffer 分配崩溃。
+            XCTAssertTrue(highQualityProfileOptions.allSatisfy {
+                $0["hdr-compute-peak"] == "auto"
+            })
+            XCTAssertEqual(highQualityProfileOptions.first?["scale"], "bilinear")
+            #else
             XCTAssertTrue(highQualityProfileOptions.allSatisfy {
                 $0["hdr-compute-peak"] == "yes"
             })
+            #endif
         }
 
         playerView.videoQualityPreset = .balanced
@@ -511,19 +519,37 @@ final class MPVPictureInPictureTests: XCTestCase {
 
         playerView.usesExtendedDynamicRangeOutput = true
         playerView.isDolbyVisionPlayback = false
+        #if targetEnvironment(simulator)
+        // 模拟器不启用 EDR，refreshColorOutputForTargetScreen 固定 SDR。
+        XCTAssertRendererOptionsAndProfiles(
+            playerView: playerView,
+            expectedColorOptions: MPVPlayerView.sdrMetalVideoOutputOptions,
+            expectedHintMode: nil
+        )
+        #else
         XCTAssertRendererOptionsAndProfiles(
             playerView: playerView,
             expectedColorOptions: MPVPlayerView.edrMetalVideoOutputOptions,
             expectedHintMode: "target"
         )
+        #endif
 
         let regularEDROptions = playerView.metalVideoOutputOptions
         playerView.isDolbyVisionPlayback = true
+        #if targetEnvironment(simulator)
+        // 模拟器不启用 EDR，颜色输出固定为 SDR-sRGB。
+        XCTAssertRendererOptionsAndProfiles(
+            playerView: playerView,
+            expectedColorOptions: MPVPlayerView.sdrMetalVideoOutputOptions,
+            expectedHintMode: nil
+        )
+        #else
         XCTAssertRendererOptionsAndProfiles(
             playerView: playerView,
             expectedColorOptions: MPVPlayerView.dolbyVisionEDRMetalVideoOutputOptions,
             expectedHintMode: "target"
         )
+        #endif
         XCTAssertEqual(
             MPVPictureInPictureRendererInvariantSnapshot.optionMap(
                 playerView.metalVideoOutputOptions

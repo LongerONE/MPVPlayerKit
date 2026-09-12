@@ -590,6 +590,13 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(options["gpu-api"], "vulkan")
         XCTAssertEqual(options["gpu-context"], "moltenvk")
         XCTAssertEqual(options["gpu-dumb-mode"], "yes")
+        // 模拟器 MTLSimDriver 无法安全分配全分辨率 host-visible buffer。
+        XCTAssertEqual(options["video-max-x"], "1920")
+        XCTAssertEqual(options["video-max-y"], "1080")
+        XCTAssertEqual(options["scale"], "bilinear")
+        XCTAssertEqual(options["cscale"], "bilinear")
+        XCTAssertEqual(options["dscale"], "bilinear")
+        XCTAssertEqual(options["demuxer-max-bytes"], "64MiB")
         XCTAssertFalse(playerView.usesExtendedDynamicRangeOutput)
         #endif
     }

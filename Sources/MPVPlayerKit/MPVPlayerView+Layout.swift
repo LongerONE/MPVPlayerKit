@@ -205,12 +205,25 @@ extension MPVPlayerView {
             width: max(screenBounds.width, screenBounds.height),
             height: min(screenBounds.width, screenBounds.height)
         )
-        let scale = max(screen.nativeScale, 1.0)
+        var scale = max(screen.nativeScale, 1.0)
+        #if targetEnvironment(simulator)
+        // 模拟器 MTLSimDriver 经 XPC 共享内存创建 MTLBuffer；全尺寸 3x
+        // 画布会让 MoltenVK 在 pl_tex_upload_pbo 分配超大 host-visible
+        // buffer 时触发 _xpc_api_misuse 崩溃。把 drawable 顶到约 1080p
+        // 宽即可覆盖常见手机逻辑分辨率，又避开 XPC shmem 上限。
+        let maxDrawableWidth: CGFloat = 1920
+        let neededScale = maxDrawableWidth / max(logicalSize.width, 1)
+        if neededScale > 0, neededScale < scale {
+            scale = neededScale
+        }
+        #endif
+        // CAMetalLayer 会把非整数 drawable 尺寸四舍五入；画布先取整，
+        // 避免 canvas 与 layer 尺寸在测试/布局校验时对不齐。
         let canvas = MPVStableMetalCanvas(
             logicalSize: logicalSize,
             drawableSize: CGSize(
-                width: logicalSize.width * scale,
-                height: logicalSize.height * scale
+                width: (logicalSize.width * scale).rounded(),
+                height: (logicalSize.height * scale).rounded()
             ),
             contentsScale: scale
         )

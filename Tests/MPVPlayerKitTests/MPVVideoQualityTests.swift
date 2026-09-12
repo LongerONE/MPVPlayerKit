@@ -52,11 +52,20 @@ final class MPVVideoQualityTests: XCTestCase {
         playerView.videoQualityPreset = .powerSaving
         XCTAssertEqual(playerView.videoRenderOptions.first?.1, "no")
 
+        #if targetEnvironment(simulator)
+        // 模拟器始终关闭 deband，避免 vo_thread 额外内存压力。
+        playerView.videoQualityPreset = .balanced
+        XCTAssertEqual(playerView.videoRenderOptions.first?.1, "no")
+
+        playerView.videoQualityPreset = .highQuality
+        XCTAssertEqual(playerView.videoRenderOptions.first?.1, "no")
+        #else
         playerView.videoQualityPreset = .balanced
         XCTAssertEqual(playerView.videoRenderOptions.first?.1, "yes")
 
         playerView.videoQualityPreset = .highQuality
         XCTAssertEqual(playerView.videoRenderOptions.first?.1, "yes")
+        #endif
     }
 
     func testQualityOptionsOverrideAutomaticColorPolicyForEveryOutputTier() {

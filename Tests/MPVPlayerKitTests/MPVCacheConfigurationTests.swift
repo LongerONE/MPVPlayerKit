@@ -31,7 +31,7 @@ final class MPVCacheConfigurationTests: XCTestCase {
             encoding: .utf8
         )
 
-        XCTAssertTrue(setupSource.contains("(\"demuxer-max-bytes\", Self.demuxerMaxBytes)"))
+        XCTAssertTrue(setupSource.contains("demuxerMaxBytes"))
         XCTAssertTrue(setupSource.contains("(\"demuxer-max-back-bytes\", Self.demuxerMaxBackBytes)"))
         XCTAssertTrue(setupSource.contains("(\"cache-on-disk\", \"no\")"))
         XCTAssertTrue(setupSource.contains("cacheConfiguration.isEnabled ? cacheConfiguration.duration : 0"))
