@@ -3,13 +3,28 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 56;
+	objectVersion = 60;
 	objects = {
 
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* AppDelegate.swift */; };
 		A10000000000000000000003 /* MPVPlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000004 /* MPVPlayerKit */; };
+		E9366F05303D97C9008E41DE /* MPVPlayerKit in Embed Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000004 /* MPVPlayerKit */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		E9366F06303D97C9008E41DE /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				E9366F05303D97C9008E41DE /* MPVPlayerKit in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A10000000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -62,6 +77,7 @@
 				A1000000000000000000000C /* Sources */,
 				A10000000000000000000006 /* Frameworks */,
 				A1000000000000000000000D /* Resources */,
+				E9366F06303D97C9008E41DE /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -169,6 +185,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = M6ADTQ6ADM;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MPVPlayerKitDemo/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "MPVPlayerKit Demo";
@@ -181,7 +198,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.MPVPlayerKitDemo;
+				PRODUCT_BUNDLE_IDENTIFIER = wan.long.MPVPlayerKitDemo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
@@ -195,6 +212,7 @@
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = M6ADTQ6ADM;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = MPVPlayerKitDemo/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = "MPVPlayerKit Demo";
@@ -207,7 +225,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.example.MPVPlayerKitDemo;
+				PRODUCT_BUNDLE_IDENTIFIER = wan.long.MPVPlayerKitDemo;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
 				SWIFT_EMIT_LOC_STRINGS = YES;
