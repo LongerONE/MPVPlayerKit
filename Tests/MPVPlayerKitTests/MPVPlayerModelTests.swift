@@ -591,9 +591,9 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertEqual(options["gpu-context"], "moltenvk")
         XCTAssertEqual(options["gpu-dumb-mode"], "yes")
         // 模拟器 MTLSimDriver 无法安全分配全分辨率 host-visible buffer。
-        // video-max-x/y 为可选项：部分 MPVKit 构建不存在该 option，setup 会跳过而不失败。
-        XCTAssertEqual(options["video-max-x"], "1920")
-        XCTAssertEqual(options["video-max-y"], "1080")
+        // video-max-x/y 为可选项：部分 MPVKit 构建不存在该 option，setup 会跳过并走 vf scale 回退。
+        XCTAssertEqual(options["video-max-x"], "1280")
+        XCTAssertEqual(options["video-max-y"], "720")
         XCTAssertTrue(MPVPlayerView.optionalSetupOptionNames.contains("video-max-x"))
         XCTAssertEqual(MPVPlayerView.mpvErrorOptionNotFound, -5)
         XCTAssertEqual(options["scale"], "bilinear")

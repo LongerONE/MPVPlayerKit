@@ -149,11 +149,12 @@ extension MPVPlayerView {
         // 模拟器仅有软件解码；4K/HEVC 帧经 libplacebo PBO 上传时，
         // MoltenVK 的 host-visible MTLBuffer 分配会撞上 XPC shmem 限制。
         // 限制解码输出并降到省电缩放器，避免 vo_thread 内 vkAllocateMemory 崩溃。
-        // 注：video-max-x/y 在部分 MPVKit/libmpv 构建中不存在（-5），见 optionalSetupOptionNames。
+        // 注：video-max-x/y 在部分 MPVKit/libmpv 构建中不存在（-5），
+        // setup 会尝试 vf scale 回退（见 applySimulatorDecoderResolutionCap）。
         return colorOptions + [
             ("gpu-dumb-mode", "yes"),
-            ("video-max-x", "1920"),
-            ("video-max-y", "1080"),
+            ("video-max-x", "1280"),
+            ("video-max-y", "720"),
             ("vd-lavc-threads", "2"),
         ] + MPVVideoQualityPreset.powerSaving.options + videoRenderOptions
         #else
@@ -247,6 +248,43 @@ extension MPVPlayerView {
         recordDiagnosticSnapshot("渲染设置变化")
     }
 
+    /// Simulator-only fallback when `video-max-x/y` is unavailable.
+    /// Caps decoder output via vf scale so software decode stays inside MTLSimDriver limits.
+    private nonisolated func applySimulatorDecoderResolutionCap(mpv: OpaquePointer, profileName: String) {
+        #if targetEnvironment(simulator)
+        let maxW = 1280
+        let maxH = 720
+        // vf 语法在不同 libmpv 版本均较常见；失败则再尝试更简单的 scale 字符串。
+        let candidates = [
+            "lavfi=[scale=w=min(\(maxW),iw):h=min(\(maxH),ih)]",
+            "scale=w=min(\(maxW)\\,iw):h=min(\(maxH)\\,ih)",
+            "scale=\(maxW):\(maxH)",
+        ]
+        for filter in candidates {
+            let status = mpv_set_option_string(mpv, "vf", filter)
+            if status >= 0 {
+                mpvDebugLog(
+                    "setupMPV simulator vf cap applied filter=\(filter) profile=\(profileName)"
+                )
+                recordDiagnosticEvent(
+                    "模拟器分辨率回退",
+                    fields: ["配置": profileName, "滤镜": filter]
+                )
+                return
+            }
+            mpvDebugLog(
+                "setupMPV simulator vf cap failed filter=\(filter) status=\(status) profile=\(profileName)"
+            )
+        }
+        // 最后再限制 demuxer 内存，降低 OOM/崩溃概率（不替代分辨率上限）。
+        _ = mpv_set_option_string(mpv, "demuxer-max-bytes", "32MiB")
+        recordDiagnosticEvent(
+            "模拟器分辨率回退失败",
+            fields: ["配置": profileName]
+        )
+        #endif
+    }
+
     nonisolated func setupMPV(url: URL, profile: MPVSetupProfile) -> Bool {
         var didSetup = false
         performOnMPVQueueSync {
@@ -325,6 +363,9 @@ extension MPVPlayerView {
             destroyMPVHandle(reason: "profile-\(profile.name)-option-\(option.0)-failed", sendStopCommand: false)
             return false
         }
+        // Simulator: large software-decoded frames can crash MoltenVK/XPC
+        // (vkAllocateMemory / _xpc_api_misuse) when video-max-* is missing.
+        applySimulatorDecoderResolutionCap(mpv: mpv, profileName: profile.name)
         configureGPUShaderCache(for: mpv)
 
         checkError(mpv_set_option_string(mpv, "video-rotate", "no"), operation: "set_option video-rotate", notifyOnFailure: false)
