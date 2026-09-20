@@ -63,6 +63,7 @@ enum MPVProperty {
     static let seeking = "seeking"
     static let demuxerCacheState = "demuxer-cache-state"
     static let demuxerCacheTime = "demuxer-cache-time"
+    static let trackListCount = "track-list/count"
     static let timePosition = "time-pos"
     static let duration = "duration"
     static let panscan = "panscan"
@@ -282,6 +283,8 @@ public final class MPVPlayerView: UIView {
     @objc public internal(set) var diagnosticSessionID: UUID?
     // Queue-bound cache used when libmpv has already reported shutdown.
     nonisolated(unsafe) var lastMPVTimeSnapshot: MPVPlaybackTimeSnapshot?
+    /// MPV 队列：未就绪时早期探针节流时间戳。
+    nonisolated(unsafe) var lastEarlyProbeUptime: TimeInterval = 0
     // 仅在 MPV 串行队列上创建/取消；主线程只提交启停意图。
     nonisolated(unsafe) var timeTimer: DispatchSourceTimer?
     // Ready 上报与 profile 回退可跨主线程/MPV 队列读写，统一走 playbackStateLock。

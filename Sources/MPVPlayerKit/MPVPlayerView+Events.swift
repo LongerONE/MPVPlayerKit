@@ -52,6 +52,7 @@ extension MPVPlayerView {
 
     nonisolated func publishTime() {
         guard let update = readMPVPlaybackUpdate() else { return }
+        maybeLogEarlyProbeWhileUnready()
         notifyOnMain {
             self.applyMPVTimeUpdate(update)
         }

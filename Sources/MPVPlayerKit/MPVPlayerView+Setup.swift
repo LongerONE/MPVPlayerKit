@@ -23,7 +23,6 @@ extension MPVPlayerView {
     /// Do not retain an additional unbounded-looking past range while the
     /// player is already using a forward cache.
     nonisolated static let demuxerMaxBackBytes = "0"
-    /// libmpv `MPV_ERROR_OPTION_NOT_FOUND`
     nonisolated static let mpvErrorOptionNotFound: CInt = -5
     /// Simulator / power-saving tuning knobs that may be absent in a given MPVKit build.
     nonisolated static let optionalSetupOptionNames: Set<String> = [
@@ -32,6 +31,7 @@ extension MPVPlayerView {
         "gpu-dumb-mode",
         "vd-lavc-threads",
         "demuxer-hysteresis-secs",
+        "demuxer-lavf-o",
         "cache-on-disk",
         "vf",
     ]
@@ -200,11 +200,18 @@ extension MPVPlayerView {
 
     nonisolated var cacheOptions: [(String, String)] {
         #if targetEnvironment(simulator)
-        // 模拟器内存与 XPC shmem 更紧，前向缓存压到 64MiB；大文件再压到 32MiB 更稳。
-        let demuxerMaxBytes = "32MiB"
+        // 模拟器 GPU/内存更紧，大体积 HTTP MKV 易在 file-loaded 前崩溃。
+        // 关闭前向预读，并限制 lavf 探测窗口，缩短 demuxer 启动峰值。
+        return [
+            (MPVProperty.cache, "no"),
+            (MPVProperty.cacheSeconds, "0"),
+            ("demuxer-hysteresis-secs", "0"),
+            ("cache-on-disk", "no"),
+            ("demuxer-max-bytes", "16MiB"),
+            ("demuxer-max-back-bytes", Self.demuxerMaxBackBytes),
+            ("demuxer-lavf-o", "probesize=524288,analyzeduration=2000000"),
+        ]
         #else
-        let demuxerMaxBytes = Self.demuxerMaxBytes
-        #endif
         return [
             (MPVProperty.cache, cacheConfiguration.isEnabled ? "yes" : "no"),
             // 禁用缓存时下发 0，避免 cache=no 仍携带正数 duration。
@@ -218,12 +225,22 @@ extension MPVPlayerView {
             ),
             ("demuxer-hysteresis-secs", String(cacheConfiguration.demuxerHysteresisSeconds)),
             ("cache-on-disk", "no"),
-            ("demuxer-max-bytes", demuxerMaxBytes),
+            ("demuxer-max-bytes", Self.demuxerMaxBytes),
             ("demuxer-max-back-bytes", Self.demuxerMaxBackBytes),
         ]
+        #endif
     }
 
     nonisolated func applyCacheConfiguration(_ configuration: MPVCacheConfiguration) {
+        #if targetEnvironment(simulator)
+        // 运行时 Temby 仍可能下发 cache=true；模拟器保持关闭，避免大文件回退崩溃。
+        let options = [
+            (MPVProperty.cache, "no"),
+            (MPVProperty.cacheSeconds, "0"),
+            ("demuxer-hysteresis-secs", "0"),
+            ("cache-on-disk", "no"),
+        ]
+        #else
         let options = [
             (MPVProperty.cache, configuration.isEnabled ? "yes" : "no"),
             (
@@ -237,6 +254,7 @@ extension MPVPlayerView {
             ("demuxer-hysteresis-secs", String(configuration.demuxerHysteresisSeconds)),
             ("cache-on-disk", "no"),
         ]
+        #endif
         options.forEach { option in
             let status = command("set", args: [option.0, option.1], checkForErrors: false)
             mpvDebugLog("cache option updated name=\(option.0) status=\(status)")
@@ -279,7 +297,8 @@ extension MPVPlayerView {
             )
         }
         // 最后再限制 demuxer 内存，降低 OOM/崩溃概率（不替代分辨率上限）。
-        _ = mpv_set_option_string(mpv, "demuxer-max-bytes", "32MiB")
+        _ = mpv_set_option_string(mpv, "demuxer-max-bytes", "16MiB")
+        _ = mpv_set_option_string(mpv, "demuxer-lavf-o", "probesize=524288,analyzeduration=2000000")
         recordDiagnosticEvent(
             "模拟器分辨率回退失败",
             fields: ["配置": profileName]
@@ -504,6 +523,7 @@ extension MPVPlayerView {
             return false
         }
         mpvDebugLog("setupMPV profile ready name=\(profile.name)")
+        scheduleEarlyPlaybackProbes()
         return true
     }
 

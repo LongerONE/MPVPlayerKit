@@ -1,4 +1,5 @@
 import AVFoundation
+import QuartzCore
 #if canImport(Libmpv)
 import Libmpv
 #elseif canImport(libmpv)
@@ -8,6 +9,23 @@ import libmpv
 #endif
 
 extension MPVPlayerView {
+    /// 未就绪时早期探针最小间隔。
+    nonisolated static let earlyProbeThrottleSeconds: TimeInterval = 2.0
+
+    /// loadfile 后立刻采样；file-loaded 未到时继续探针（大 MKV 取证）。
+    nonisolated func scheduleEarlyPlaybackProbes() {
+        dispatchPrecondition(condition: .onQueue(queue))
+        logEarlyPlaybackPipelineProbe(reason: "post-loadfile")
+        logPlaybackPipelineDiagnostics(reason: "post-loadfile")
+        ensureVideoTrackSelected(reason: "post-loadfile")
+        for delay in [0.5, 2.0, 5.0, 12.0] as [Double] {
+            queue.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, self.mpv != nil else { return }
+                self.maybeLogEarlyProbeWhileUnready(reason: "post-loadfile-\(delay)s")
+            }
+        }
+    }
+
     nonisolated func getDouble(_ name: String) -> Double {
         guard let mpv else { return 0.0 }
         var data = Double()
@@ -268,6 +286,71 @@ extension MPVPlayerView {
             "强制选中视频轨",
             fields: ["原因": reason, "轨道": String(firstVideoID), "错误码": String(status)]
         )
+    }
+
+    /// file-loaded 前的 demuxer / 轨就绪探针（大体积 HTTP MKV 模拟器崩溃取证）。
+    nonisolated func logEarlyPlaybackPipelineProbe(reason: String) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard mpv != nil else { return }
+        let trackCount = getInt64("track-list/count") ?? -1
+        let duration = getString("duration") ?? "nil"
+        let timePos = getString("time-pos") ?? "nil"
+        let path = getString("path").map { redactedURLDescription(URL(string: $0)) } ?? "nil"
+        let fileFormat = getString("file-format") ?? "nil"
+        let demuxViaNetwork = getString("demuxer-via-network") ?? "nil"
+        let demuxerCacheTime = getString("demuxer-cache-time") ?? "nil"
+        let demuxerCacheDuration = getString("demuxer-cache-duration") ?? "nil"
+        let cacheSpeed = getString("cache-speed") ?? "nil"
+        let pausedForCache = getString("paused-for-cache") ?? "nil"
+        let bufferingState = getString("cache-buffering-state") ?? "nil"
+        let coreIdle = getString("core-idle") ?? "nil"
+        let pause = getString("pause") ?? "nil"
+        let vid = getString("vid") ?? "nil"
+        let aid = getString("aid") ?? "nil"
+        let vo = getString("vo") ?? "nil"
+        mpvDebugLog(
+            "earlyProbe reason=\(reason) tracks=\(trackCount) duration=\(duration) time=\(timePos) "
+                + "path=\(path) format=\(fileFormat) demuxNet=\(demuxViaNetwork) "
+                + "demuxCacheTime=\(demuxerCacheTime) demuxCacheDur=\(demuxerCacheDuration) "
+                + "cacheSpeed=\(cacheSpeed) pausedForCache=\(pausedForCache) "
+                + "bufferingState=\(bufferingState) coreIdle=\(coreIdle) pause=\(pause) "
+                + "vid=\(vid) aid=\(aid) vo=\(vo)"
+        )
+        recordDiagnosticEvent(
+            "早期管线探针",
+            fields: [
+                "原因": reason,
+                "轨道数": String(trackCount),
+                "时长": duration,
+                "路径": path,
+                "容器": fileFormat,
+                "网络demux": demuxViaNetwork,
+                "缓存时间": demuxerCacheTime,
+                "缓冲": bufferingState,
+            ]
+        )
+    }
+
+    /// duration/track 就绪前按节流输出探针，避免只在 file-loaded 才有日志。
+    nonisolated func maybeLogEarlyProbeWhileUnready(reason: String = "unready-poll") {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard mpv != nil else { return }
+        let duration = getDouble(MPVProperty.duration)
+        let trackCount = Int(getInt64("track-list/count") ?? 0)
+        let isReady = duration > 0 && trackCount > 0
+        if isReady {
+            lastEarlyProbeUptime = 0
+            return
+        }
+        let now = CACurrentMediaTime()
+        let last = lastEarlyProbeUptime
+        if last > 0, (now - last) < Self.earlyProbeThrottleSeconds {
+            return
+        }
+        lastEarlyProbeUptime = now
+        logEarlyPlaybackPipelineProbe(reason: reason)
+        logPlaybackPipelineDiagnostics(reason: reason)
+        ensureVideoTrackSelected(reason: reason)
     }
 
     /// Snapshot vo / track / decoded frame path for black-screen diagnosis.
