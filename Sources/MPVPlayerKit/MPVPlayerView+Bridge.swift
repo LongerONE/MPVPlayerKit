@@ -331,8 +331,16 @@ extension MPVPlayerView {
     }
 
     nonisolated func mpvDebugLog(_ message: @autoclosure () -> String) {
-        // 历史自由文本包含地址、字体文件名等，不再输出或求值。
-        // 使用 PowerDiagnostics 的白名单事件，避免隐私泄漏和高频字符串构造。
+        // Release 默认关闭。DEBUG 默认开启；可用 UserDefaults `MPVPlayerKit.debugLog` 覆盖。
+        #if DEBUG
+        let enabled = UserDefaults.standard.object(forKey: "MPVPlayerKit.debugLog") != nil
+            ? UserDefaults.standard.bool(forKey: "MPVPlayerKit.debugLog")
+            : true
+        #else
+        let enabled = UserDefaults.standard.bool(forKey: "MPVPlayerKit.debugLog")
+        #endif
+        guard enabled else { return }
+        NSLog("[MPV][Diag] %@", message())
     }
 
     nonisolated func notifyState(_ state: MPVPlayerState) {
