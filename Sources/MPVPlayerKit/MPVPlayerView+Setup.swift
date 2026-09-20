@@ -23,6 +23,17 @@ extension MPVPlayerView {
     /// Do not retain an additional unbounded-looking past range while the
     /// player is already using a forward cache.
     nonisolated static let demuxerMaxBackBytes = "0"
+    /// libmpv `MPV_ERROR_OPTION_NOT_FOUND`
+    nonisolated static let mpvErrorOptionNotFound: CInt = -5
+    /// Simulator / power-saving tuning knobs that may be absent in a given MPVKit build.
+    nonisolated static let optionalSetupOptionNames: Set<String> = [
+        "video-max-x",
+        "video-max-y",
+        "gpu-dumb-mode",
+        "vd-lavc-threads",
+        "demuxer-hysteresis-secs",
+        "cache-on-disk",
+    ]
 
     nonisolated static func safeDecodeOptions(
         hardwareDecodeMethod: String
@@ -138,6 +149,7 @@ extension MPVPlayerView {
         // 模拟器仅有软件解码；4K/HEVC 帧经 libplacebo PBO 上传时，
         // MoltenVK 的 host-visible MTLBuffer 分配会撞上 XPC shmem 限制。
         // 限制解码输出并降到省电缩放器，避免 vo_thread 内 vkAllocateMemory 崩溃。
+        // 注：video-max-x/y 在部分 MPVKit/libmpv 构建中不存在（-5），见 optionalSetupOptionNames。
         return colorOptions + [
             ("gpu-dumb-mode", "yes"),
             ("video-max-x", "1920"),
@@ -289,14 +301,29 @@ extension MPVPlayerView {
         }
 
         for option in profile.options {
-            guard checkError(
-                mpv_set_option_string(mpv, option.0, option.1),
+            let status = mpv_set_option_string(mpv, option.0, option.1)
+            if checkError(
+                status,
                 operation: "set_option \(option.0)=\(option.1)",
                 notifyOnFailure: false
-            ) else {
-                destroyMPVHandle(reason: "profile-\(profile.name)-option-\(option.0)-failed", sendStopCommand: false)
-                return false
+            ) {
+                continue
             }
+            // MPVKit / libmpv builds may not expose every tuning option
+            // (e.g. video-max-x → MPV_ERROR_OPTION_NOT_FOUND = -5 on iOS 27 / iPhone Duo).
+            // Missing optional options must not abort the whole profile.
+            if Self.optionalSetupOptionNames.contains(option.0) || status == Self.mpvErrorOptionNotFound {
+                mpvDebugLog(
+                    "setupMPV optional option skipped name=\(option.0) value=\(option.1) status=\(status)"
+                )
+                recordDiagnosticEvent(
+                    "跳过可选选项",
+                    fields: ["选项": option.0, "错误码": String(status), "配置": profile.name]
+                )
+                continue
+            }
+            destroyMPVHandle(reason: "profile-\(profile.name)-option-\(option.0)-failed", sendStopCommand: false)
+            return false
         }
         configureGPUShaderCache(for: mpv)
 
