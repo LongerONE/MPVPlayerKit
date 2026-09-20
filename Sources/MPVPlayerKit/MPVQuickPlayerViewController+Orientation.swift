@@ -290,14 +290,15 @@ extension MPVQuickPlayerViewController {
     func updatePlaybackControlSafeAreaInsets() {
         guard isViewLoaded else { return }
         let usesManualLandscape = isUsingManualLandscape && isLandscapeForced
-        updatePlaybackControlLayout(isCompact: usesManualLandscape)
+        updatePlaybackControlLayout(isCompact: usesManualLandscape || isHingeCompact)
         let insets = Self.playbackControlHorizontalInsets(
             rootBounds: view.bounds,
             rootSafeAreaInsets: view.safeAreaInsets,
             usesManualLandscape: usesManualLandscape
         )
-        let chromeLeading = insets.left + additionalChromeInsets.leading
-        let chromeTrailing = insets.right + additionalChromeInsets.trailing
+        let reserved = duoReservedHorizontalPadding()
+        let chromeLeading = insets.left + additionalChromeInsets.leading + reserved.leading
+        let chromeTrailing = insets.right + additionalChromeInsets.trailing + reserved.trailing
         closeButtonLeadingConstraint?.constant = 12 + chromeLeading
         statusLabelTrailingConstraint?.constant = -(12 + chromeTrailing)
         transportStackLeadingConstraint?.constant = 12 + chromeLeading

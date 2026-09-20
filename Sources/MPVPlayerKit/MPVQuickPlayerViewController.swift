@@ -30,6 +30,9 @@ public final class MPVQuickPlayerViewController: UIViewController {
     }
     /// Extra chrome insets beyond safe area (e.g. system vertical bar channel).
     public private(set) var additionalChromeInsets: MPVPlayerChromeInsets = .zero
+    /// Compact chrome when iPhone Duo hinge is partially folded.
+    var isHingeCompact = false
+    var hingeInteraction: AnyObject?
     public internal(set) var playbackRate = 1.0
     public internal(set) var videoQuality: MPVVideoQuality
     public internal(set) var debandEnabled: Bool
@@ -196,6 +199,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         configureLayout()
         configureGestures()
         applyOrientationPolicy()
+        installDuoHingeObservationIfNeeded()
         updatePlaybackControlSafeAreaInsets()
     }
 

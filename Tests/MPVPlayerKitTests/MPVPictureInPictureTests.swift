@@ -58,7 +58,7 @@ final class MPVPictureInPictureTests: XCTestCase {
         let playerView = MPVPlayerView(frame: CGRect(x: 0, y: 0, width: 393, height: 852))
         playerView.updateMetalLayerGeometry(
             for: playerView.bounds,
-            scale: UIScreen.main.nativeScale,
+            scale: 3.0,
             transitionReason: "test",
             animated: false
         )
@@ -257,7 +257,7 @@ final class MPVPictureInPictureTests: XCTestCase {
         let playerView = MPVPlayerView(frame: CGRect(x: 0, y: 0, width: 390, height: 844))
         playerView.updateMetalLayerGeometry(
             for: playerView.bounds,
-            scale: UIScreen.main.nativeScale,
+            scale: 3.0,
             transitionReason: "test",
             animated: false
         )
