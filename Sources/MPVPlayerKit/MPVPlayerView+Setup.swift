@@ -202,6 +202,7 @@ extension MPVPlayerView {
         #if targetEnvironment(simulator)
         // 模拟器 GPU/内存更紧，大体积 HTTP MKV 易在 file-loaded 前崩溃。
         // 关闭前向预读，并限制 lavf 探测窗口，缩短 demuxer 启动峰值。
+        // probesize 取 2MiB：过小（如 512KiB）可能扫不到 MKV Tracks，file-loaded 永不触发。
         return [
             (MPVProperty.cache, "no"),
             (MPVProperty.cacheSeconds, "0"),
@@ -209,7 +210,7 @@ extension MPVPlayerView {
             ("cache-on-disk", "no"),
             ("demuxer-max-bytes", "16MiB"),
             ("demuxer-max-back-bytes", Self.demuxerMaxBackBytes),
-            ("demuxer-lavf-o", "probesize=524288,analyzeduration=2000000"),
+            ("demuxer-lavf-o", "probesize=2097152,analyzeduration=3000000"),
         ]
         #else
         return [
@@ -298,7 +299,7 @@ extension MPVPlayerView {
         }
         // 最后再限制 demuxer 内存，降低 OOM/崩溃概率（不替代分辨率上限）。
         _ = mpv_set_option_string(mpv, "demuxer-max-bytes", "16MiB")
-        _ = mpv_set_option_string(mpv, "demuxer-lavf-o", "probesize=524288,analyzeduration=2000000")
+        _ = mpv_set_option_string(mpv, "demuxer-lavf-o", "probesize=2097152,analyzeduration=3000000")
         recordDiagnosticEvent(
             "模拟器分辨率回退失败",
             fields: ["配置": profileName]

@@ -263,10 +263,15 @@ extension MPVPlayerView {
     @objc public func mediaTracks(_ options: NSDictionary) -> NSArray {
         let requestedType = options["mediaType"] as? String
         let tracks = cachedMediaTracks(mediaType: requestedType)
-        let summary = tracks.map { track in
-            "id=\(track["trackID"] ?? "?") type=\(track["mpvType"] ?? "?") name=\(track["name"] ?? "?") selected=\(track["isEnabled"] ?? false)"
-        }.joined(separator: " | ")
-        mpvDebugLog("mediaTracks requested=\(requestedType ?? "<all>") count=\(tracks.count) tracks=[\(summary)]")
+        // Temby 在 file-loaded 前会空轨轮询；数量未变时不刷日志，避免淹没 earlyProbe。
+        let signature = "\(requestedType ?? "<all>")|\(tracks.count)"
+        if signature != lastMediaTracksLogSignature {
+            lastMediaTracksLogSignature = signature
+            let summary = tracks.map { track in
+                "id=\(track["trackID"] ?? "?") type=\(track["mpvType"] ?? "?") name=\(track["name"] ?? "?") selected=\(track["isEnabled"] ?? false)"
+            }.joined(separator: " | ")
+            mpvDebugLog("mediaTracks requested=\(requestedType ?? "<all>") count=\(tracks.count) tracks=[\(summary)]")
+        }
         return tracks as NSArray
     }
 
