@@ -39,10 +39,11 @@ extension MPVPlayerView {
     nonisolated static let simulatorResolutionLimitFilter =
         "scale=1280:720"
     /// Preferred runtime vf candidates when option-stage `vf` cannot be applied.
+    /// Simpler native scale first — lavfi may leave HEVC track unselected / vo empty on simulator.
     nonisolated static let simulatorResolutionLimitCandidates = [
-        "lavfi=[scale=w=min(1280,iw):h=min(720,ih)]",
-        "scale=w=min(1280\\,iw):h=min(720\\,ih)",
         "scale=1280:720",
+        "scale=w=min(1280\\,iw):h=min(720\\,ih)",
+        "lavfi=[scale=w=min(1280,iw):h=min(720,ih)]",
     ]
 
     nonisolated static func safeDecodeOptions(

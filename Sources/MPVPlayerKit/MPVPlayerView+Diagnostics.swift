@@ -231,6 +231,68 @@ extension MPVPlayerView {
         subtitleTextCacheLock.unlock()
     }
 
+    /// If the first video track exists but is not selected, force `vid` so audio-only
+    /// playback does not leave a black canvas (seen on iPhone Duo simulator + HEVC).
+    nonisolated func ensureVideoTrackSelected(reason: String) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard mpv != nil else { return }
+        let count = Int(getInt64("track-list/count") ?? 0)
+        var firstVideoID: Int64?
+        var selectedVideoID: Int64?
+        for index in 0..<count {
+            guard getString("track-list/\(index)/type") == "video" else { continue }
+            let trackID = getInt64("track-list/\(index)/id")
+            if firstVideoID == nil {
+                firstVideoID = trackID
+            }
+            if getFlag("track-list/\(index)/selected") == true {
+                selectedVideoID = trackID
+            }
+        }
+        let vidProperty = getString("vid") ?? "nil"
+        if selectedVideoID != nil {
+            mpvDebugLog(
+                "ensureVideoTrack reason=\(reason) ok selected=\(selectedVideoID!) vid=\(vidProperty) count=\(count)"
+            )
+            return
+        }
+        guard let firstVideoID else {
+            mpvDebugLog("ensureVideoTrack reason=\(reason) noVideoTrack count=\(count) vid=\(vidProperty)")
+            return
+        }
+        let status = command("set", args: [MPVProperty.videoID, "\(firstVideoID)"], checkForErrors: false)
+        mpvDebugLog(
+            "ensureVideoTrack reason=\(reason) forceSet vid=\(firstVideoID) status=\(status) previous=\(vidProperty) count=\(count)"
+        )
+        recordDiagnosticEvent(
+            "强制选中视频轨",
+            fields: ["原因": reason, "轨道": String(firstVideoID), "错误码": String(status)]
+        )
+    }
+
+    /// Snapshot vo / track / decoded frame path for black-screen diagnosis.
+    nonisolated func logPlaybackPipelineDiagnostics(reason: String) {
+        dispatchPrecondition(condition: .onQueue(queue))
+        guard mpv != nil else { return }
+        let vid = getString("vid") ?? "nil"
+        let aid = getString("aid") ?? "nil"
+        let vo = getString("vo") ?? "nil"
+        let paused = getString("pause") ?? "nil"
+        let timePos = getString("time-pos") ?? "nil"
+        let duration = getString("duration") ?? "nil"
+        let codec = getString("video-codec") ?? "nil"
+        let format = getString("video-format") ?? "nil"
+        let width = getString("video-params/w") ?? getString("video-out-params/dw") ?? "nil"
+        let height = getString("video-params/h") ?? getString("video-out-params/dh") ?? "nil"
+        let pixfmt = getString("video-params/pixelformat") ?? "nil"
+        let hwdec = getString("hwdec-current") ?? getString("hwdec") ?? "nil"
+        mpvDebugLog(
+            "pipeline reason=\(reason) vid=\(vid) aid=\(aid) vo=\(vo) pause=\(paused) "
+                + "time=\(timePos) duration=\(duration) codec=\(codec) format=\(format) "
+                + "size=\(width)x\(height) pixfmt=\(pixfmt) hwdec=\(hwdec)"
+        )
+    }
+
     nonisolated func readMediaTracks(mediaType requestedType: String?) -> [[String: Any]] {
         guard let count = getInt64("track-list/count"), count > 0 else {
             return []

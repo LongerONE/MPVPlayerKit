@@ -74,7 +74,9 @@ extension MPVPlayerView {
                         "event file-loaded profile=\(self.activeProfileDescription)"
                     )
                     self.markBufferingFileLoaded()
+                    self.ensureVideoTrackSelected(reason: "file-loaded")
                     self.refreshMediaTracksCache()
+                    self.logPlaybackPipelineDiagnostics(reason: "file-loaded")
                     self.refreshPictureInPictureVideoDisplaySize()
                     self.refreshVideoDisplayAspectRatio()
                     self.publishDurationIfNewlyKnown()
@@ -88,6 +90,8 @@ extension MPVPlayerView {
                     self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-begin")
                     self.refreshDecoderModeAfterPlaybackRestart()
                     self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-end")
+                    self.ensureVideoTrackSelected(reason: "playback-restart")
+                    self.logPlaybackPipelineDiagnostics(reason: "playback-restart")
                     self.refreshPictureInPictureVideoDisplaySize()
                     self.refreshVideoDisplayAspectRatio()
                     self.mpvDebugLog("event playback-restart stage=end")
@@ -100,6 +104,8 @@ extension MPVPlayerView {
                         "event video-reconfig current=\(currentTime) duration=\(duration) "
                             + "playing=\(isPlaying)"
                     )
+                    self.ensureVideoTrackSelected(reason: "video-reconfig")
+                    self.logPlaybackPipelineDiagnostics(reason: "video-reconfig")
                     self.refreshPictureInPictureVideoDisplaySize()
                     self.refreshVideoDisplayAspectRatio()
                 case MPV_EVENT_END_FILE:
