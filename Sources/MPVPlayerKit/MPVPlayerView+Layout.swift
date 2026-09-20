@@ -199,13 +199,16 @@ extension MPVPlayerView {
 
     private func ensureStableMetalCanvas() {
         guard stableMetalCanvas == nil else { return }
-        let screen = window?.windowScene?.screen ?? UIScreen.main
-        let screenBounds = screen.bounds
+        // Prefer the hosting scene's screen. On dual-display devices `UIScreen.main`
+        // is ambiguous and must not be used as a layout fallback.
+        let sceneScreen = window?.windowScene?.screen
+        let screenBounds = sceneScreen?.bounds
+            ?? CGRect(origin: .zero, size: bounds.size)
         let logicalSize = CGSize(
             width: max(screenBounds.width, screenBounds.height),
             height: min(screenBounds.width, screenBounds.height)
         )
-        var scale = max(screen.nativeScale, 1.0)
+        var scale = max(sceneScreen?.nativeScale ?? traitCollection.displayScale, 1.0)
         #if targetEnvironment(simulator)
         // 模拟器 MTLSimDriver 经 XPC 共享内存创建 MTLBuffer；全尺寸 3x
         // 画布会让 MoltenVK 在 pl_tex_upload_pbo 分配超大 host-visible

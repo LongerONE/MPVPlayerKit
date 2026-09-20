@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* AppDelegate.swift */; };
+		A10000000000000000000015 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* SceneDelegate.swift */; };
 		A10000000000000000000003 /* MPVPlayerKit in Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000004 /* MPVPlayerKit */; };
 		E9366F05303D97C9008E41DE /* MPVPlayerKit in Embed Frameworks */ = {isa = PBXBuildFile; productRef = A10000000000000000000004 /* MPVPlayerKit */; settings = {ATTRIBUTES = (CodeSignOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -28,6 +29,7 @@
 
 /* Begin PBXFileReference section */
 		A10000000000000000000002 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A10000000000000000000016 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		A10000000000000000000005 /* MPVPlayerKitDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MPVPlayerKitDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -55,6 +57,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000002 /* AppDelegate.swift */,
+				A10000000000000000000016 /* SceneDelegate.swift */,
 			);
 			path = MPVPlayerKitDemo;
 			sourceTree = "<group>";
@@ -143,6 +146,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A10000000000000000000001 /* AppDelegate.swift in Sources */,
+				A10000000000000000000015 /* SceneDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

@@ -24,6 +24,12 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public var autoplay: Bool
     public var gestureOptions: MPVQuickPlayerGestureOptions = .all
     public internal(set) var isLandscapeForced: Bool
+    /// Orientation policy for resizable displays (iPhone Duo). Default keeps the optional force-landscape control.
+    public var orientationPolicy: MPVOrientationPolicy = .optionalForceLandscape {
+        didSet { applyOrientationPolicy() }
+    }
+    /// Extra chrome insets beyond safe area (e.g. system vertical bar channel).
+    public private(set) var additionalChromeInsets: MPVPlayerChromeInsets = .zero
     public internal(set) var playbackRate = 1.0
     public internal(set) var videoQuality: MPVVideoQuality
     public internal(set) var debandEnabled: Bool
@@ -143,6 +149,15 @@ public final class MPVQuickPlayerViewController: UIViewController {
         try player.setSubtitleFont(from: url)
     }
 
+    /// Injects host-side chrome padding (safe-area side channel) into playback controls.
+    public func setAdditionalChromeInsets(_ insets: MPVPlayerChromeInsets) {
+        additionalChromeInsets = insets
+        guard isViewLoaded else { return }
+        updatePlaybackControlSafeAreaInsets()
+        actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+    }
+
     public func resetSubtitleFont() {
         player.resetSubtitleFont()
     }
@@ -180,6 +195,8 @@ public final class MPVQuickPlayerViewController: UIViewController {
         configureViews()
         configureLayout()
         configureGestures()
+        applyOrientationPolicy()
+        updatePlaybackControlSafeAreaInsets()
     }
 
     public override func viewDidAppear(_ animated: Bool) {
@@ -196,6 +213,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         layoutOrientationContentView()
         layoutPresentedViewControllerInPlayerOrientation()
         updatePlaybackControlSafeAreaInsets()
+        updateOrientationButtonVisibility()
         actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
         cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }

@@ -3,6 +3,11 @@ import UIKit
 import UniformTypeIdentifiers
 
 extension MPVQuickPlayerViewController {
+    /// Screen that currently hosts this player; nil when not in a window yet.
+    var brightnessScreen: UIScreen? {
+        view.window?.windowScene?.screen
+    }
+
     @objc func handlePinchGesture(_ gesture: UIPinchGestureRecognizer) {
         switch gesture.state {
         case .began:
@@ -31,7 +36,7 @@ extension MPVQuickPlayerViewController {
             panStartLocation = gesture.location(in: contentView)
             panStartTime = player.currentTime
             panTargetTime = panStartTime
-            panStartBrightness = UIScreen.main.brightness
+            panStartBrightness = brightnessScreen?.brightness ?? 0
             panStartVolume = systemVolumeSlider?.value ?? 0
         case .changed:
             if panDirection == .none {
@@ -93,7 +98,8 @@ extension MPVQuickPlayerViewController {
                 translationY: translation.y,
                 viewHeight: contentView.bounds.height
             )
-            UIScreen.main.brightness = value
+            guard let brightnessScreen else { return }
+            brightnessScreen.brightness = value
             showGestureHUD(
                 icon: .brightness,
                 text: "\(Int((value * 100).rounded()))%",

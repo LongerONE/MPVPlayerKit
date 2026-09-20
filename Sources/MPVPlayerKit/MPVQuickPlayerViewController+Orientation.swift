@@ -30,12 +30,11 @@ extension MPVQuickPlayerViewController {
     }
 
     static var applicationSupportsLandscape: Bool {
-        let deviceSpecificKey = UIDevice.current.userInterfaceIdiom == .pad
-            ? "UISupportedInterfaceOrientations~ipad"
-            : "UISupportedInterfaceOrientations"
-        let orientationNames = Bundle.main.object(forInfoDictionaryKey: deviceSpecificKey) as? [String]
-            ?? Bundle.main.object(forInfoDictionaryKey: "UISupportedInterfaceOrientations") as? [String]
-        return supportsLandscape(orientationNames: orientationNames)
+        // Dual-display / foldable devices are not reliably described by a single
+        // idiom-specific Info.plist key. Merge both declarations.
+        let phone = Bundle.main.object(forInfoDictionaryKey: "UISupportedInterfaceOrientations") as? [String]
+        let pad = Bundle.main.object(forInfoDictionaryKey: "UISupportedInterfaceOrientations~ipad") as? [String]
+        return supportsLandscape(orientationNames: phone) || supportsLandscape(orientationNames: pad)
     }
 
     static func supportsLandscape(orientationNames: [String]?) -> Bool {
@@ -62,10 +61,51 @@ extension MPVQuickPlayerViewController {
             restoreManualLandscape()
             requestInterfaceOrientation(forced ? .landscapeRight : .portrait)
         }
+        updateOrientationButtonVisibility()
     }
 
     @objc func toggleForcedLandscape() {
         setForceLandscape(isLandscapeForced == false)
+    }
+
+    func applyOrientationPolicy() {
+        guard isViewLoaded else { return }
+        if orientationPolicy == .followPose {
+            if isLandscapeForced {
+                setForceLandscape(false)
+            } else {
+                isUsingManualLandscape = false
+                updateOrientationButtonVisibility()
+                invalidateSupportedInterfaceOrientations()
+            }
+        } else {
+            updateOrientationButtonVisibility()
+        }
+    }
+
+    /// Force-landscape control is only offered when policy allows it, the app
+    /// declares landscape, and the current surface is not already wide (Duo inner).
+    func shouldOfferForceLandscape() -> Bool {
+        guard orientationPolicy == .optionalForceLandscape else { return false }
+        guard Self.applicationSupportsLandscape else { return false }
+        let bounds = view.bounds
+        if bounds.width > 0, bounds.width >= bounds.height,
+           traitCollection.horizontalSizeClass == .regular {
+            return false
+        }
+        return true
+    }
+
+    func updateOrientationButtonVisibility() {
+        guard isViewLoaded else { return }
+        let offered = shouldOfferForceLandscape()
+        orientationButton.isHidden = offered == false
+        if offered == false, isLandscapeForced {
+            // Wide regular surfaces (Duo opened) already give horizontal canvas.
+            setForceLandscape(false)
+        } else {
+            updateOrientationButton()
+        }
     }
 
     func applyPreferredOrientationIfNeeded() {
@@ -94,16 +134,21 @@ extension MPVQuickPlayerViewController {
 
         if #available(iOS 16.0, *) {
             let mask: UIInterfaceOrientationMask = orientation == .portrait ? .portrait : .landscapeRight
-            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { [weak self] _ in
-                guard orientation != .portrait else { return }
+            // errorHandler fires only when the geometry update fails.
+            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { [weak self] error in
                 DispatchQueue.main.async { [weak self] in
-                    guard let self, isLandscapeForced else { return }
-                    isUsingManualLandscape = true
-                    invalidateSupportedInterfaceOrientations()
-                    applyManualLandscape()
+                    guard let self else { return }
+                    // Never fall back to private orientation APIs; restore follow-pose instead.
+                    isUsingManualLandscape = false
+                    if isLandscapeForced, orientation != .portrait {
+                        isLandscapeForced = false
+                        invalidateSupportedInterfaceOrientations()
+                        updateOrientationButtonVisibility()
+                    }
                 }
             }
         } else {
+            // Legacy systems only. iOS 27 / iPhone Duo never take this path.
             UIDevice.current.setValue(orientation.rawValue, forKey: "orientation")
             UIViewController.attemptRotationToDeviceOrientation()
         }
@@ -147,10 +192,16 @@ extension MPVQuickPlayerViewController {
     /// Manual landscape rotates the content view while its host remains portrait,
     /// so the root's four edges need to be mapped before Auto Layout runs.
     func playerOrientationSafeAreaInsets() -> UIEdgeInsets {
-        Self.playerOrientationSafeAreaInsets(
+        let base = Self.playerOrientationSafeAreaInsets(
             rootBounds: view.bounds,
             rootSafeAreaInsets: view.safeAreaInsets,
             usesManualLandscape: isUsingManualLandscape && isLandscapeForced
+        )
+        return UIEdgeInsets(
+            top: base.top + additionalChromeInsets.top,
+            left: base.left + additionalChromeInsets.leading,
+            bottom: base.bottom + additionalChromeInsets.bottom,
+            right: base.right + additionalChromeInsets.trailing
         )
     }
 
@@ -245,10 +296,12 @@ extension MPVQuickPlayerViewController {
             rootSafeAreaInsets: view.safeAreaInsets,
             usesManualLandscape: usesManualLandscape
         )
-        closeButtonLeadingConstraint?.constant = 12 + insets.left
-        statusLabelTrailingConstraint?.constant = -(12 + insets.right)
-        transportStackLeadingConstraint?.constant = 12 + insets.left
-        progressSliderTrailingConstraint?.constant = -(12 + insets.right)
+        let chromeLeading = insets.left + additionalChromeInsets.leading
+        let chromeTrailing = insets.right + additionalChromeInsets.trailing
+        closeButtonLeadingConstraint?.constant = 12 + chromeLeading
+        statusLabelTrailingConstraint?.constant = -(12 + chromeTrailing)
+        transportStackLeadingConstraint?.constant = 12 + chromeLeading
+        progressSliderTrailingConstraint?.constant = -(12 + chromeTrailing)
         closeButtonTopSafeAreaConstraint?.isActive = usesManualLandscape == false
         closeButtonTopEdgeConstraint?.isActive = usesManualLandscape
         trackButtonStackBottomSafeAreaConstraint?.isActive = usesManualLandscape == false
