@@ -32,6 +32,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     public private(set) var additionalChromeInsets: MPVPlayerChromeInsets = .zero
     /// Compact chrome when iPhone Duo hinge is partially folded.
     var isHingeCompact = false
+    /// Opaque slot for a future hinge interaction; holds `true` once installation is attempted.
     var hingeInteraction: AnyObject?
     public internal(set) var playbackRate = 1.0
     public internal(set) var videoQuality: MPVVideoQuality
