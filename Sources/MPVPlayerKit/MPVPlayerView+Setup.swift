@@ -33,6 +33,16 @@ extension MPVPlayerView {
         "vd-lavc-threads",
         "demuxer-hysteresis-secs",
         "cache-on-disk",
+        "vf",
+    ]
+    /// Portable resolution cap for simulator (video-max-x/y unavailable in MPVKit 1.0.0).
+    nonisolated static let simulatorResolutionLimitFilter =
+        "scale=1280:720"
+    /// Preferred runtime vf candidates when option-stage `vf` cannot be applied.
+    nonisolated static let simulatorResolutionLimitCandidates = [
+        "lavfi=[scale=w=min(1280,iw):h=min(720,ih)]",
+        "scale=w=min(1280\\,iw):h=min(720\\,ih)",
+        "scale=1280:720",
     ]
 
     nonisolated static func safeDecodeOptions(
@@ -148,13 +158,11 @@ extension MPVPlayerView {
         #if targetEnvironment(simulator)
         // 模拟器仅有软件解码；4K/HEVC 帧经 libplacebo PBO 上传时，
         // MoltenVK 的 host-visible MTLBuffer 分配会撞上 XPC shmem 限制。
-        // 限制解码输出并降到省电缩放器，避免 vo_thread 内 vkAllocateMemory 崩溃。
-        // 注：video-max-x/y 在部分 MPVKit/libmpv 构建中不存在（-5），
-        // setup 会尝试 vf scale 回退（见 applySimulatorDecoderResolutionCap）。
+        // MPVKit 1.0.0 无 video-max-x/y（-5），改用标准 vf scale 限流，
+        // setup 阶段 applySimulatorDecoderResolutionCap 会再兜底尝试。
         return colorOptions + [
             ("gpu-dumb-mode", "yes"),
-            ("video-max-x", "1280"),
-            ("video-max-y", "720"),
+            ("vf", Self.simulatorResolutionLimitFilter),
             ("vd-lavc-threads", "2"),
         ] + MPVVideoQualityPreset.powerSaving.options + videoRenderOptions
         #else
@@ -191,8 +199,8 @@ extension MPVPlayerView {
 
     nonisolated var cacheOptions: [(String, String)] {
         #if targetEnvironment(simulator)
-        // 模拟器内存与 XPC shmem 更紧，前向缓存压到 64MiB。
-        let demuxerMaxBytes = "64MiB"
+        // 模拟器内存与 XPC shmem 更紧，前向缓存压到 64MiB；大文件再压到 32MiB 更稳。
+        let demuxerMaxBytes = "32MiB"
         #else
         let demuxerMaxBytes = Self.demuxerMaxBytes
         #endif
@@ -252,14 +260,7 @@ extension MPVPlayerView {
     /// Caps decoder output via vf scale so software decode stays inside MTLSimDriver limits.
     private nonisolated func applySimulatorDecoderResolutionCap(mpv: OpaquePointer, profileName: String) {
         #if targetEnvironment(simulator)
-        let maxW = 1280
-        let maxH = 720
-        // vf 语法在不同 libmpv 版本均较常见；失败则再尝试更简单的 scale 字符串。
-        let candidates = [
-            "lavfi=[scale=w=min(\(maxW),iw):h=min(\(maxH),ih)]",
-            "scale=w=min(\(maxW)\\,iw):h=min(\(maxH)\\,ih)",
-            "scale=\(maxW):\(maxH)",
-        ]
+        let candidates = Self.simulatorResolutionLimitCandidates
         for filter in candidates {
             let status = mpv_set_option_string(mpv, "vf", filter)
             if status >= 0 {
@@ -402,6 +403,27 @@ extension MPVPlayerView {
             destroyMPVHandle(reason: "profile-\(profile.name)-initialize-failed", sendStopCommand: false)
             return false
         }
+        #if targetEnvironment(simulator)
+        // 初始化后再次确保限流生效（option 阶段若 vf 被跳过，这里用 runtime property 补上）。
+        var vfStatus: CInt = -1
+        for filter in Self.simulatorResolutionLimitCandidates {
+            vfStatus = command("set", args: ["vf", filter], checkForErrors: false)
+            mpvDebugLog("setupMPV simulator vf runtime apply status=\(vfStatus) filter=\(filter)")
+            if vfStatus >= 0 {
+                recordDiagnosticEvent(
+                    "模拟器限流生效",
+                    fields: ["滤镜": filter, "配置": profile.name]
+                )
+                break
+            }
+        }
+        if vfStatus < 0 {
+            recordDiagnosticEvent(
+                "模拟器限流失败",
+                fields: ["错误码": String(vfStatus), "配置": profile.name]
+            )
+        }
+        #endif
         // Some libmpv builds accept subtitle styling only as pre-initialization
         // options, but do not apply the font size to a newly added text track.
         // Reapply the cached values as runtime properties so the first SRT load
