@@ -8,7 +8,6 @@ import libmpv
 #else
 #error("MPVPlayerKit requires MPVKit's Libmpv module.")
 #endif
-
 extension MPVPlayerView {
     /// Keep decoded VideoToolbox surfaces on the GPU path first. The copy
     /// profile remains available because some libmpv/MoltenVK combinations
@@ -48,7 +47,6 @@ extension MPVPlayerView {
         "scale=w=min(1280\\,iw):h=min(720\\,ih)",
         "lavfi=[scale=w=min(1280,iw):h=min(720,ih)]",
     ]
-
     nonisolated static func safeDecodeOptions(
         hardwareDecodeMethod: String
     ) -> [(String, String)] {
@@ -76,8 +74,7 @@ extension MPVPlayerView {
         // Allocate the renderer surface before libmpv receives `wid`. The
         // surface remains fixed while UIKit animates portrait/landscape.
         prepareStableMetalCanvasForRendererSetup()
-
-        while true {
+        while !isStopped() {
             prepareProfilesForNextRenderer()
             let profile = activeSetupProfileSnapshot()
             guard profile.index < profile.count,
@@ -90,11 +87,10 @@ extension MPVPlayerView {
                 profile.index + 1
             )
         }
-
+        guard !isStopped() else { return }
         mpvDebugLog("setupMPV exhausted all profiles")
         failSetup()
     }
-
     nonisolated func prepareProfilesForNextRenderer() {
         // Reserve the renderer slot before reading options. Screen changes
         // after this point become pending instead of mutating CAMetalLayer
@@ -110,14 +106,12 @@ extension MPVPlayerView {
             activeProfileIndex: index
         )
     }
-
     nonisolated func makeSetupProfiles() -> [MPVSetupProfile] {
         #if targetEnvironment(simulator)
         let hardwareDecode = "no"
         #else
         let hardwareDecode = Self.deviceHardwareDecodeMethod
         #endif
-
         let softwareDecodeOptions = Self.safeDecodeOptions(
             hardwareDecodeMethod: "no"
         )
@@ -346,7 +340,10 @@ extension MPVPlayerView {
         let originalURL = url.absoluteString
         let loadURL: String
         if MPVHLSMasterResolver.needsResolution(url) {
-            let resolved = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url)
+            let resolved = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url) { [weak self] in
+                self?.isStopped() != false
+            }
+            guard !isStopped() else { return false }
             loadURL = resolved.absoluteString
             if loadURL != originalURL {
                 mpvDebugLog("setupMPV HLS master resolved variant=\(redactedURLDescription(resolved))")

@@ -25,16 +25,37 @@ enum MPVHLSMasterResolver: Sendable {
             || text.contains("m3u8?")
     }
 
-    /// Blocking resolve for the MPV queue (master fetch is one small HTTP GET).
-    static func resolveMediaPlaylistSync(from masterURL: URL) -> URL {
-        guard needsResolution(masterURL) else { return masterURL }
+    private final class ResolutionResult: @unchecked Sendable {
+        private let lock = NSLock()
+        private var url: URL?
         let semaphore = DispatchSemaphore(value: 0)
-        var resultURL = masterURL
+
+        func store(_ url: URL) {
+            lock.lock()
+            self.url = url
+            lock.unlock()
+        }
+
+        func value() -> URL? {
+            lock.lock()
+            defer { lock.unlock() }
+            return url
+        }
+    }
+
+    /// MPV 串行队列入口；停止播放时及时取消，不等完整网络超时。
+    static func resolveMediaPlaylistSync(
+        from masterURL: URL,
+        session: URLSession = .shared,
+        shouldCancel: @Sendable () -> Bool = { false }
+    ) -> URL {
+        guard needsResolution(masterURL), !shouldCancel() else { return masterURL }
+        let result = ResolutionResult()
         var request = URLRequest(url: masterURL)
         request.timeoutInterval = 15
         request.setValue(defaultUserAgent, forHTTPHeaderField: "User-Agent")
-        let task = URLSession.shared.dataTask(with: request) { data, response, _ in
-            defer { semaphore.signal() }
+        let task = session.dataTask(with: request) { data, response, _ in
+            defer { result.semaphore.signal() }
             guard let data else { return }
             if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
                 return
@@ -42,11 +63,18 @@ enum MPVHLSMasterResolver: Sendable {
             let text = String(decoding: data, as: UTF8.self)
             let variants = parseVariants(in: text, baseURL: masterURL)
             guard let picked = pickVariant(from: variants) else { return }
-            resultURL = picked.url
+            result.store(picked.url)
         }
         task.resume()
-        _ = semaphore.wait(timeout: .now() + 15)
-        return resultURL
+        let deadline = DispatchTime.now() + 15
+        while !shouldCancel() {
+            if result.semaphore.wait(timeout: min(deadline, .now() + .milliseconds(100))) == .success {
+                return shouldCancel() ? masterURL : result.value() ?? masterURL
+            }
+            if DispatchTime.now() >= deadline { break }
+        }
+        task.cancel()
+        return masterURL
     }
 
     /// Returns the master URL unchanged when it is already a media playlist

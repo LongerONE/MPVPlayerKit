@@ -3,6 +3,44 @@ import XCTest
 @testable import MPVPlayerKit
 
 final class MPVHLSMasterResolverTests: XCTestCase {
+    func testSyncResolutionReturnsVariant() {
+        let session = makeSession()
+        defer { session.invalidateAndCancel() }
+        let url = URL(string: "https://example.com/master.m3u8")!
+        XCTAssertEqual(MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url, session: session),
+                       URL(string: "https://example.com/video.m3u8")!)
+    }
+
+    func testSyncCancellationStopsPendingRequestPromptly() {
+        let session = makeSession()
+        defer { session.invalidateAndCancel() }
+        let url = URL(string: "https://example.com/stalled.m3u8")!
+        let started = Date.timeIntervalSinceReferenceDate
+        let result = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url, session: session) {
+            Date.timeIntervalSinceReferenceDate - started >= 0.2
+        }
+        XCTAssertEqual(result, url)
+        XCTAssertLessThan(Date.timeIntervalSinceReferenceDate - started, 2)
+        XCTAssertEqual(ResolverURLProtocol.cancelled.wait(timeout: .now() + 2), .success)
+    }
+
+    func testSyncTimeoutCancelsPendingRequest() {
+        let session = makeSession()
+        defer { session.invalidateAndCancel() }
+        let url = URL(string: "https://example.com/stalled.m3u8")!
+        let started = Date.timeIntervalSinceReferenceDate
+        XCTAssertEqual(MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url, session: session), url)
+        XCTAssertGreaterThanOrEqual(Date.timeIntervalSinceReferenceDate - started, 14)
+        XCTAssertLessThan(Date.timeIntervalSinceReferenceDate - started, 18)
+        XCTAssertEqual(ResolverURLProtocol.cancelled.wait(timeout: .now() + 2), .success)
+    }
+
+    private func makeSession() -> URLSession {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [ResolverURLProtocol.self]
+        return URLSession(configuration: configuration)
+    }
+
     func testParseVariantsSkipsIFrameAndReadsAttributes() {
         let playlist = """
         #EXTM3U
@@ -52,5 +90,24 @@ final class MPVHLSMasterResolverTests: XCTestCase {
                 URL(string: "https://example.com/a/video.mp4")!
             )
         )
+    }
+}
+
+private final class ResolverURLProtocol: URLProtocol, @unchecked Sendable {
+    static let cancelled = DispatchSemaphore(value: 0)
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        guard request.url?.lastPathComponent != "stalled.m3u8" else { return }
+        let playlist = """
+        #EXTM3U
+        #EXT-X-STREAM-INF:BANDWIDTH=1000,CODECS="avc1",RESOLUTION=1280x720
+        video.m3u8
+        """
+        client?.urlProtocol(self, didLoad: Data(playlist.utf8))
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() {
+        if request.url?.lastPathComponent == "stalled.m3u8" { Self.cancelled.signal() }
     }
 }
