@@ -34,6 +34,9 @@ extension MPVPlayerView {
         "demuxer-lavf-o",
         "cache-on-disk",
         "vf",
+        "network-timeout",
+        "stream-lavf-o",
+        "hls-bitrate",
     ]
     /// Portable resolution cap for simulator (video-max-x/y unavailable in MPVKit 1.0.0).
     nonisolated static let simulatorResolutionLimitFilter =
@@ -397,20 +400,7 @@ extension MPVPlayerView {
         checkError(mpv_set_option_string(mpv, "sub-shaper", "complex"), operation: "set_option sub-shaper", notifyOnFailure: false)
         checkError(mpv_set_option_string(mpv, MPVProperty.subtitleASSOverride, "strip"), operation: "set_option sub-ass-override", notifyOnFailure: false)
         applyUserSubtitleStyleOptions(to: mpv)
-
-        if let userAgent, userAgent.isEmpty == false {
-            checkError(mpv_set_option_string(mpv, "user-agent", userAgent), operation: "set_option user-agent", notifyOnFailure: false)
-        }
-
-        let httpHeaders = makeMPVHTTPHeaderFields()
-        mpvDebugLog("setupMPV http headers total=\(headers.count) forwarded=\(httpHeaders.fields.count) skippedAuthHeaders=\(httpHeaders.skippedAuthHeaders) profile=\(profile.name)")
-        if httpHeaders.fields.isEmpty == false {
-            checkError(
-                mpv_set_option_string(mpv, "http-header-fields", httpHeaders.fields.joined(separator: ",")),
-                operation: "set_option http-header-fields",
-                notifyOnFailure: false
-            )
-        }
+        applyNetworkSetupOptions()
 
         guard checkError(mpv_initialize(mpv), operation: "initialize", notifyOnFailure: false) else {
             destroyMPVHandle(reason: "profile-\(profile.name)-initialize-failed", sendStopCommand: false)
