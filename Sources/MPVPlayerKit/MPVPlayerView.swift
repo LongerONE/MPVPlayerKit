@@ -577,6 +577,11 @@ public final class MPVPlayerView: UIView {
 
     public override func layoutSubviews() {
         super.layoutSubviews()
+        #if targetEnvironment(simulator)
+        if bounds.width > 1, bounds.height > 1 {
+            softwareVideoLayer.frame = bounds
+        }
+        #endif
         clientSubtitleController.update(at: currentTime, force: true)
         if let reason = pendingPictureInPictureGeometryResynchronizationReason {
             resynchronizeMetalLayerGeometry(reason: reason)

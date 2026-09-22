@@ -185,22 +185,17 @@ extension MPVPlayerView {
     /// Called from the MPV queue before `wid` is assigned. A 90° controller
     /// rotation never changes this drawable or the Vulkan swapchain.
     nonisolated func prepareStableMetalCanvasForRendererSetup() {
-#if targetEnvironment(simulator)
         let apply = { @MainActor [self] in
-            softwareVideoLayer.frame = bounds
+            #if targetEnvironment(simulator)
+            // Bounds can still be zero when play() runs before the first layout.
+            // Size the software layer from the hosting screen so decoding and
+            // presentation have a real canvas.
+            let size = layoutCanvasLogicalSize()
+            softwareVideoLayer.frame = CGRect(origin: .zero, size: size)
             softwareVideoLayer.contents = nil
-        }
-        if Thread.isMainThread {
-            MainActor.assumeIsolated(apply)
-        } else {
-            DispatchQueue.main.sync {
-                MainActor.assumeIsolated(apply)
-            }
-        }
-        return
-#else
-        let apply = { @MainActor [self] in
+            #else
             ensureStableMetalCanvas()
+            #endif
         }
         if Thread.isMainThread {
             MainActor.assumeIsolated(apply)
@@ -209,7 +204,19 @@ extension MPVPlayerView {
                 MainActor.assumeIsolated(apply)
             }
         }
-#endif
+    }
+
+    private func layoutCanvasLogicalSize() -> CGSize {
+        if bounds.width > 1, bounds.height > 1 {
+            return bounds.size
+        }
+        let sceneScreen = window?.windowScene?.screen
+        let screenBounds = sceneScreen?.bounds
+            ?? CGRect(origin: .zero, size: bounds.size)
+        return CGSize(
+            width: max(screenBounds.width, screenBounds.height),
+            height: min(screenBounds.width, screenBounds.height)
+        )
     }
 
     private func ensureStableMetalCanvas() {

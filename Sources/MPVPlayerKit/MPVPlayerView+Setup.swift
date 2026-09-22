@@ -343,7 +343,21 @@ extension MPVPlayerView {
         diagnosticProbe?.bindStaticMPVFieldCache(to: mpv)
         mpvDebugLog("setupMPV created handle=\(mpv)")
 
-        let loadURL = url.absoluteString
+        let originalURL = url.absoluteString
+        let loadURL: String
+        if MPVHLSMasterResolver.needsResolution(url) {
+            let resolved = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url)
+            loadURL = resolved.absoluteString
+            if loadURL != originalURL {
+                mpvDebugLog("setupMPV HLS master resolved variant=\(redactedURLDescription(resolved))")
+                recordDiagnosticEvent(
+                    "HLS 选定变体",
+                    fields: ["来源": "master", "目标": redactedURLDescription(resolved)]
+                )
+            }
+        } else {
+            loadURL = originalURL
+        }
 
         // 原始 mpv 日志可能包含媒体地址或字幕正文；只使用白名单结构化诊断。
         checkError(mpv_request_log_messages(mpv, "no"), operation: "request_log_messages", notifyOnFailure: false)
