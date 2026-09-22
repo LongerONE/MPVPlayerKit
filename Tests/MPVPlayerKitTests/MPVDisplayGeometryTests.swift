@@ -69,13 +69,13 @@ final class MPVDisplayGeometryTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(mapping.targetVideoRect.height, 852.0)
     }
 
-    func testCustomScaleKeepsAspectFitPresentationMapping() {
+    func testCustomScaleUsesFillCoverWithoutLetterbox() {
         let targetBounds = CGRect(x: 0, y: 0, width: 852, height: 393)
-        let fitMapping = MPVDisplayGeometry.make(
+        let fillMapping = MPVDisplayGeometry.make(
             canvasSize: targetBounds.size,
             videoAspectRatio: 16.0 / 9.0,
             targetBounds: targetBounds,
-            contentMode: .fit
+            contentMode: .fill
         )
         let customMapping = MPVDisplayGeometry.make(
             canvasSize: targetBounds.size,
@@ -84,8 +84,11 @@ final class MPVDisplayGeometryTests: XCTestCase {
             contentMode: .custom(scale: 1.5)
         )
 
-        XCTAssertEqual(customMapping.targetVideoRect, fitMapping.targetVideoRect)
-        XCTAssertEqual(customMapping.scale, fitMapping.scale, accuracy: 0.001)
+        // Custom shares fill's cover mapping so 100% custom has no black bars.
+        XCTAssertEqual(customMapping.targetVideoRect, fillMapping.targetVideoRect)
+        XCTAssertEqual(customMapping.scale, fillMapping.scale, accuracy: 0.001)
+        XCTAssertGreaterThanOrEqual(customMapping.targetVideoRect.width, targetBounds.width)
+        XCTAssertGreaterThanOrEqual(customMapping.targetVideoRect.height, targetBounds.height)
     }
 
     func testCustomScaleUsesMPVVideoZoom() {
