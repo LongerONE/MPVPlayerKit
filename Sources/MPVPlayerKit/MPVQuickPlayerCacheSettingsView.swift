@@ -45,6 +45,11 @@ final class MPVQuickPlayerCacheSettingsView: UIView, MPVQuickPlayerPanelOverlay 
     override func didMoveToWindow() {
         super.didMoveToWindow()
         guard window != nil else { return }
+        if #available(iOS 26.0, *) {
+            effectView.effect = UIGlassEffect(style: .regular)
+        } else {
+            effectView.effect = UIBlurEffect(style: .systemMaterial)
+        }
         backdropButton.alpha = 0
         cardView.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
         UIView.animate(
@@ -138,16 +143,12 @@ final class MPVQuickPlayerCacheSettingsView: UIView, MPVQuickPlayerPanelOverlay 
         effectView.layer.cornerCurve = .continuous
         effectView.clipsToBounds = true
         cardView.addSubview(effectView)
-        if #available(iOS 26.0, *) {
-            effectView.effect = UIGlassEffect(style: .regular)
-        } else {
-            effectView.effect = UIBlurEffect(style: .systemMaterial)
-        }
 
         titleLabel.text = mpvLocalized("cache.title")
         titleLabel.font = .preferredFont(forTextStyle: .headline)
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textAlignment = .center
+        titleLabel.textColor = .label
         effectView.contentView.addSubview(titleLabel)
 
         configureSwitch(cacheSwitch, title: "cache.enabled")
@@ -175,6 +176,13 @@ final class MPVQuickPlayerCacheSettingsView: UIView, MPVQuickPlayerPanelOverlay 
         cancelButton.titleLabel?.adjustsFontForContentSizeCategory = true
         cancelButton.addTarget(self, action: #selector(cancel), for: .touchUpInside)
         effectView.contentView.addSubview(cancelButton)
+
+        [
+            titleLabel,
+            scrollView,
+            contentStack,
+            cancelButton,
+        ].forEach { $0.translatesAutoresizingMaskIntoConstraints = false }
 
         cacheSwitch.addTarget(self, action: #selector(cacheSwitchChanged(_:)), for: .valueChanged)
     }
@@ -244,6 +252,7 @@ final class MPVQuickPlayerCacheSettingsView: UIView, MPVQuickPlayerPanelOverlay 
 
     private func makeSwitchRow(title: String, switchView: UISwitch) -> UIView {
         let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
         let label = UILabel()
         label.text = title
         label.font = .preferredFont(forTextStyle: .body)
@@ -266,6 +275,7 @@ final class MPVQuickPlayerCacheSettingsView: UIView, MPVQuickPlayerPanelOverlay 
 
     private func makeDurationRow() -> UIView {
         let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
         let label = UILabel()
         label.text = mpvLocalized("cache.duration")
         label.font = .preferredFont(forTextStyle: .body)

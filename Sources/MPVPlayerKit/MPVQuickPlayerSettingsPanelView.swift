@@ -53,6 +53,7 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
     override func didMoveToWindow() {
         super.didMoveToWindow()
         guard window != nil else { return }
+        installBackgroundEffect()
         backdropButton.alpha = 0
         cardView.transform = CGAffineTransform(scaleX: 0.96, y: 0.96)
         UIView.animate(
@@ -62,6 +63,15 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
         ) {
             self.backdropButton.alpha = 1
             self.cardView.transform = .identity
+        }
+    }
+
+    /// UIKit materializes Liquid Glass only after the effect view is in a window.
+    private func installBackgroundEffect() {
+        if #available(iOS 26.0, *) {
+            effectView.effect = UIGlassEffect(style: .regular)
+        } else {
+            effectView.effect = UIBlurEffect(style: .systemMaterial)
         }
     }
 
@@ -152,16 +162,12 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
         effectView.layer.cornerCurve = .continuous
         effectView.clipsToBounds = true
         cardView.addSubview(effectView)
-        if #available(iOS 26.0, *) {
-            effectView.effect = UIGlassEffect(style: .regular)
-        } else {
-            effectView.effect = UIBlurEffect(style: .systemMaterial)
-        }
 
         titleLabel.text = mpvLocalized(type(of: self).titleKey)
         titleLabel.font = .preferredFont(forTextStyle: .headline)
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textAlignment = .center
+        titleLabel.textColor = .label
         effectView.contentView.addSubview(titleLabel)
 
         contentStack.axis = .vertical
@@ -178,6 +184,16 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
         cancelButton.titleLabel?.adjustsFontForContentSizeCategory = true
         cancelButton.addTarget(self, action: #selector(cancelTapped), for: .touchUpInside)
         effectView.contentView.addSubview(cancelButton)
+
+        // These must opt out of autoresizing translation. Leaving it on (the
+        // default for programmatic views) freezes them at a zero frame and the
+        // card renders as an empty blur.
+        [
+            titleLabel,
+            scrollView,
+            contentStack,
+            cancelButton,
+        ].forEach { $0.translatesAutoresizingMaskIntoConstraints = false }
 
         configureLayout()
     }
@@ -265,6 +281,7 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
         switchView.onTintColor = .systemBlue
         switchView.accessibilityLabel = title
         let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
         let label = makeRowLabel(title)
         row.addSubview(label)
         row.addSubview(switchView)
@@ -283,6 +300,7 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
 
     func makeSegmentRow(title: String, segmentedControl: UISegmentedControl) -> UIView {
         let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
         let label = makeRowLabel(title)
         row.addSubview(label)
         row.addSubview(segmentedControl)
@@ -312,6 +330,7 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
         valueLabel.setContentHuggingPriority(.required, for: .horizontal)
         stepper.stepValue = 1
         let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
         let label = makeRowLabel(title)
         row.addSubview(label)
         row.addSubview(valueLabel)
@@ -339,6 +358,7 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
         button.tintColor = .label
         button.contentHorizontalAlignment = .right
         let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
         let label = makeRowLabel(title)
         row.addSubview(label)
         row.addSubview(button)
@@ -361,6 +381,7 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
         button.setTitleColor(.systemBlue, for: .normal)
         button.contentHorizontalAlignment = .right
         let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
         let label = makeRowLabel(title)
         row.addSubview(label)
         row.addSubview(button)

@@ -82,6 +82,7 @@ final class MPVQuickPlayerPictureSettingsView: MPVQuickPlayerSettingsPanelView {
 
     private func makeScaleRow() -> UIView {
         let row = UIView()
+        row.translatesAutoresizingMaskIntoConstraints = false
         let label = UILabel()
         label.text = mpvLocalized("settings.custom_scale")
         label.font = .preferredFont(forTextStyle: .body)
