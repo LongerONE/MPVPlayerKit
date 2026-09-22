@@ -265,7 +265,7 @@ public final class MPVPlayerView: UIView {
     nonisolated let systemSubtitleFontDirectory: String?
     nonisolated(unsafe) var customSubtitleFontName: String?
     let contentModeSnapshotLock = NSLock()
-    var contentModeSnapshot: MPVContentModeSnapshot = .fill
+    var contentModeSnapshot: MPVContentModeSnapshot = .fit
     var displayModeState = MPVDisplayModeState()
     nonisolated let mediaTracksCacheLock = NSLock()
     nonisolated(unsafe) var mediaTracksCache: [[String: Any]] = []
@@ -437,7 +437,7 @@ public final class MPVPlayerView: UIView {
         layer.addSublayer(metalLayer)
 #if targetEnvironment(simulator)
         metalLayer.isHidden = true
-        softwareVideoLayer.contentsGravity = .resizeAspectFill
+        softwareVideoLayer.contentsGravity = .resizeAspect
         layer.addSublayer(softwareVideoLayer)
 #endif
     }

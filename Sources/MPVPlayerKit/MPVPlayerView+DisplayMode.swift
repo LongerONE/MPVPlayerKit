@@ -33,8 +33,7 @@ enum MPVContentModeSnapshot {
 }
 
 struct MPVDisplayModeState {
-    /// QuickPlayer defaults to fill so letterbox bars stay hidden.
-    var mode: MPVVideoDisplayMode = .fill
+    var mode: MPVVideoDisplayMode = .fit
     var scale: CGFloat = 1.0
 }
 
