@@ -265,7 +265,7 @@ public final class MPVPlayerView: UIView {
     nonisolated let systemSubtitleFontDirectory: String?
     nonisolated(unsafe) var customSubtitleFontName: String?
     let contentModeSnapshotLock = NSLock()
-    var contentModeSnapshot: MPVContentModeSnapshot = .fit
+    var contentModeSnapshot: MPVContentModeSnapshot = .fill
     var displayModeState = MPVDisplayModeState()
     nonisolated let mediaTracksCacheLock = NSLock()
     nonisolated(unsafe) var mediaTracksCache: [[String: Any]] = []
@@ -437,7 +437,8 @@ public final class MPVPlayerView: UIView {
         layer.addSublayer(metalLayer)
 #if targetEnvironment(simulator)
         metalLayer.isHidden = true
-        softwareVideoLayer.contentsGravity = .resizeAspect; layer.addSublayer(softwareVideoLayer)
+        softwareVideoLayer.contentsGravity = .resizeAspectFill
+        layer.addSublayer(softwareVideoLayer)
 #endif
     }
     func refreshColorOutputForTargetScreen(reason: String) {
@@ -580,6 +581,7 @@ public final class MPVPlayerView: UIView {
         #if targetEnvironment(simulator)
         if bounds.width > 1, bounds.height > 1 {
             softwareVideoLayer.frame = bounds
+            applySoftwareVideoGravity()
         }
         #endif
         clientSubtitleController.update(at: currentTime, force: true)

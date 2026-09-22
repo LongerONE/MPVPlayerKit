@@ -42,6 +42,7 @@ extension MPVPlayerView {
         notifyOnMain {
             self.softwareVideoLayer.contents = image
             self.softwareVideoLayer.frame = self.bounds
+            self.applySoftwareVideoGravity()
         }
     }
 }

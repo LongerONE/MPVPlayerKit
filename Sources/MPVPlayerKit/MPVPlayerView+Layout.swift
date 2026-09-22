@@ -40,12 +40,11 @@ struct MPVDisplayGeometry: Equatable {
             sourceVideoRect = aspectRect(aspect, in: sourceBounds, fill: false)
             targetVideoRect = aspectRect(aspect, in: safeTarget, fill: false)
         case .fill:
-            // mpv's panscan fills and crops the fixed canvas. The pixels
-            // available to UIKit are therefore the whole canvas; only the
-            // target rect is allowed to extend beyond the controller bounds.
-            sourceVideoRect = sourceBounds
-            let canvasAspect = safeCanvas.width / max(safeCanvas.height, 1.0)
-            targetVideoRect = aspectRect(canvasAspect, in: safeTarget, fill: true)
+            // Cover the visible target with the video aspect. Using the canvas
+            // aspect keeps any mpv-side letterbox bars visible on wide Duo
+            // screens; video-aspect fill crops overflow instead.
+            sourceVideoRect = aspectRect(aspect, in: sourceBounds, fill: true)
+            targetVideoRect = aspectRect(aspect, in: safeTarget, fill: true)
         case .custom:
             sourceVideoRect = aspectRect(aspect, in: sourceBounds, fill: false)
             // Zoom is applied by libmpv. Keeping this presentation mapping at
@@ -163,6 +162,7 @@ extension MPVPlayerView {
             return
         }
         contentMode = videoDisplayMode == .fill ? .scaleAspectFill : .scaleAspectFit
+        applySoftwareVideoGravity()
         let contentModeSnapshot = MPVContentModeSnapshot(
             displayMode: videoDisplayMode,
             customScale: displayModeState.scale
@@ -170,6 +170,14 @@ extension MPVPlayerView {
         setContentModeSnapshot(contentModeSnapshot)
         applyContentMode(contentModeSnapshot)
         updateDisplayPresentationMapping(reason: "display-mode")
+    }
+
+    func applySoftwareVideoGravity() {
+        #if targetEnvironment(simulator)
+        softwareVideoLayer.contentsGravity = videoDisplayMode == .fill
+            ? .resizeAspectFill
+            : .resizeAspect
+        #endif
     }
 
     func applyContentMode(_ contentMode: UIView.ContentMode) {
@@ -368,9 +376,7 @@ extension MPVPlayerView {
         guard targetSize.width > 1.0, targetSize.height > 1.0 else { return }
 #if targetEnvironment(simulator)
         softwareVideoLayer.frame = CGRect(origin: .zero, size: targetSize)
-        softwareVideoLayer.contentsGravity = videoDisplayMode == .fill
-            ? .resizeAspectFill
-            : .resizeAspect
+        applySoftwareVideoGravity()
         return
 #else
         ensureStableMetalCanvas()

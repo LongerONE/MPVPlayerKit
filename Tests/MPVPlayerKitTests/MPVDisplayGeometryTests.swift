@@ -40,7 +40,7 @@ final class MPVDisplayGeometryTests: XCTestCase {
         XCTAssertEqual(landscapeMapping.scale, 1.0, accuracy: 0.001)
     }
 
-    func testAspectFillUsesUniformScaleAndCanvasAsSource() {
+    func testAspectFillCoversTargetWithVideoAspect() {
         let mapping = MPVDisplayGeometry.make(
             canvasSize: CGSize(width: 852, height: 393),
             videoAspectRatio: 2.35,
@@ -49,7 +49,11 @@ final class MPVDisplayGeometryTests: XCTestCase {
         )
 
         XCTAssertEqual(mapping.rotation, 0.0)
-        XCTAssertEqual(mapping.sourceVideoRect.size, CGSize(width: 852, height: 393))
+        XCTAssertEqual(
+            mapping.targetVideoRect.width / mapping.targetVideoRect.height,
+            2.35,
+            accuracy: 0.001
+        )
         XCTAssertEqual(
             mapping.targetVideoRect.width / mapping.targetVideoRect.height,
             mapping.sourceVideoRect.width / mapping.sourceVideoRect.height,
@@ -60,6 +64,7 @@ final class MPVDisplayGeometryTests: XCTestCase {
             mapping.targetVideoRect.width / mapping.sourceVideoRect.width,
             accuracy: 0.001
         )
+        // Cover the visible target — no top/bottom letterbox bars.
         XCTAssertGreaterThanOrEqual(mapping.targetVideoRect.width, 393.0)
         XCTAssertGreaterThanOrEqual(mapping.targetVideoRect.height, 852.0)
     }
