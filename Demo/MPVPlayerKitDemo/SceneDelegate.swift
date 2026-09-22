@@ -11,7 +11,7 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     ) {
         guard let windowScene = scene as? UIWindowScene else { return }
 
-        let sampleURL = URL(string: "https://devstreaming-cdn.apple.com/videos/streaming/examples/bipbop_4x3/bipbop_4x3_variant.m3u8")!
+        let sampleURL = URL(string: "https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/main.m3u8")!
         let playerViewController = MPVQuickPlayerViewController(url: sampleURL)
         let window = UIWindow(windowScene: windowScene)
         window.rootViewController = playerViewController
