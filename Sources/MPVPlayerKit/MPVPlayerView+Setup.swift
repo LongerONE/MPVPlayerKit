@@ -58,19 +58,16 @@ extension MPVPlayerView {
             ("vd-lavc-dr", directRendering),
         ]
     }
-
     nonisolated func setupMPV() {
         guard let url else {
             mpvDebugLog("setupMPV failed missing url")
             failSetup()
             return
         }
-
+        pendingProfileRetry = nil
         setActiveSetupProfileIndex(0)
-        // Playback setup runs on `queue`, so UIKit geometry must be sampled on
-        // the main thread before it is included in diagnostics. Reading
-        // `UIView.bounds` here triggers Main Thread Checker and can terminate a
-        // debug session while libmpv is starting.
+        // Playback setup runs on `queue`; sample UIKit geometry on main thread
+        // before diagnostics to avoid Main Thread Checker termination.
         let boundsSnapshot = currentViewBoundsSnapshot()
         mpvDebugLog("setupMPV begin url=\(redactedURLDescription(url)) bounds=\(boundsSnapshot) headers=\(headers.count)")
         // Allocate the renderer surface before libmpv receives `wid`. The
@@ -157,12 +154,10 @@ extension MPVPlayerView {
         colorOutputStateLock.unlock()
         let colorOptions = MPVColorMappingPolicy.options(for: outputMode)
         #if targetEnvironment(simulator)
-        // 模拟器仅有软件解码；4K/HEVC 帧经 libplacebo PBO 上传时，
-        // MoltenVK 的 host-visible MTLBuffer 分配会撞上 XPC shmem 限制。
-        // MPVKit 1.0.0 无 video-max-x/y（-5），改用标准 vf scale 限流，
-        // setup 阶段 applySimulatorDecoderResolutionCap 会再兜底尝试。
-        return colorOptions + [
-            ("gpu-dumb-mode", "yes"),
+        let softwareColorOptions = colorOptions.filter {
+            $0.0 != "vo" && $0.0 != "gpu-api" && $0.0 != "gpu-context"
+        }
+        return [("vo", "libmpv")] + softwareColorOptions + [
             ("vf", Self.simulatorResolutionLimitFilter),
             ("vd-lavc-threads", "2"),
         ] + MPVVideoQualityPreset.powerSaving.options + videoRenderOptions
@@ -350,15 +345,12 @@ extension MPVPlayerView {
         // 原始 mpv 日志可能包含媒体地址或字幕正文；只使用白名单结构化诊断。
         checkError(mpv_request_log_messages(mpv, "no"), operation: "request_log_messages", notifyOnFailure: false)
 
-        var metalLayerHandle = Int64(Int(bitPattern: Unmanaged.passUnretained(metalLayer).toOpaque()))
-        guard checkError(
-            mpv_set_option(mpv, "wid", MPV_FORMAT_INT64, &metalLayerHandle),
-            operation: "set_option wid",
-            notifyOnFailure: false
-        ) else {
-            destroyMPVHandle(reason: "profile-\(profile.name)-wid-failed", sendStopCommand: false)
+#if !targetEnvironment(simulator)
+        guard configureMPVRenderOutput(mpv: mpv, profileName: profile.name) else {
+            destroyMPVHandle(reason: "profile-\(profile.name)-renderer-failed", sendStopCommand: false)
             return false
         }
+#endif
 
         for option in profile.options {
             let status = mpv_set_option_string(mpv, option.0, option.1)
@@ -424,6 +416,12 @@ extension MPVPlayerView {
             destroyMPVHandle(reason: "profile-\(profile.name)-initialize-failed", sendStopCommand: false)
             return false
         }
+#if targetEnvironment(simulator)
+        guard configureMPVRenderOutput(mpv: mpv, profileName: profile.name) else {
+            destroyMPVHandle(reason: "profile-\(profile.name)-renderer-failed", sendStopCommand: false)
+            return false
+        }
+#endif
         #if targetEnvironment(simulator)
         // 初始化后再次确保限流生效（option 阶段若 vf 被跳过，这里用 runtime property 补上）。
         var vfStatus: CInt = -1

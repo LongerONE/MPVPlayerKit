@@ -185,6 +185,20 @@ extension MPVPlayerView {
     /// Called from the MPV queue before `wid` is assigned. A 90° controller
     /// rotation never changes this drawable or the Vulkan swapchain.
     nonisolated func prepareStableMetalCanvasForRendererSetup() {
+#if targetEnvironment(simulator)
+        let apply = { @MainActor [self] in
+            softwareVideoLayer.frame = bounds
+            softwareVideoLayer.contents = nil
+        }
+        if Thread.isMainThread {
+            MainActor.assumeIsolated(apply)
+        } else {
+            DispatchQueue.main.sync {
+                MainActor.assumeIsolated(apply)
+            }
+        }
+        return
+#else
         let apply = { @MainActor [self] in
             ensureStableMetalCanvas()
         }
@@ -195,6 +209,7 @@ extension MPVPlayerView {
                 MainActor.assumeIsolated(apply)
             }
         }
+#endif
     }
 
     private func ensureStableMetalCanvas() {
@@ -344,6 +359,13 @@ extension MPVPlayerView {
             return
         }
         guard targetSize.width > 1.0, targetSize.height > 1.0 else { return }
+#if targetEnvironment(simulator)
+        softwareVideoLayer.frame = CGRect(origin: .zero, size: targetSize)
+        softwareVideoLayer.contentsGravity = videoDisplayMode == .fill
+            ? .resizeAspectFill
+            : .resizeAspect
+        return
+#else
         ensureStableMetalCanvas()
         guard let canvas = stableMetalCanvas else { return }
 
@@ -373,9 +395,10 @@ extension MPVPlayerView {
         mpvDebugLog(
             "display mapping applied reason=\(reason) target=\(targetSize) "
                 + "aspect=\(aspect) source=\(mapping.sourceVideoRect) "
-                + "targetVideo=\(mapping.targetVideoRect) scale=\(mapping.scale) "
+            + "targetVideo=\(mapping.targetVideoRect) scale=\(mapping.scale) "
                 + "translation=\(mapping.translation) rotation=0"
         )
+#endif
     }
 
     func currentVideoDisplayAspectRatio() -> CGFloat {

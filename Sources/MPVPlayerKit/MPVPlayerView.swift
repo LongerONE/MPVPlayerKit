@@ -243,6 +243,9 @@ public final class MPVPlayerView: UIView {
     }
 
     nonisolated(unsafe) var metalLayer = MPVPlayerMetalLayer()
+#if targetEnvironment(simulator)
+    nonisolated(unsafe) var softwareVideoLayer = CALayer(); nonisolated(unsafe) var softwareRenderer: MPVSoftwareRenderer?
+#endif
     var pictureInPictureCoordinator: MPVPictureInPictureCoordinator?
     /// Shapes the Picture in Picture window, which hosts this view.
     var pictureInPictureVideoDisplaySize: CGSize = .zero
@@ -389,7 +392,7 @@ public final class MPVPlayerView: UIView {
     var pictureInPictureGeometryResynchronizationTask: Task<Void, Never>?
     var pictureInPictureGeometryResynchronizationGeneration = 0
     nonisolated(unsafe) var setupProfiles: [MPVSetupProfile] = []
-    nonisolated(unsafe) var activeSetupProfileIndex = 0
+    nonisolated(unsafe) var activeSetupProfileIndex = 0; nonisolated(unsafe) var pendingProfileRetry: (resumeTime: TimeInterval, shouldPlay: Bool)?
     nonisolated let pictureInPictureRendererRuntimeState =
         MPVPictureInPictureRendererRuntimeState()
 
@@ -432,8 +435,11 @@ public final class MPVPlayerView: UIView {
         applyColorOutputMode(.sdr, reason: "initial-detached")
         metalLayer.backgroundColor = UIColor.black.cgColor
         layer.addSublayer(metalLayer)
+#if targetEnvironment(simulator)
+        metalLayer.isHidden = true
+        softwareVideoLayer.contentsGravity = .resizeAspect; layer.addSublayer(softwareVideoLayer)
+#endif
     }
-
     func refreshColorOutputForTargetScreen(reason: String) {
         let desiredMode: MPVColorOutputMode
         #if os(iOS) && !targetEnvironment(simulator)

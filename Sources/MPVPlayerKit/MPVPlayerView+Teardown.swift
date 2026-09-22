@@ -42,6 +42,10 @@ extension MPVPlayerView {
         mpv = nil
         let timer = timeTimer
         timeTimer = nil
+#if targetEnvironment(simulator)
+        let renderer = softwareRenderer
+        softwareRenderer = nil
+#endif
         let wakeup = wakeupContextTransfer
         wakeupContextTransfer = nil
         mpvHandleLock.unlock()
@@ -52,11 +56,17 @@ extension MPVPlayerView {
         if let handle {
             let teardown = MPVHandleTeardown(handle: handle)
             queue.async {
+#if targetEnvironment(simulator)
+                renderer?.stop()
+#endif
                 timer?.setEventHandler {}
                 timer?.cancel()
                 teardown.terminate()
             }
         } else {
+#if targetEnvironment(simulator)
+            renderer?.stop()
+#endif
             timer?.setEventHandler {}
             timer?.cancel()
         }
@@ -90,6 +100,9 @@ extension MPVPlayerView {
 
     private nonisolated func destroyMPVHandleOnMPVQueue(reason: String, sendStopCommand: Bool) {
         recordDiagnosticEvent("销毁解码配置", fields: ["原因": reason, "配置": activeProfileDescription])
+        if reason == "stop" || reason == "setup-failed" {
+            pendingProfileRetry = nil
+        }
         if reason == "stop" || reason == "setup-failed" { finishPowerDiagnostics(reason: reason) }
         diagnosticProbe?.clearStaticMPVFieldCache()
         notifyOnMain {
@@ -132,6 +145,11 @@ extension MPVPlayerView {
             mpvHandleLock.lock()
             let handleToDestroy = mpv
             mpv = nil
+#if targetEnvironment(simulator)
+            let rendererToDestroy = softwareRenderer
+            softwareRenderer = nil
+            rendererToDestroy?.stop()
+#endif
             let pendingWakeup = wakeupContextTransfer
             wakeupContextTransfer = nil
             mpvHandleLock.unlock()

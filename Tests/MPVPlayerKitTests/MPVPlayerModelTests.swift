@@ -586,19 +586,18 @@ final class MPVPlayerModelTests: XCTestCase {
             uniquingKeysWith: { _, replacement in replacement }
         )
 
-        XCTAssertEqual(options["vo"], "gpu-next")
-        XCTAssertEqual(options["gpu-api"], "vulkan")
-        XCTAssertEqual(options["gpu-context"], "moltenvk")
-        XCTAssertEqual(options["gpu-dumb-mode"], "yes")
-        // MPVKit 1.0.0 无 video-max-x/y；用标准 vf scale 限制解码分辨率，避免模拟器 Metal 崩溃。
+        XCTAssertEqual(options["vo"], "libmpv")
+        XCTAssertNil(options["gpu-api"])
+        XCTAssertNil(options["gpu-context"])
+        // 模拟器使用 libmpv CPU 渲染；用标准 vf scale 限制软件解码分辨率。
         XCTAssertEqual(options["vf"], MPVPlayerView.simulatorResolutionLimitFilter)
-        XCTAssertEqual(options["demuxer-max-bytes"], "32MiB")
+        XCTAssertEqual(options["demuxer-max-bytes"], "16MiB")
         XCTAssertTrue(MPVPlayerView.optionalSetupOptionNames.contains("video-max-x"))
         XCTAssertEqual(MPVPlayerView.mpvErrorOptionNotFound, -5)
         XCTAssertEqual(options["scale"], "bilinear")
         XCTAssertEqual(options["cscale"], "bilinear")
         XCTAssertEqual(options["dscale"], "bilinear")
-        XCTAssertEqual(options["demuxer-max-bytes"], "32MiB")
+        XCTAssertEqual(options["demuxer-max-bytes"], "16MiB")
         XCTAssertFalse(playerView.usesExtendedDynamicRangeOutput)
         #endif
     }

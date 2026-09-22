@@ -16,7 +16,6 @@ final class MPVPlayerViewWeakTransfer: @unchecked Sendable {
         self.value = value
     }
 }
-
 func makeMPVTimeTimerHandler(_ playerView: MPVPlayerView) -> @Sendable () -> Void {
     let transfer = MPVPlayerViewWeakTransfer(playerView)
     return {
@@ -75,6 +74,7 @@ extension MPVPlayerView {
                         "event file-loaded profile=\(self.activeProfileDescription)"
                     )
                     self.markBufferingFileLoaded()
+                    self.restoreProfileRetryIfNeeded()
                     self.ensureVideoTrackSelected(reason: "file-loaded")
                     self.refreshMediaTracksCache()
                     self.logPlaybackPipelineDiagnostics(reason: "file-loaded")
@@ -525,37 +525,6 @@ extension MPVPlayerView {
                 self.notifyState(state)
             }
         }
-    }
-
-    func retryNextProfileAfterPlaybackFailure(errorCode: CInt) -> Bool {
-        guard isReadyToPlayReported() == false, isPlaybackRestarted() == false else {
-            mpvDebugLog("profile retry skipped playback already started profile=\(activeProfileDescription) error=\(errorCode)")
-            return false
-        }
-        guard let url else {
-            mpvDebugLog("profile retry skipped missing url error=\(errorCode)")
-            return false
-        }
-        let profile = activeSetupProfileSnapshot()
-        let nextIndex = profile.index + 1
-        guard nextIndex < profile.count else {
-            mpvDebugLog("profile retry skipped no more profiles current=\(activeProfileDescription) error=\(errorCode)")
-            return false
-        }
-
-        let oldProfile = activeProfileDescription
-        destroyMPVHandle(reason: "profile-\(oldProfile)-end-file-error-\(errorCode)", sendStopCommand: false)
-        setActiveSetupProfileIndex(nextIndex)
-        prepareProfilesForNextRenderer()
-        setReadyToPlayReported(false)
-        setPlaybackRestarted(false)
-        resetPictureInPictureVideoDisplaySize()
-        guard let nextProfile = setupProfile(at: nextIndex) else {
-            mpvDebugLog("profile retry skipped missing rebuilt profile next=\(nextIndex) error=\(errorCode)")
-            return false
-        }
-        mpvDebugLog("profile retry next old=\(oldProfile) next=\(activeProfileDescription) error=\(errorCode)")
-        return setupMPV(url: url, profile: nextProfile)
     }
 
     nonisolated func handlePropertyChange(_ event: UnsafeMutablePointer<mpv_event>) {
