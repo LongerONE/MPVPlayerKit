@@ -17,10 +17,12 @@ final class MPVQuickPlayerCacheSettingsView: UIView, MPVQuickPlayerPanelOverlay 
     private var safeAreaTopConstraint: NSLayoutConstraint!
     private var safeAreaBottomConstraint: NSLayoutConstraint!
     private var cardHeightConstraint: NSLayoutConstraint!
+    private var playerSafeAreaInsets = UIEdgeInsets.zero
     private var configuration: MPVCacheConfiguration
 
     private static let cardWidth: CGFloat = 320
     private static let cardHeight: CGFloat = 250
+    private static let minimumCardHeight: CGFloat = 240
 
     var onChange: ((MPVCacheConfiguration) -> Void)?
     var onDurationTap: ((UIView) -> Void)?
@@ -55,11 +57,31 @@ final class MPVQuickPlayerCacheSettingsView: UIView, MPVQuickPlayerPanelOverlay 
         }
     }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateCardHeight()
+    }
+
     func updatePlayerSafeAreaInsets(_ insets: UIEdgeInsets) {
+        playerSafeAreaInsets = insets
         safeAreaLeadingConstraint.constant = insets.left
         safeAreaTrailingConstraint.constant = -insets.right
         safeAreaTopConstraint.constant = insets.top
         safeAreaBottomConstraint.constant = -insets.bottom
+        updateCardHeight()
+    }
+
+    private func updateCardHeight() {
+        let verticalMargin: CGFloat = 32
+        let availableHeight = max(
+            0,
+            bounds.height - playerSafeAreaInsets.top - playerSafeAreaInsets.bottom - verticalMargin
+        )
+        if availableHeight >= Self.cardHeight {
+            cardHeightConstraint.constant = Self.cardHeight
+        } else {
+            cardHeightConstraint.constant = max(Self.minimumCardHeight, availableHeight)
+        }
     }
 
     func update(configuration: MPVCacheConfiguration) {
@@ -161,11 +183,20 @@ final class MPVQuickPlayerCacheSettingsView: UIView, MPVQuickPlayerPanelOverlay 
         addLayoutGuide(safeAreaGuide)
         let contentView = effectView.contentView
         cardHeightConstraint = cardView.heightAnchor.constraint(equalToConstant: Self.cardHeight)
-        cardHeightConstraint.priority = .defaultHigh
         safeAreaLeadingConstraint = safeAreaGuide.leadingAnchor.constraint(equalTo: leadingAnchor)
         safeAreaTrailingConstraint = safeAreaGuide.trailingAnchor.constraint(equalTo: trailingAnchor)
         safeAreaTopConstraint = safeAreaGuide.topAnchor.constraint(equalTo: topAnchor)
         safeAreaBottomConstraint = safeAreaGuide.bottomAnchor.constraint(equalTo: bottomAnchor)
+        let cardTopConstraint = cardView.topAnchor.constraint(
+            greaterThanOrEqualTo: safeAreaGuide.topAnchor,
+            constant: 16
+        )
+        let cardBottomConstraint = cardView.bottomAnchor.constraint(
+            lessThanOrEqualTo: safeAreaGuide.bottomAnchor,
+            constant: -16
+        )
+        cardTopConstraint.priority = .defaultHigh
+        cardBottomConstraint.priority = .defaultHigh
         NSLayoutConstraint.activate([
             backdropButton.leadingAnchor.constraint(equalTo: leadingAnchor),
             backdropButton.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -175,9 +206,10 @@ final class MPVQuickPlayerCacheSettingsView: UIView, MPVQuickPlayerPanelOverlay 
             cardView.centerYAnchor.constraint(equalTo: safeAreaGuide.centerYAnchor),
             cardView.widthAnchor.constraint(equalToConstant: Self.cardWidth),
             cardView.widthAnchor.constraint(lessThanOrEqualTo: safeAreaGuide.widthAnchor, constant: -32),
-            cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaGuide.topAnchor, constant: 16),
-            cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaGuide.bottomAnchor, constant: -16),
+            cardTopConstraint,
+            cardBottomConstraint,
             cardHeightConstraint,
+            scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 80),
             effectView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor),
             effectView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor),
             effectView.topAnchor.constraint(equalTo: cardView.topAnchor),

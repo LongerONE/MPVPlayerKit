@@ -24,11 +24,15 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
     private var safeAreaTopConstraint: NSLayoutConstraint!
     private var safeAreaBottomConstraint: NSLayoutConstraint!
     private var cardHeightConstraint: NSLayoutConstraint!
+    private var cardWidthConstraint: NSLayoutConstraint!
+    private var cardMinHeightConstraint: NSLayoutConstraint!
+    private var playerSafeAreaInsets = UIEdgeInsets.zero
 
     var onDismiss: (() -> Void)?
 
     class var cardWidth: CGFloat { 320 }
     class var cardHeight: CGFloat { 280 }
+    class var minimumCardHeight: CGFloat { 240 }
     class var titleKey: String { "settings.title" }
     class var accessibilityIdentifierKey: String { "MPVQuickPlayer.settingsPanel" }
 
@@ -61,11 +65,47 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
         }
     }
 
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        updateCardMetrics()
+    }
+
     func updatePlayerSafeAreaInsets(_ insets: UIEdgeInsets) {
+        playerSafeAreaInsets = insets
         safeAreaLeadingConstraint.constant = insets.left
         safeAreaTrailingConstraint.constant = -insets.right
         safeAreaTopConstraint.constant = insets.top
         safeAreaBottomConstraint.constant = -insets.bottom
+        updateCardMetrics()
+    }
+
+    /// Keeps the card visible on short (landscape) heights: preferred size when
+    /// it fits, otherwise shrink to the safe-area box instead of collapsing.
+    private func updateCardMetrics() {
+        let horizontalMargin: CGFloat = 32
+        let verticalMargin: CGFloat = 32
+        let availableWidth = max(
+            0,
+            bounds.width - playerSafeAreaInsets.left - playerSafeAreaInsets.right - horizontalMargin
+        )
+        let availableHeight = max(
+            0,
+            bounds.height - playerSafeAreaInsets.top - playerSafeAreaInsets.bottom - verticalMargin
+        )
+        let preferredWidth = type(of: self).cardWidth
+        if availableWidth > 0 {
+            cardWidthConstraint.constant = min(preferredWidth, availableWidth)
+        } else {
+            cardWidthConstraint.constant = preferredWidth
+        }
+        let preferredHeight = type(of: self).cardHeight
+        let minimumHeight = type(of: self).minimumCardHeight
+        if availableHeight >= preferredHeight {
+            cardHeightConstraint.constant = preferredHeight
+        } else {
+            cardHeightConstraint.constant = max(minimumHeight, availableHeight)
+        }
+        cardMinHeightConstraint.constant = min(minimumHeight, cardHeightConstraint.constant)
     }
 
     func dismiss(animated: Bool) {
@@ -145,14 +185,32 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
     private func configureLayout() {
         addLayoutGuide(safeAreaGuide)
         let contentView = effectView.contentView
+        // Required height/width: the old .defaultHigh preferred height was dropped
+        // whenever the landscape safe-area box was shorter than the card, and the
+        // scroll view then collapsed to a sliver.
         cardHeightConstraint = cardView.heightAnchor.constraint(
             equalToConstant: type(of: self).cardHeight
         )
-        cardHeightConstraint.priority = .defaultHigh
+        cardMinHeightConstraint = cardView.heightAnchor.constraint(
+            greaterThanOrEqualToConstant: type(of: self).minimumCardHeight
+        )
+        cardWidthConstraint = cardView.widthAnchor.constraint(
+            equalToConstant: type(of: self).cardWidth
+        )
         safeAreaLeadingConstraint = safeAreaGuide.leadingAnchor.constraint(equalTo: leadingAnchor)
         safeAreaTrailingConstraint = safeAreaGuide.trailingAnchor.constraint(equalTo: trailingAnchor)
         safeAreaTopConstraint = safeAreaGuide.topAnchor.constraint(equalTo: topAnchor)
         safeAreaBottomConstraint = safeAreaGuide.bottomAnchor.constraint(equalTo: bottomAnchor)
+        let cardTopConstraint = cardView.topAnchor.constraint(
+            greaterThanOrEqualTo: safeAreaGuide.topAnchor,
+            constant: 16
+        )
+        let cardBottomConstraint = cardView.bottomAnchor.constraint(
+            lessThanOrEqualTo: safeAreaGuide.bottomAnchor,
+            constant: -16
+        )
+        cardTopConstraint.priority = .defaultHigh
+        cardBottomConstraint.priority = .defaultHigh
         NSLayoutConstraint.activate([
             backdropButton.leadingAnchor.constraint(equalTo: leadingAnchor),
             backdropButton.trailingAnchor.constraint(equalTo: trailingAnchor),
@@ -160,11 +218,16 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
             backdropButton.bottomAnchor.constraint(equalTo: bottomAnchor),
             cardView.centerXAnchor.constraint(equalTo: safeAreaGuide.centerXAnchor),
             cardView.centerYAnchor.constraint(equalTo: safeAreaGuide.centerYAnchor),
-            cardView.widthAnchor.constraint(equalToConstant: type(of: self).cardWidth),
-            cardView.widthAnchor.constraint(lessThanOrEqualTo: safeAreaGuide.widthAnchor, constant: -32),
-            cardView.topAnchor.constraint(greaterThanOrEqualTo: safeAreaGuide.topAnchor, constant: 16),
-            cardView.bottomAnchor.constraint(lessThanOrEqualTo: safeAreaGuide.bottomAnchor, constant: -16),
+            cardWidthConstraint,
+            cardView.widthAnchor.constraint(
+                lessThanOrEqualTo: safeAreaGuide.widthAnchor,
+                constant: -32
+            ),
+            cardTopConstraint,
+            cardBottomConstraint,
             cardHeightConstraint,
+            cardMinHeightConstraint,
+            scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 80),
             effectView.leadingAnchor.constraint(equalTo: cardView.leadingAnchor),
             effectView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor),
             effectView.topAnchor.constraint(equalTo: cardView.topAnchor),
