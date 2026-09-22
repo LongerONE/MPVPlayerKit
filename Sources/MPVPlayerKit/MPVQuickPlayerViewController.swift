@@ -243,7 +243,10 @@ public final class MPVQuickPlayerViewController: UIViewController {
         contentView.backgroundColor = .black
         view.addSubview(contentView)
         player.playbackView.backgroundColor = .black
-        player.contentMode = .scaleAspectFit
+        // Fill the screen by default so letterbox bars do not appear; users can
+        // still switch to fit/custom in picture settings.
+        player.videoDisplayMode = .fill
+        player.contentMode = .scaleAspectFill
         contentView.addSubview(player.playbackView)
 
         topBar.backgroundColor = UIColor.black.withAlphaComponent(0.55)
