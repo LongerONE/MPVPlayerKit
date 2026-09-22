@@ -93,7 +93,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var isUsingManualLandscape: Bool
     weak var orientationSynchronizedPresentedViewController: UIViewController?
     weak var actionSheetOverlay: MPVQuickPlayerMenuView?
-    weak var cacheSettingsOverlay: MPVQuickPlayerCacheSettingsView?
+    weak var settingsPanelOverlay: (UIView & MPVQuickPlayerPanelOverlay)?
     var arePlaybackControlsHidden = false
     var closeButtonLeadingConstraint: NSLayoutConstraint!
     var statusLabelTrailingConstraint: NSLayoutConstraint!
@@ -159,7 +159,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         guard isViewLoaded else { return }
         updatePlaybackControlSafeAreaInsets()
         actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
-        cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        settingsPanelOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
     public func resetSubtitleFont() {
@@ -220,14 +220,14 @@ public final class MPVQuickPlayerViewController: UIViewController {
         updatePlaybackControlSafeAreaInsets()
         updateOrientationButtonVisibility()
         actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
-        cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        settingsPanelOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
     public override func viewSafeAreaInsetsDidChange() {
         super.viewSafeAreaInsetsDidChange()
         updatePlaybackControlSafeAreaInsets()
         actionSheetOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
-        cacheSettingsOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
+        settingsPanelOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
     public override func viewDidDisappear(_ animated: Bool) {

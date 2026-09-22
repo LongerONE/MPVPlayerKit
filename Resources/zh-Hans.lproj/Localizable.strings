@@ -22,15 +22,20 @@
 "playback.error.message" = "无法播放此视频。";
 
 "settings.title" = "播放设置";
-"settings.cache" = "缓存设置";
 "settings.playback_speed" = "播放速度";
 "settings.playback_speed.value" = "播放速度 · %@";
+"settings.picture" = "画面设置";
+"settings.subtitle" = "字幕设置";
+"settings.cache" = "缓存设置";
 "settings.video_quality" = "视频质量";
 "settings.video_quality.value" = "视频质量 · %@";
+"settings.debanding" = "色带抑制";
 "settings.enable_debanding" = "启用色带抑制";
 "settings.disable_debanding" = "关闭色带抑制";
+"settings.display_mode" = "显示模式";
 "settings.fit_video" = "适应画面";
 "settings.fill_screen" = "填满屏幕";
+"settings.custom_scale" = "自定义缩放";
 "settings.custom_scale.value" = "自定义缩放 · %d%%";
 "settings.reset_custom_scale" = "重置缩放";
 
@@ -55,6 +60,9 @@
 "subtitle.style.default" = "默认";
 "subtitle.style.large" = "大字号";
 "subtitle.style.high_contrast" = "高对比度";
+"subtitle.font_size" = "字号";
+"subtitle.bold" = "加粗";
+"subtitle.bottom_offset" = "底部偏移";
 "subtitle.style.use_file" = "使用字幕文件样式";
 "subtitle.style.use_player" = "使用播放器样式";
 "subtitle.load_external" = "加载外部字幕…";

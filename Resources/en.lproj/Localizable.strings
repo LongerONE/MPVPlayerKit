@@ -22,15 +22,20 @@
 "playback.error.message" = "The video could not be played.";
 
 "settings.title" = "Playback Settings";
-"settings.cache" = "Cache Settings";
 "settings.playback_speed" = "Playback Speed";
 "settings.playback_speed.value" = "Playback Speed · %@";
+"settings.picture" = "Picture Settings";
+"settings.subtitle" = "Subtitle Settings";
+"settings.cache" = "Cache Settings";
 "settings.video_quality" = "Video Quality";
 "settings.video_quality.value" = "Video Quality · %@";
+"settings.debanding" = "Debanding";
 "settings.enable_debanding" = "Enable Debanding";
 "settings.disable_debanding" = "Disable Debanding";
+"settings.display_mode" = "Display Mode";
 "settings.fit_video" = "Fit Video";
 "settings.fill_screen" = "Fill Screen";
+"settings.custom_scale" = "Custom Scale";
 "settings.custom_scale.value" = "Custom Scale · %d%%";
 "settings.reset_custom_scale" = "Reset Scale";
 
@@ -55,6 +60,9 @@
 "subtitle.style.default" = "Default";
 "subtitle.style.large" = "Large";
 "subtitle.style.high_contrast" = "High Contrast";
+"subtitle.font_size" = "Font Size";
+"subtitle.bold" = "Bold";
+"subtitle.bottom_offset" = "Bottom Offset";
 "subtitle.style.use_file" = "Use Subtitle File Style";
 "subtitle.style.use_player" = "Use Player Style";
 "subtitle.load_external" = "Load External Subtitle…";

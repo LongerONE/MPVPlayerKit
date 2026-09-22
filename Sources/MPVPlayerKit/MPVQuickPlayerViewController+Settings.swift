@@ -4,56 +4,23 @@ import UniformTypeIdentifiers
 
 extension MPVQuickPlayerViewController {
     @objc func showSettings() {
-        var options: [MPVQuickPlayerActionSheetOption] = [
-            .init(title: mpvLocalized("settings.playback_speed.value", Self.rateTitle(playbackRate))) {
-                [weak self] in self?.presentAfterCurrentSheet { $0.showPlaybackRatePicker() }
+        let options: [MPVQuickPlayerActionSheetOption] = [
+            .init(
+                title: mpvLocalized("settings.playback_speed.value", Self.rateTitle(playbackRate)),
+                symbol: .playbackSpeed
+            ) { [weak self] in
+                self?.presentAfterCurrentSheet { $0.showPlaybackRatePicker() }
             },
-            .init(title: mpvLocalized("settings.video_quality.value", Self.videoQualityTitle(videoQuality))) {
-                [weak self] in self?.presentAfterCurrentSheet { $0.showVideoQualityPicker() }
+            .init(title: mpvLocalized("settings.picture"), symbol: .pictureSettings) {
+                [weak self] in self?.presentAfterCurrentSheet { $0.showPictureSettings() }
+            },
+            .init(title: mpvLocalized("settings.subtitle"), symbol: .subtitles) {
+                [weak self] in self?.presentAfterCurrentSheet { $0.showSubtitleSettings() }
+            },
+            .init(title: mpvLocalized("settings.cache"), symbol: .cache) {
+                [weak self] in self?.presentAfterCurrentSheet { $0.showCacheSettings() }
             },
         ]
-        options.append(.init(
-            title: mpvLocalized("settings.cache"),
-            symbol: .cache
-        ) { [weak self] in
-            self?.presentAfterCurrentSheet { $0.showCacheSettings() }
-        })
-        let debandTitle = mpvLocalized(
-            debandEnabled ? "settings.disable_debanding" : "settings.enable_debanding"
-        )
-        options.append(.init(title: debandTitle) { [weak self] in
-            guard let self else { return }
-            setDebandEnabled(debandEnabled == false)
-        })
-        options.append(.init(
-            title: mpvLocalized("settings.fit_video"),
-            isSelected: player.videoDisplayMode == .fit
-        ) { [weak self] in
-            self?.setVideoDisplayMode(.fit)
-        })
-        options.append(.init(
-            title: mpvLocalized("settings.fill_screen"),
-            isSelected: player.videoDisplayMode == .fill
-        ) { [weak self] in
-            self?.setVideoDisplayMode(.fill)
-        })
-        options.append(.init(
-            title: mpvLocalized("settings.custom_scale.value", Int((player.customVideoScale * 100).rounded())),
-            isSelected: player.videoDisplayMode == .custom
-        ) { [weak self] in
-            self?.setVideoDisplayMode(.custom)
-        })
-        if player.videoDisplayMode == .custom {
-            options.append(.init(title: mpvLocalized("settings.reset_custom_scale")) { [weak self] in
-                self?.resetCustomVideoScale()
-            })
-        }
-        options.append(.init(title: mpvLocalized("subtitle.delay.value", Self.delayTitle(subtitleDelay))) {
-            [weak self] in self?.presentAfterCurrentSheet { $0.showSubtitleDelayPicker() }
-        })
-        options.append(.init(title: mpvLocalized("subtitle.style")) {
-            [weak self] in self?.presentAfterCurrentSheet { $0.showSubtitleStylePicker() }
-        })
         presentActionSheet(
             title: mpvLocalized("settings.title"),
             sourceView: settingsButton,
@@ -107,10 +74,94 @@ extension MPVQuickPlayerViewController {
             self?.showCacheDurationPicker(from: sourceView, settingsView: settingsView)
         }
         settingsView.onDismiss = { [weak self, weak settingsView] in
-            guard let self, cacheSettingsOverlay === settingsView else { return }
-            cacheSettingsOverlay = nil
+            guard let self, settingsPanelOverlay === settingsView else { return }
+            settingsPanelOverlay = nil
         }
-        presentCacheSettingsOverlay(settingsView)
+        presentSettingsPanel(settingsView)
+    }
+
+    func showPictureSettings() {
+        let settingsView = MPVQuickPlayerPictureSettingsView()
+        settingsView.onQualityChange = { [weak self, weak settingsView] quality in
+            guard let self else { return }
+            setVideoQuality(quality)
+            settingsView?.update(
+                quality: videoQuality,
+                debandEnabled: debandEnabled,
+                displayMode: player.videoDisplayMode,
+                customScale: player.customVideoScale
+            )
+        }
+        settingsView.onDebandChange = { [weak self, weak settingsView] enabled in
+            guard let self else { return }
+            setDebandEnabled(enabled)
+            settingsView?.update(
+                quality: videoQuality,
+                debandEnabled: debandEnabled,
+                displayMode: player.videoDisplayMode,
+                customScale: player.customVideoScale
+            )
+        }
+        settingsView.onDisplayModeChange = { [weak self, weak settingsView] mode in
+            guard let self else { return }
+            setVideoDisplayMode(mode)
+            settingsView?.update(
+                quality: videoQuality,
+                debandEnabled: debandEnabled,
+                displayMode: player.videoDisplayMode,
+                customScale: player.customVideoScale
+            )
+        }
+        settingsView.onScaleChange = { [weak self, weak settingsView] scale in
+            guard let self else { return }
+            setCustomVideoScale(scale)
+            if player.videoDisplayMode != .custom {
+                setVideoDisplayMode(.custom)
+            }
+            settingsView?.update(
+                quality: videoQuality,
+                debandEnabled: debandEnabled,
+                displayMode: player.videoDisplayMode,
+                customScale: player.customVideoScale
+            )
+        }
+        settingsView.onResetScaleTap = { [weak self, weak settingsView] in
+            guard let self else { return }
+            resetCustomVideoScale()
+            settingsView?.update(
+                quality: videoQuality,
+                debandEnabled: debandEnabled,
+                displayMode: player.videoDisplayMode,
+                customScale: player.customVideoScale
+            )
+        }
+        settingsView.onDismiss = { [weak self, weak settingsView] in
+            guard let self, settingsPanelOverlay === settingsView else { return }
+            settingsPanelOverlay = nil
+        }
+        settingsView.update(
+            quality: videoQuality,
+            debandEnabled: debandEnabled,
+            displayMode: player.videoDisplayMode,
+            customScale: player.customVideoScale
+        )
+        presentSettingsPanel(settingsView)
+    }
+
+    func showSubtitleSettings() {
+        let settingsView = MPVQuickPlayerSubtitleSettingsView()
+        settingsView.onStyleChange = { [weak self] style in
+            self?.setSubtitleStyle(style)
+        }
+        settingsView.onDelayTap = { [weak self, weak settingsView] sourceView in
+            self?.showSubtitleDelayPicker(from: sourceView, settingsView: settingsView)
+        }
+        settingsView.onDismiss = { [weak self, weak settingsView] in
+            guard let self, settingsPanelOverlay === settingsView else { return }
+            settingsPanelOverlay = nil
+        }
+        settingsView.update(style: subtitleStyle, delay: subtitleDelay)
+        presentSettingsPanel(settingsView)
     }
 
     private func showCacheDurationPicker(
@@ -164,42 +215,35 @@ extension MPVQuickPlayerViewController {
         )
     }
 
-    func showVideoQualityPicker() {
-        let options = [MPVVideoQuality.powerSaving, .balanced, .highQuality].map { quality in
-            let marker = quality == videoQuality ? "✓ " : ""
-            return MPVQuickPlayerActionSheetOption(
-                title: marker + Self.videoQualityTitle(quality),
-                action: { [weak self] in self?.setVideoQuality(quality) }
-            )
-        }
-        presentActionSheet(
-            title: mpvLocalized("settings.video_quality"),
-            sourceView: settingsButton,
-            options: options,
-            cancelTitle: mpvLocalized("common.cancel")
-        )
-    }
-
-    func showSubtitleDelayPicker() {
+    func showSubtitleDelayPicker(
+        from sourceView: UIView,
+        settingsView: MPVQuickPlayerSubtitleSettingsView?
+    ) {
         var options = [-2.0, -1, -0.5, 0, 0.5, 1, 2].map { delay in
             let marker = abs(delay - subtitleDelay) < 0.001 ? "✓ " : ""
             return MPVQuickPlayerActionSheetOption(
                 title: marker + Self.delayTitle(delay),
-                action: { [weak self] in self?.setSubtitleDelay(delay) }
+                action: { [weak self, weak settingsView] in
+                    guard let self else { return }
+                    setSubtitleDelay(delay)
+                    settingsView?.update(style: subtitleStyle, delay: subtitleDelay)
+                }
             )
         }
-        options.append(.init(title: mpvLocalized("common.custom")) { [weak self] in
-            self?.presentAfterCurrentSheet { $0.showCustomSubtitleDelayPrompt() }
+        options.append(.init(title: mpvLocalized("common.custom")) { [weak self, weak settingsView] in
+            self?.presentAfterCurrentSheet {
+                $0.showCustomSubtitleDelayPrompt(settingsView: settingsView)
+            }
         })
         presentActionSheet(
             title: mpvLocalized("subtitle.delay"),
-            sourceView: settingsButton,
+            sourceView: sourceView,
             options: options,
             cancelTitle: mpvLocalized("common.cancel")
         )
     }
 
-    func showCustomSubtitleDelayPrompt() {
+    func showCustomSubtitleDelayPrompt(settingsView: MPVQuickPlayerSubtitleSettingsView?) {
         let alert = UIAlertController(
             title: mpvLocalized("subtitle.delay"),
             message: mpvLocalized("subtitle.delay.prompt"),
@@ -209,33 +253,14 @@ extension MPVQuickPlayerViewController {
             field.keyboardType = .numbersAndPunctuation
             field.text = String(format: "%.2f", subtitleDelay)
         }
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.apply"), style: .default) { [weak self, weak alert] _ in
-            guard let value = alert?.textFields?.first?.text.flatMap(Double.init) else { return }
-            self?.setSubtitleDelay(value)
+        alert.addAction(UIAlertAction(title: mpvLocalized("common.apply"), style: .default) {
+            [weak self, weak alert, weak settingsView] _ in
+            guard let self, let value = alert?.textFields?.first?.text.flatMap(Double.init) else { return }
+            setSubtitleDelay(value)
+            settingsView?.update(style: subtitleStyle, delay: subtitleDelay)
         })
         alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
         presentInPlayerOrientation(alert)
-    }
-
-    func showSubtitleStylePicker() {
-        let styles: [(String, MPVSubtitleStyle)] = [
-            (mpvLocalized("subtitle.style.default"), .defaultStyle),
-            (mpvLocalized("subtitle.style.large"), .large),
-            (mpvLocalized("subtitle.style.high_contrast"), .highContrast),
-        ]
-        let options = styles.map { title, style in
-            let marker = style == subtitleStyle ? "✓ " : ""
-            return MPVQuickPlayerActionSheetOption(
-                title: marker + title,
-                action: { [weak self] in self?.setSubtitleStyle(style) }
-            )
-        }
-        presentActionSheet(
-            title: mpvLocalized("subtitle.style"),
-            sourceView: settingsButton,
-            options: options,
-            cancelTitle: mpvLocalized("common.cancel")
-        )
     }
 
     func presentActionSheet(
@@ -277,13 +302,14 @@ extension MPVQuickPlayerViewController {
         contentView.layoutIfNeeded()
     }
 
-    func presentCacheSettingsOverlay(_ settingsView: MPVQuickPlayerCacheSettingsView) {
+    func presentSettingsPanel(_ settingsView: UIView & MPVQuickPlayerPanelOverlay) {
         dismissActionSheet(animated: false)
+        settingsPanelOverlay?.dismiss(animated: false)
         layoutOrientationContentView()
         updatePlaybackControlSafeAreaInsets()
         view.layoutIfNeeded()
         contentView.layoutIfNeeded()
-        cacheSettingsOverlay = settingsView
+        settingsPanelOverlay = settingsView
         contentView.addSubview(settingsView)
         settingsView.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
