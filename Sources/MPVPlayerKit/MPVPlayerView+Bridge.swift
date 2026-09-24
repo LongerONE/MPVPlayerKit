@@ -360,12 +360,11 @@ extension MPVPlayerView {
 
     nonisolated func setDecoderMode(_ decoderMode: MPVPlayerDecoderMode) {
         let rawValue = decoderMode.rawValue
+        // 只绑定解码会话代次。play/pause 会推进 playbackIntentGeneration，
+        // 若一并校验会把合法的解码模式更新误判为过期并静默丢弃。
         let sessionGeneration = currentBufferingSessionGeneration()
-        let intentGeneration = currentPlaybackIntentGeneration()
         notifyOnMain {
-            guard self.currentBufferingSessionGeneration() == sessionGeneration,
-                  self.currentPlaybackIntentGeneration() == intentGeneration
-            else {
+            guard self.currentBufferingSessionGeneration() == sessionGeneration else {
                 return
             }
             NotificationCenter.default.post(

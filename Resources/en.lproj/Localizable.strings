@@ -90,4 +90,5 @@
 "status.playback_error" = "Playback Error";
 "status.decoder_initializing" = "Decoder initializing";
 "status.hardware_decoding" = "Hardware decoding";
+"status.hardware_decoding_copy" = "Hardware decoding (copy)";
 "status.software_decoding" = "Software decoding";

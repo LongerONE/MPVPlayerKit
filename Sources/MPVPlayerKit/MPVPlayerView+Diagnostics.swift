@@ -58,34 +58,37 @@ extension MPVPlayerView {
     }
 
     nonisolated func getString(_ name: String) -> String? {
+        guard let value = getStringPreservingEmpty(name), value.isEmpty == false else {
+            return nil
+        }
+        return value
+    }
+
+    /// 保留空字符串。mpv 的 `hwdec-current` 在无硬解时为 `""`，不能与“属性缺失”混为一谈。
+    nonisolated func getStringPreservingEmpty(_ name: String) -> String? {
         guard let mpv, let pointer = mpv_get_property_string(mpv, name) else {
             return nil
         }
         defer {
             mpv_free(UnsafeMutableRawPointer(pointer))
         }
-        let value = String(cString: pointer)
-        return value.isEmpty ? nil : value
+        return String(cString: pointer)
     }
 
-    nonisolated func refreshDecoderModeAfterPlaybackRestart() {
+    nonisolated func refreshDecoderMode() {
+        dispatchPrecondition(condition: .onQueue(queue))
         mpvDebugLog("decoder diagnostics read hwdec-current begin")
-        guard let activeHWDec = getString(MPVProperty.hwdecCurrent)?
-            .trimmingCharacters(in: .whitespacesAndNewlines),
-              activeHWDec.isEmpty == false else {
-            mpvDebugLog("decoder diagnostics read hwdec-current unavailable")
-            mpvDebugLog("decoder mode remains initializing because hwdec-current is unavailable profile=\(activeProfileDescription)")
+        guard mpv != nil else {
+            mpvDebugLog("decoder mode remains initializing because handle is unavailable")
             setDecoderMode(.initializing)
             return
         }
+        let activeHWDec = getStringPreservingEmpty(MPVProperty.hwdecCurrent)
+        let decoderMode = MPVPlayerDecoderMode(hardwareDecodeCurrent: activeHWDec)
         mpvDebugLog(
-            "decoder diagnostics read hwdec-current end value=\(activeHWDec)"
+            "decoder mode confirmed activeHWDec=\(activeHWDec.map { "\"\($0)\"" } ?? "nil") "
+                + "mode=\(decoderMode) profile=\(activeProfileDescription)"
         )
-
-        let decoderMode: MPVPlayerDecoderMode = activeHWDec.caseInsensitiveCompare("no") == .orderedSame
-            ? .software
-            : .hardware
-        mpvDebugLog("decoder mode confirmed activeHWDec=\(activeHWDec) mode=\(decoderMode) profile=\(activeProfileDescription)")
         setDecoderMode(decoderMode)
     }
 

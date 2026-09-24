@@ -102,7 +102,7 @@ public protocol MPVPlayerDelegate: AnyObject {
 
 ### Decoding
 
-Hardware decoding tries `videotoolbox` first, falls back to `videotoolbox-copy`, and then to software decoding when a profile fails on the first playback attempt. The Simulator always decodes in software. Set `forceSoftwareDecode: true` in the configuration to skip the hardware paths. The active mode is reported through `didUpdateDecoderMode` (`initializing`, `hardware`, `software`).
+Hardware decoding tries `videotoolbox` first, falls back to `videotoolbox-copy`, and then to software decoding when a profile fails on the first playback attempt. The Simulator always decodes in software. Set `forceSoftwareDecode: true` in the configuration to skip the hardware paths. The active mode is reported through `didUpdateDecoderMode` (`initializing`, `hardware`, `hardwareCopy`, `software`). An empty or `no` `hwdec-current` means software decoding; values containing `copy` report as copy-based hardware decoding.
 
 ### Video quality
 

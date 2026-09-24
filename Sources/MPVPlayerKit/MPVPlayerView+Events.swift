@@ -89,7 +89,7 @@ extension MPVPlayerView {
                     self.handleBufferingPlaybackRestart()
                     self.setPlaybackRestarted(true)
                     self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-begin")
-                    self.refreshDecoderModeAfterPlaybackRestart()
+                    self.refreshDecoderMode()
                     self.mpvDebugLog("event playback-restart stage=decoder-diagnostics-end")
                     self.ensureVideoTrackSelected(reason: "playback-restart")
                     self.logPlaybackPipelineDiagnostics(reason: "playback-restart")
@@ -105,6 +105,8 @@ extension MPVPlayerView {
                         "event video-reconfig current=\(currentTime) duration=\(duration) "
                             + "playing=\(isPlaying)"
                     )
+                    // 解码器 reinit 常伴随 video-reconfig，且不一定再发 playback-restart。
+                    self.refreshDecoderMode()
                     self.ensureVideoTrackSelected(reason: "video-reconfig")
                     self.logPlaybackPipelineDiagnostics(reason: "video-reconfig")
                     self.refreshPictureInPictureVideoDisplaySize()
@@ -543,6 +545,9 @@ extension MPVPlayerView {
             handleBufferingPropertyChange(property)
         case MPVProperty.demuxerCacheTime:
             publishBufferedProgress()
+        case MPVProperty.hwdecCurrent:
+            // 播放中硬解→软解（或相反）只改 hwdec-current，必须即时刷新 UI。
+            refreshDecoderMode()
         default:
             break
         }

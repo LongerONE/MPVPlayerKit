@@ -601,4 +601,34 @@ final class MPVPlayerModelTests: XCTestCase {
         XCTAssertFalse(playerView.usesExtendedDynamicRangeOutput)
         #endif
     }
+
+    func testDecoderModeFromHardwareDecodeCurrent() {
+        XCTAssertEqual(MPVDecoderMode(hardwareDecodeCurrent: nil), .initializing)
+        XCTAssertEqual(MPVDecoderMode(hardwareDecodeCurrent: ""), .software)
+        XCTAssertEqual(MPVDecoderMode(hardwareDecodeCurrent: "   "), .software)
+        XCTAssertEqual(MPVDecoderMode(hardwareDecodeCurrent: "no"), .software)
+        XCTAssertEqual(MPVDecoderMode(hardwareDecodeCurrent: "NO"), .software)
+        XCTAssertEqual(MPVDecoderMode(hardwareDecodeCurrent: "videotoolbox"), .hardware)
+        XCTAssertEqual(MPVDecoderMode(hardwareDecodeCurrent: "videotoolbox-copy"), .hardwareCopy)
+        XCTAssertEqual(MPVDecoderMode(hardwareDecodeCurrent: "VIDEOTOOLBOX-COPY"), .hardwareCopy)
+    }
+
+    func testPlayerDecoderModeRawValuesMatchPublicMode() {
+        XCTAssertEqual(
+            MPVPlayerDecoderMode.initializing.rawValue,
+            MPVDecoderMode.initializing.rawValue
+        )
+        XCTAssertEqual(
+            MPVPlayerDecoderMode.hardware.rawValue,
+            MPVDecoderMode.hardware.rawValue
+        )
+        XCTAssertEqual(
+            MPVPlayerDecoderMode.software.rawValue,
+            MPVDecoderMode.software.rawValue
+        )
+        XCTAssertEqual(
+            MPVPlayerDecoderMode.hardwareCopy.rawValue,
+            MPVDecoderMode.hardwareCopy.rawValue
+        )
+    }
 }

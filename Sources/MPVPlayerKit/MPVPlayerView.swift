@@ -22,6 +22,18 @@ import libmpv
     case initializing
     case hardware
     case software
+    /// `videotoolbox-copy`：仍是硬解，但帧会拷贝到 CPU 可访问内存。
+    case hardwareCopy
+
+    /// 与 `MPVDecoderMode.init(hardwareDecodeCurrent:)` 同一语义。
+    init(hardwareDecodeCurrent value: String?) {
+        switch MPVDecoderMode(hardwareDecodeCurrent: value) {
+        case .initializing: self = .initializing
+        case .hardware: self = .hardware
+        case .software: self = .software
+        case .hardwareCopy: self = .hardwareCopy
+        }
+    }
 }
 
 /// 公共通知名与 payload key。字符串与现网一致，供宿主（含 Temby 桥接）直接引用。

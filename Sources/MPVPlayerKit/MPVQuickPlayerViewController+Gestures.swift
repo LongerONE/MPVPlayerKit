@@ -230,6 +230,7 @@ extension MPVQuickPlayerViewController {
         switch decoderMode {
         case .initializing: decoderTitle = mpvLocalized("status.decoder_initializing")
         case .hardware: decoderTitle = mpvLocalized("status.hardware_decoding")
+        case .hardwareCopy: decoderTitle = mpvLocalized("status.hardware_decoding_copy")
         case .software: decoderTitle = mpvLocalized("status.software_decoding")
         }
         statusLabel.text = "\(stateTitle) · \(decoderTitle) · \(Self.rateTitle(playbackRate))"

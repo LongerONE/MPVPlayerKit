@@ -90,4 +90,5 @@
 "status.playback_error" = "播放错误";
 "status.decoder_initializing" = "正在初始化解码器";
 "status.hardware_decoding" = "硬件解码";
+"status.hardware_decoding_copy" = "硬件解码（拷贝）";
 "status.software_decoding" = "软件解码";

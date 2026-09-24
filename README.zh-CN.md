@@ -108,7 +108,7 @@ public protocol MPVPlayerDelegate: AnyObject {
 
 ### 解码
 
-硬解先尝试 `videotoolbox`，失败后降级到 `videotoolbox-copy`，首次播放仍失败再降级为软解。模拟器始终使用软解。在配置中设置 `forceSoftwareDecode: true` 可跳过硬解路径。当前解码模式通过 `didUpdateDecoderMode` 上报（`initializing`、`hardware`、`software`）。
+硬解先尝试 `videotoolbox`，失败后降级到 `videotoolbox-copy`，首次播放仍失败再降级为软解。模拟器始终使用软解。在配置中设置 `forceSoftwareDecode: true` 可跳过硬解路径。当前解码模式通过 `didUpdateDecoderMode` 上报（`initializing`、`hardware`、`hardwareCopy`、`software`）。`hwdec-current` 为空或 `no` 表示软解；含 `copy` 显示为拷贝硬解。播放中 `hwdec-current` 变化与 `video-reconfig` 都会刷新该状态。
 
 ### 画质
 
@@ -184,7 +184,7 @@ JSON 编码、OSLog 输出和文件写入在 utility 异步消费任务中完成
 
 ### 解释与隐私
 
-- `hwdec-current=videotoolbox-copy` 与 `videotoolbox` 均可能被 UI 标为硬解，分析时必须看原始属性。
+- `hwdec-current` 为空或 `no` 表示当前无硬解；`videotoolbox` 为零拷贝硬解，`videotoolbox-copy` 为拷贝硬解（UI 显示「硬件解码（拷贝）」）。分析时仍应核对原始属性。
 - CPU 的 100% 表示占满一个逻辑核心，可超过 100%；它包含 App 网络、解密、UI 等工作，不是 MPV 独占值。CPU 与丢帧增量对应相邻快照区间，关键事件可能使区间短于 5 秒。首次采样、属性不可用或计数器重置时不伪装成零。
 - “首帧就绪近似值”使用 `MPV_PLAYBACK_RESTART`，不是屏幕实际呈现时间；“媒体结束”不等于播放器对象已停止，最终以“会话汇总”为准。
 - 缺失的位深/Profile/HDR/缓存属性标为“不可用”；可结合像素格式与选中轨道参数判断，不编造值。平均 bits-per-pixel 与单通道位深不可混用。

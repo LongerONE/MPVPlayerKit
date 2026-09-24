@@ -14,6 +14,30 @@ public enum MPVDecoderMode: Int, Sendable {
     case initializing
     case hardware
     case software
+    /// `videotoolbox-copy`：仍是硬解，但帧会拷贝到 CPU 可访问内存。
+    case hardwareCopy
+
+    /// 将 mpv `hwdec-current` 映射为解码模式。
+    /// - `nil`：属性不可用（句柄未就绪等）→ `initializing`
+    /// - 空字符串或 `no`：mpv 表示当前无硬解 → `software`
+    /// - 含 `copy`：拷贝硬解 → `hardwareCopy`
+    /// - 其他非空：零拷贝硬解 → `hardware`
+    public init(hardwareDecodeCurrent value: String?) {
+        guard let value else {
+            self = .initializing
+            return
+        }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty || trimmed.caseInsensitiveCompare("no") == .orderedSame {
+            self = .software
+            return
+        }
+        if trimmed.localizedCaseInsensitiveContains("copy") {
+            self = .hardwareCopy
+            return
+        }
+        self = .hardware
+    }
 }
 
 public enum MPVVideoQuality: Int, Sendable {
