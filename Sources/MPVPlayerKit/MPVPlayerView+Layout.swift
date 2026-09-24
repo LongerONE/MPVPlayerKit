@@ -36,13 +36,13 @@ struct MPVDisplayGeometry: Equatable {
         let targetVideoRect: CGRect
 
         switch contentMode {
-        case .fit:
+        case .fit, .custom:
+            // Custom shares Fit's contain mapping so 100% custom matches Fit
+            // (letterbox preserved). User zoom is layered via libmpv `video-zoom`.
             sourceVideoRect = aspectRect(aspect, in: sourceBounds, fill: false)
             targetVideoRect = aspectRect(aspect, in: safeTarget, fill: false)
-        case .fill, .custom:
+        case .fill:
             // Cover the visible target with the video aspect (no letterbox).
-            // Custom mode layers user zoom via libmpv `video-zoom` on top of
-            // this fill base so 100% custom still has no black bars.
             sourceVideoRect = aspectRect(aspect, in: sourceBounds, fill: true)
             targetVideoRect = aspectRect(aspect, in: safeTarget, fill: true)
         }
@@ -141,11 +141,11 @@ extension MPVPlayerView {
         dispatchPrecondition(condition: .onQueue(queue))
         guard mpv != nil else { return }
         switch contentModeSnapshot {
-        case .fill, .custom:
-            // Custom starts from a covered frame so letterbox bars stay hidden;
-            // `video-zoom` still applies the user's scale on top.
+        case .fill:
             setDouble(MPVProperty.panscan, 1.0)
-        case .fit:
+        case .fit, .custom:
+            // Custom starts from Fit so 100% matches Fit; `video-zoom` applies
+            // the user's scale on top.
             setDouble(MPVProperty.panscan, 0.0)
         }
         setDouble(MPVProperty.videoZoom, contentModeSnapshot.nativeVideoZoom)
@@ -158,9 +158,9 @@ extension MPVPlayerView {
             }
             return
         }
-        contentMode = videoDisplayMode == .fit
-            ? .scaleAspectFit
-            : .scaleAspectFill
+        contentMode = videoDisplayMode == .fill
+            ? .scaleAspectFill
+            : .scaleAspectFit
         applySoftwareVideoGravity()
         let contentModeSnapshot = MPVContentModeSnapshot(
             displayMode: videoDisplayMode,
@@ -174,9 +174,9 @@ extension MPVPlayerView {
     func applySoftwareVideoGravity() {
         #if targetEnvironment(simulator)
         switch videoDisplayMode {
-        case .fill, .custom:
+        case .fill:
             softwareVideoLayer.contentsGravity = .resizeAspectFill
-        case .fit:
+        case .fit, .custom:
             softwareVideoLayer.contentsGravity = .resizeAspect
         }
         #endif

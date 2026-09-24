@@ -69,26 +69,33 @@ final class MPVDisplayGeometryTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(mapping.targetVideoRect.height, 852.0)
     }
 
-    func testCustomScaleUsesFillCoverWithoutLetterbox() {
+    func testCustomScaleUsesFitBaseMatchingFitMode() {
         let targetBounds = CGRect(x: 0, y: 0, width: 852, height: 393)
-        let fillMapping = MPVDisplayGeometry.make(
+        let fitMapping = MPVDisplayGeometry.make(
             canvasSize: targetBounds.size,
             videoAspectRatio: 16.0 / 9.0,
             targetBounds: targetBounds,
-            contentMode: .fill
+            contentMode: .fit
         )
         let customMapping = MPVDisplayGeometry.make(
+            canvasSize: targetBounds.size,
+            videoAspectRatio: 16.0 / 9.0,
+            targetBounds: targetBounds,
+            contentMode: .custom(scale: 1.0)
+        )
+        let zoomedCustomMapping = MPVDisplayGeometry.make(
             canvasSize: targetBounds.size,
             videoAspectRatio: 16.0 / 9.0,
             targetBounds: targetBounds,
             contentMode: .custom(scale: 1.5)
         )
 
-        // Custom shares fill's cover mapping so 100% custom has no black bars.
-        XCTAssertEqual(customMapping.targetVideoRect, fillMapping.targetVideoRect)
-        XCTAssertEqual(customMapping.scale, fillMapping.scale, accuracy: 0.001)
-        XCTAssertGreaterThanOrEqual(customMapping.targetVideoRect.width, targetBounds.width)
-        XCTAssertGreaterThanOrEqual(customMapping.targetVideoRect.height, targetBounds.height)
+        // Custom shares Fit's contain mapping so 100% custom equals Fit.
+        XCTAssertEqual(customMapping.targetVideoRect, fitMapping.targetVideoRect)
+        XCTAssertEqual(customMapping.scale, fitMapping.scale, accuracy: 0.001)
+        // Zoom lives in libmpv `video-zoom`; geometry stays on the Fit base.
+        XCTAssertEqual(zoomedCustomMapping.targetVideoRect, fitMapping.targetVideoRect)
+        XCTAssertLessThan(customMapping.targetVideoRect.width, targetBounds.width)
     }
 
     func testCustomScaleUsesMPVVideoZoom() {
