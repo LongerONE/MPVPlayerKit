@@ -25,6 +25,7 @@ final class MPVSoftwareRenderer: @unchecked Sendable {
         label: "com.mpvplayerkit.software-renderer",
         qos: .userInitiated
     )
+    private let renderQueueKey = DispatchSpecificKey<Void>()
     private var renderContext: OpaquePointer?
     private var callbackContext: Unmanaged<MPVSoftwareRenderCallbackContext>?
     private var pixelBuffer: UnsafeMutableRawPointer?
@@ -33,6 +34,7 @@ final class MPVSoftwareRenderer: @unchecked Sendable {
 
     init?(mpv: OpaquePointer, playerView: MPVPlayerView) {
         self.playerView = playerView
+        renderQueue.setSpecific(key: renderQueueKey, value: ())
 
         var context: OpaquePointer?
         let api = UnsafeMutableRawPointer(
@@ -65,17 +67,24 @@ final class MPVSoftwareRenderer: @unchecked Sendable {
     }
 
     func stop() {
-        renderQueue.sync {
-            guard stopped == false else { return }
-            stopped = true
-            if let renderContext {
-                mpv_render_context_set_update_callback(renderContext, nil, nil)
-                mpv_render_context_free(renderContext)
-                self.renderContext = nil
-            }
-            callbackContext?.release()
-            callbackContext = nil
+        if DispatchQueue.getSpecific(key: renderQueueKey) != nil {
+            stopOnRenderQueue()
+        } else {
+            renderQueue.sync { stopOnRenderQueue() }
         }
+    }
+
+    private func stopOnRenderQueue() {
+        dispatchPrecondition(condition: .onQueue(renderQueue))
+        guard stopped == false else { return }
+        stopped = true
+        if let renderContext {
+            mpv_render_context_set_update_callback(renderContext, nil, nil)
+            mpv_render_context_free(renderContext)
+            self.renderContext = nil
+        }
+        callbackContext?.release()
+        callbackContext = nil
     }
 
     fileprivate func scheduleRender() {
