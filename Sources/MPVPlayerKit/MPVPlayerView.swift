@@ -403,6 +403,8 @@ public final class MPVPlayerView: UIView {
     /// layout is applied without requiring a device rotation.
     var pictureInPictureGeometryResynchronizationTask: Task<Void, Never>?
     var pictureInPictureGeometryResynchronizationGeneration = 0
+    // 仅在 MPV 串行队列访问；句柄销毁时清空。
+    nonisolated(unsafe) var backgroundHardwareDecode = MPVBackgroundHardwareDecode()
     nonisolated(unsafe) var setupProfiles: [MPVSetupProfile] = []
     nonisolated(unsafe) var activeSetupProfileIndex = 0; nonisolated(unsafe) var pendingProfileRetry: (resumeTime: TimeInterval, shouldPlay: Bool)?
     nonisolated let pictureInPictureRendererRuntimeState =
@@ -413,6 +415,7 @@ public final class MPVPlayerView: UIView {
         super.init(frame: frame)
         queue.setSpecific(key: queueSpecificKey, value: ())
         setupLayer()
+        observeHardwareDecodeLifecycle()
         clientSubtitleController.install(in: self)
     }
 
@@ -534,58 +537,6 @@ public final class MPVPlayerView: UIView {
     deinit {
         // deinit 不得经 stop() → queue.async { [self] } 复活对象。
         _ = detachHandleForDeinitTeardown()
-    }
-
-    @objc public func configure(_ configuration: NSDictionary) {
-        // 不在主线程读取 mpv 指针；stop 自身带 generation/stopped 守卫。
-        stop()
-
-        let urlString = configuration["url"] as? String
-        url = urlString.flatMap(URL.init(string:))
-        headers = configuration["headers"] as? [String: String] ?? [:]
-        userAgent = configuration["userAgent"] as? String
-        forceSoftwareDecode = boolValue(configuration["forceSoftwareDecode"])
-        isDolbyVisionPlayback = boolValue(configuration["isDolbyVisionPlayback"])
-        let qualityRawValue = (configuration["videoQuality"] as? NSNumber)?.intValue
-        videoQualityPreset = qualityRawValue.flatMap(MPVVideoQualityPreset.init(rawValue:)) ?? .balanced
-        debandEnabled = boolValue(configuration["debandEnabled"])
-        cacheConfiguration = MPVCacheConfiguration(
-            isEnabled: boolValue(configuration["cacheEnabled"], default: true),
-            duration: (configuration["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration
-        )
-        configurePowerDiagnostics(configuration)
-        setDecoderMode(.initializing)
-        setStopped(false)
-        setSetupFailed(false)
-        setReadyToPlayReported(false)
-        resetPictureInPictureVideoDisplaySize()
-        setPlaybackRestarted(false)
-        replaceSetupProfiles([], activeIndex: 0)
-        pictureInPictureRendererRuntimeState.reset()
-        stableMetalCanvas = nil
-        videoDisplayAspectRatioLock.lock()
-        videoDisplayAspectRatio = MPVDisplayGeometry.defaultVideoAspectRatio
-        videoDisplayAspectRatioLock.unlock()
-        pictureInPictureGeometryResynchronizationTask?.cancel()
-        pictureInPictureGeometryResynchronizationTask = nil
-        pictureInPictureGeometryResynchronizationGeneration &+= 1
-        pendingPictureInPictureGeometryResynchronizationReason = nil
-        currentTime = 0.0
-        duration = 0.0
-        bufferedProgress = nil
-        isPlaying = false
-        currentSubtitleFontCapability = .noSubtitle
-        playbackSpeed = 1.0
-        _ = nextPlaybackIntentGeneration()
-        clearPendingPlaybackPositionUpdate()
-        _ = nextBufferingSessionGeneration()
-        queue.async { [weak self] in
-            self?.resetBufferingStateOnMPVQueue(reason: "configure")
-        }
-        let colorHint = MPVColorMappingPolicy.contentHint(
-            isDolbyVisionPlayback: isDolbyVisionPlayback
-        )
-        mpvDebugLog("configure url=\(redactedURLDescription(url)) headers=\(headers.count) hasUserAgent=\(userAgent?.isEmpty == false) forceSoftwareDecode=\(forceSoftwareDecode) contentColorHint=\(colorHint.rawValue)")
     }
 
     public override func layoutSubviews() {

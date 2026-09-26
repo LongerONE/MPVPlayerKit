@@ -31,6 +31,7 @@ extension MPVPlayerView {
     }
 
     @objc public func play() {
+        let isApplicationActive = UIApplication.shared.applicationState == .active
         refreshColorOutputForTargetScreen(reason: "play")
         recordDiagnosticEvent("请求播放")
         let generation = nextPlaybackIntentGeneration()
@@ -64,6 +65,8 @@ extension MPVPlayerView {
                 return
             }
 
+            // 宿主的 didBecomeActive 可能先收到通知并调用 play。
+            if isApplicationActive { self.restoreBackgroundHardwareDecodeIfNeeded() }
             self.updateBufferingPlaybackIntent(.playing)
             let isTimeAdvancing = self.bufferingStateMachine.state == .finished
             self.setFlag(MPVProperty.pause, false)

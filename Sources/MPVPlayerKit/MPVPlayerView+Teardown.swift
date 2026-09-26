@@ -99,6 +99,7 @@ extension MPVPlayerView {
     }
 
     private nonisolated func destroyMPVHandleOnMPVQueue(reason: String, sendStopCommand: Bool) {
+        backgroundHardwareDecode = MPVBackgroundHardwareDecode()
         recordDiagnosticEvent("销毁解码配置", fields: ["原因": reason, "配置": activeProfileDescription])
         if reason == "stop" || reason == "setup-failed" {
             pendingProfileRetry = nil
