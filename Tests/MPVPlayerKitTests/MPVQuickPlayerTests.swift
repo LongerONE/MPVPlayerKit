@@ -150,6 +150,85 @@ final class MPVQuickPlayerTests: XCTestCase {
     }
 
     @MainActor
+    func testLandscapeDeclarationsStayDeviceSpecific() {
+        let portrait = ["UIInterfaceOrientationPortrait"]
+        let landscape = ["UIInterfaceOrientationLandscapeRight"]
+        XCTAssertFalse(MPVQuickPlayerViewController.supportsLandscape(
+            orientationNames: portrait, padOrientationNames: landscape, idiom: .phone
+        ))
+        XCTAssertTrue(MPVQuickPlayerViewController.supportsLandscape(
+            orientationNames: portrait, padOrientationNames: landscape, idiom: .pad
+        ))
+        XCTAssertTrue(MPVQuickPlayerViewController.supportsLandscape(
+            orientationNames: landscape, idiom: .pad
+        ))
+        XCTAssertFalse(MPVQuickPlayerViewController.supportsLandscape(
+            orientationNames: landscape, padOrientationNames: portrait, idiom: .pad
+        ))
+    }
+
+    @MainActor
+    func testOrientationButtonTogglesAndRespectsFollowPosePolicy() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
+        let controller = MPVQuickPlayerViewController(url: url, autoplay: false)
+        controller.loadViewIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        controller.updateOrientationButtonVisibility()
+        XCTAssertFalse(controller.orientationButton.isHidden)
+
+        let action = NSStringFromSelector(#selector(MPVQuickPlayerViewController.toggleForcedLandscape))
+        XCTAssertTrue(controller.orientationButton.actions(
+            forTarget: controller, forControlEvent: .touchUpInside
+        )?.contains(action) == true)
+        // Tool-hosted XCTest has no app event dispatcher; invoke the verified button action directly.
+        controller.toggleForcedLandscape()
+        XCTAssertTrue(controller.isLandscapeForced)
+        XCTAssertTrue(controller.orientationButton.isSelected)
+        if MPVQuickPlayerViewController.applicationSupportsLandscape == false {
+            XCTAssertTrue(controller.isUsingManualLandscape)
+            XCTAssertEqual(controller.contentView.bounds.size, CGSize(width: 844, height: 390))
+            XCTAssertNotEqual(controller.contentView.transform, .identity)
+        }
+
+        controller.toggleForcedLandscape()
+        XCTAssertFalse(controller.isLandscapeForced)
+        XCTAssertFalse(controller.isUsingManualLandscape)
+        XCTAssertEqual(controller.contentView.transform, .identity)
+
+        controller.toggleForcedLandscape()
+        controller.orientationPolicy = .followPose
+        XCTAssertTrue(controller.orientationButton.isHidden)
+        XCTAssertFalse(controller.isLandscapeForced)
+        XCTAssertEqual(controller.contentView.transform, .identity)
+        controller.orientationPolicy = .optionalForceLandscape
+        XCTAssertFalse(controller.orientationButton.isHidden)
+    }
+
+    @MainActor
+    func testGeometryFailureFallsBackWithoutReenablingCancelledLandscape() throws {
+        let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
+        let controller = MPVQuickPlayerViewController(url: url, autoplay: false)
+        controller.loadViewIfNeeded()
+        controller.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        controller.setForceLandscape(true)
+        controller.isUsingManualLandscape = false
+        controller.handleOrientationRequestFailure(.landscapeRight)
+        XCTAssertTrue(controller.isLandscapeForced)
+        XCTAssertTrue(controller.isUsingManualLandscape)
+        XCTAssertEqual(controller.contentView.bounds.size, CGSize(width: 844, height: 390))
+        XCTAssertNotEqual(controller.contentView.transform, .identity)
+        XCTAssertEqual(controller.supportedInterfaceOrientations, .portrait)
+
+        controller.handleOrientationRequestFailure(.portrait)
+        XCTAssertTrue(controller.isUsingManualLandscape)
+        controller.setForceLandscape(false)
+        controller.handleOrientationRequestFailure(.landscapeRight)
+        XCTAssertFalse(controller.isLandscapeForced)
+        XCTAssertFalse(controller.isUsingManualLandscape)
+        XCTAssertEqual(controller.contentView.transform, .identity)
+    }
+
+    @MainActor
     func testQuickPlayerCanForceLandscapeWhenHostOnlySupportsPortrait() throws {
         let url = try XCTUnwrap(URL(string: "https://example.com/video.mkv"))
         let controller = MPVQuickPlayerViewController(url: url, autoplay: false, forceLandscape: true)
@@ -159,7 +238,10 @@ final class MPVQuickPlayerTests: XCTestCase {
         XCTAssertTrue(MPVQuickPlayerViewController.supportsLandscape(orientationNames: ["UIInterfaceOrientationPortrait", "UIInterfaceOrientationLandscapeRight"]))
 
         controller.loadViewIfNeeded()
-        controller.view.bounds = CGRect(x: 0, y: 0, width: 390, height: 844)
+        controller.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
+        controller.updateOrientationButtonVisibility()
+        XCTAssertTrue(controller.isLandscapeForced)
+        XCTAssertFalse(controller.orientationButton.isHidden)
         controller.isUsingManualLandscape = true
         controller.layoutOrientationContentView()
         controller.updatePlaybackControlSafeAreaInsets()
@@ -181,7 +263,7 @@ final class MPVQuickPlayerTests: XCTestCase {
         XCTAssertEqual(presentedView.center, controller.view.center)
         XCTAssertEqual(presentedView.transform, controller.contentView.transform)
 
-        controller.view.bounds = CGRect(x: 0, y: 0, width: 844, height: 390)
+        controller.view.frame = CGRect(x: 0, y: 0, width: 844, height: 390)
         MPVQuickPlayerViewController.layoutPresentedView(
             presentedView,
             rootBounds: controller.view.bounds,
@@ -191,7 +273,7 @@ final class MPVQuickPlayerTests: XCTestCase {
         XCTAssertEqual(presentedView.center, controller.view.center)
         XCTAssertEqual(presentedView.transform, .identity)
 
-        controller.view.bounds = CGRect(x: 0, y: 0, width: 390, height: 844)
+        controller.view.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
         let rootStart = CGPoint(x: controller.view.bounds.midX, y: 100)
         let rootEnd = CGPoint(x: controller.view.bounds.midX, y: 220)
         let contentStart = controller.contentView.convert(rootStart, from: controller.view)

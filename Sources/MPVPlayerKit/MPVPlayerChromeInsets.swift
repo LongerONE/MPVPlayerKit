@@ -21,6 +21,6 @@ public struct MPVPlayerChromeInsets: Sendable, Equatable {
 public enum MPVOrientationPolicy: Sendable, Equatable {
     /// Follow the current pose and size class. Hides the force-landscape control.
     case followPose
-    /// Default follows pose; the force-landscape button stays available when the system allows landscape.
+    /// Default follows pose; portrait-only hosts can force landscape using content rotation.
     case optionalForceLandscape
 }

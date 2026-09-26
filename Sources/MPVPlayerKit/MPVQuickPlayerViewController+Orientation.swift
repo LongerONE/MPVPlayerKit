@@ -30,15 +30,23 @@ extension MPVQuickPlayerViewController {
     }
 
     static var applicationSupportsLandscape: Bool {
-        // Dual-display / foldable devices are not reliably described by a single
-        // idiom-specific Info.plist key. Merge both declarations.
         let phone = Bundle.main.object(forInfoDictionaryKey: "UISupportedInterfaceOrientations") as? [String]
         let pad = Bundle.main.object(forInfoDictionaryKey: "UISupportedInterfaceOrientations~ipad") as? [String]
-        return supportsLandscape(orientationNames: phone) || supportsLandscape(orientationNames: pad)
+        return supportsLandscape(
+            orientationNames: phone,
+            padOrientationNames: pad,
+            idiom: UIDevice.current.userInterfaceIdiom
+        )
     }
 
-    static func supportsLandscape(orientationNames: [String]?) -> Bool {
-        orientationNames?.contains {
+    static func supportsLandscape(
+        orientationNames: [String]?,
+        padOrientationNames: [String]? = nil,
+        idiom: UIUserInterfaceIdiom = .phone
+    ) -> Bool {
+        // iPad declarations must not enable system rotation on a portrait-only iPhone host.
+        let names = idiom == .pad ? padOrientationNames ?? orientationNames : orientationNames
+        return names?.contains {
             $0 == "UIInterfaceOrientationLandscapeLeft"
                 || $0 == "UIInterfaceOrientationLandscapeRight"
         } ?? false
@@ -83,11 +91,9 @@ extension MPVQuickPlayerViewController {
         }
     }
 
-    /// Force-landscape control is only offered when policy allows it, the app
-    /// declares landscape, and the current surface is not already wide (Duo inner).
+    /// Portrait-only hosts use manual rotation; wide regular surfaces already have a landscape canvas.
     func shouldOfferForceLandscape() -> Bool {
         guard orientationPolicy == .optionalForceLandscape else { return false }
-        guard Self.applicationSupportsLandscape else { return false }
         let bounds = view.bounds
         if bounds.width > 0, bounds.width >= bounds.height,
            traitCollection.horizontalSizeClass == .regular {
@@ -135,16 +141,9 @@ extension MPVQuickPlayerViewController {
         if #available(iOS 16.0, *) {
             let mask: UIInterfaceOrientationMask = orientation == .portrait ? .portrait : .landscapeRight
             // errorHandler fires only when the geometry update fails.
-            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { [weak self] error in
+            windowScene.requestGeometryUpdate(.iOS(interfaceOrientations: mask)) { [weak self] _ in
                 DispatchQueue.main.async { [weak self] in
-                    guard let self else { return }
-                    // Never fall back to private orientation APIs; restore follow-pose instead.
-                    isUsingManualLandscape = false
-                    if isLandscapeForced, orientation != .portrait {
-                        isLandscapeForced = false
-                        invalidateSupportedInterfaceOrientations()
-                        updateOrientationButtonVisibility()
-                    }
+                    self?.handleOrientationRequestFailure(orientation)
                 }
             }
         } else {
@@ -152,6 +151,14 @@ extension MPVQuickPlayerViewController {
             UIDevice.current.setValue(orientation.rawValue, forKey: "orientation")
             UIViewController.attemptRotationToDeviceOrientation()
         }
+    }
+
+    func handleOrientationRequestFailure(_ orientation: UIInterfaceOrientation) {
+        guard orientation != .portrait, isLandscapeForced else { return }
+        // Keep the user's selection using the existing public UIView transform fallback.
+        isUsingManualLandscape = true
+        invalidateSupportedInterfaceOrientations()
+        applyManualLandscape()
     }
 
     private func invalidateSupportedInterfaceOrientations() {
