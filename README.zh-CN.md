@@ -26,6 +26,7 @@
 ## 环境要求
 
 - iOS 15.0 或更高
+- 编译需要 Xcode 27.1 SDK 或更新版本；旧系统通过 availability 保持原布局
 - Swift 6 工具链（包使用 swift-tools 6.0、Swift 6 语言模式构建）
 - [MPVKit](https://github.com/mpvkit/MPVKit) 1.0.0（精确锁定）
 - 渲染运行在自定义 `CAMetalLayer` 上；EDR 输出需要 iOS 16+ 且设备支持
@@ -347,3 +348,16 @@ playerViewController.gestureOptions = [.seeking, .volume]
 ## 许可
 
 本包源码基于 MIT 许可发布。MPVKit 是 LGPL-3.0 依赖，其原生库有各自的分发要求；发布前请自行审阅相关条款。内置字体保留其各自的 OFL 许可。
+
+## Duo 布局回归
+
+`MPVQuickPlayerViewController` 根据真实 active division 分离画面和控件，无分割区域时沿用原布局；切换只调整约束，不重建播放器。半折事件仅请求重新布局，手动 `setHingeCompactChrome` 接口继续可用。
+
+在仓库根目录运行最小几何检查：
+
+```sh
+swiftc -module-cache-path /tmp/mpv-duo-module-cache Sources/MPVPlayerKit/MPVDuoLayout.swift Tests/check_duo_layout.swift -o /tmp/mpv-duo-check
+/tmp/mpv-duo-check
+```
+
+该检查不替代 Duo 实际开合、字幕、PiP 与宿主媒体连续性验收。

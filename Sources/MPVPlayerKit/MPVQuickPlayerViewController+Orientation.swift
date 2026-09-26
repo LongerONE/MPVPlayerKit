@@ -67,7 +67,9 @@ extension MPVQuickPlayerViewController {
             applyManualLandscape()
         } else {
             restoreManualLandscape()
-            requestInterfaceOrientation(forced ? .landscapeRight : .portrait)
+            if forced || !hasFoldingDisplay {
+                requestInterfaceOrientation(forced ? .landscapeRight : .portrait)
+            }
         }
         updateOrientationButtonVisibility()
     }
@@ -204,11 +206,12 @@ extension MPVQuickPlayerViewController {
             rootSafeAreaInsets: view.safeAreaInsets,
             usesManualLandscape: isUsingManualLandscape && isLandscapeForced
         )
+        let region = duoRegions()?.controls
         return UIEdgeInsets(
-            top: base.top + additionalChromeInsets.top,
-            left: base.left + additionalChromeInsets.leading,
-            bottom: base.bottom + additionalChromeInsets.bottom,
-            right: base.right + additionalChromeInsets.trailing
+            top: (region?.minY ?? base.top) + additionalChromeInsets.top,
+            left: (region?.minX ?? base.left) + additionalChromeInsets.leading,
+            bottom: (region.map { contentView.bounds.maxY - $0.maxY } ?? base.bottom) + additionalChromeInsets.bottom,
+            right: (region.map { contentView.bounds.maxX - $0.maxX } ?? base.right) + additionalChromeInsets.trailing
         )
     }
 
@@ -297,23 +300,26 @@ extension MPVQuickPlayerViewController {
     func updatePlaybackControlSafeAreaInsets() {
         guard isViewLoaded else { return }
         let usesManualLandscape = isUsingManualLandscape && isLandscapeForced
-        updatePlaybackControlLayout(isCompact: usesManualLandscape || isHingeCompact)
-        let insets = Self.playbackControlHorizontalInsets(
+        let regions = duoRegions()
+        updateDuoRegions(regions)
+        // 折痕区域保留两行控件，避免把时间和全部按钮挤进半屏同一行。
+        updatePlaybackControlLayout(isCompact: regions == nil && (usesManualLandscape || isHingeCompact))
+        let insets = regions != nil ? UIEdgeInsets.zero : Self.playbackControlHorizontalInsets(
             rootBounds: view.bounds,
             rootSafeAreaInsets: view.safeAreaInsets,
             usesManualLandscape: usesManualLandscape
         )
-        let reserved = duoReservedHorizontalPadding()
-        let chromeLeading = insets.left + additionalChromeInsets.leading + reserved.leading
-        let chromeTrailing = insets.right + additionalChromeInsets.trailing + reserved.trailing
+        let chromeLeading = insets.left + additionalChromeInsets.leading
+        let chromeTrailing = insets.right + additionalChromeInsets.trailing
         closeButtonLeadingConstraint?.constant = 12 + chromeLeading
         statusLabelTrailingConstraint?.constant = -(12 + chromeTrailing)
         transportStackLeadingConstraint?.constant = 12 + chromeLeading
         progressSliderTrailingConstraint?.constant = -(12 + chromeTrailing)
-        closeButtonTopSafeAreaConstraint?.isActive = usesManualLandscape == false
-        closeButtonTopEdgeConstraint?.isActive = usesManualLandscape
-        trackButtonStackBottomSafeAreaConstraint?.isActive = usesManualLandscape == false
-        trackButtonStackBottomEdgeConstraint?.isActive = usesManualLandscape
+        let usesRegionEdges = usesManualLandscape || regions != nil
+        closeButtonTopSafeAreaConstraint?.isActive = !usesRegionEdges
+        closeButtonTopEdgeConstraint?.isActive = usesRegionEdges
+        trackButtonStackBottomSafeAreaConstraint?.isActive = !usesRegionEdges
+        trackButtonStackBottomEdgeConstraint?.isActive = usesRegionEdges
     }
 
     private func updatePlaybackControlLayout(isCompact: Bool) {

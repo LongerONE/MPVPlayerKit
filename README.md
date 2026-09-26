@@ -26,6 +26,7 @@ An iOS 15+ Swift Package that wraps [MPVKit](https://github.com/mpvkit/MPVKit) w
 ## Requirements
 
 - iOS 15.0 or later
+- Xcode 27.1 SDK or later to compile the reserved-region APIs; older iOS versions keep the existing layout
 - Swift 6 toolchain (the package builds with swift-tools 6.0 in the Swift 6 language mode)
 - [MPVKit](https://github.com/mpvkit/MPVKit) 1.0.0, pinned exactly
 - Rendering runs on a custom `CAMetalLayer`; EDR output requires iOS 16 or later on a device that supports it

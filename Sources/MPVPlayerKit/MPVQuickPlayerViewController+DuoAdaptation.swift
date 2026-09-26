@@ -1,44 +1,61 @@
 import UIKit
 
-// MARK: - iPhone Duo adaptation surface (Xcode 27.0 SDK compatible)
-
-// iOS 27.1 types (UIHingeInteraction / UIView.ReservedRegion /
-// UIVerticalBarBehavior / UIArrangementViewController) are not available when
-// building with Xcode 27.0 / iOS 27.0 SDK. This file uses only APIs that exist
-// on that SDK so Temby / LuWu / MPVPlayerKit can compile on the stable toolchain.
-// Hosts on Xcode 27.1 can still drive compact chrome via `setHingeCompactChrome(_:)`.
+// MARK: - 基于实际保留区域的播放布局
 
 extension MPVQuickPlayerViewController {
-    /// Marks hinge observation as attempted (API hook reserved for Xcode 27.1 SDK).
-    var isDuoHingeObservationInstalled: Bool {
-        get { hingeInteraction != nil }
-        set { hingeInteraction = newValue ? true as AnyObject : nil }
-    }
-
-    /// Install hinge observation when the platform exposes hinge APIs.
-    /// Safe no-op on Xcode 27.0 SDK / non-Duo devices.
     func installDuoHingeObservationIfNeeded() {
         guard hingeInteraction == nil else { return }
-        // Placeholder retained so future SDK can attach UIHingeInteraction without
-        // changing call sites. On iOS 27.0 SDK this remains a no-op.
-        hingeInteraction = true as AnyObject
-    }
-
-    /// Hosts (or a future 27.1 hinge observer) toggle compact playback chrome.
-    public func setHingeCompactChrome(_ compact: Bool) {
-        guard isHingeCompact != compact else { return }
-        isHingeCompact = compact
-        if isViewLoaded {
-            updatePlaybackControlSafeAreaInsets()
+        if #available(iOS 27.1, *) {
+            let interaction = UIHingeInteraction { [weak self] _, _ in
+                guard let self else { return }
+                view.setNeedsLayout()
+            }
+            hingeInteraction = interaction
+            view.addInteraction(interaction)
         }
     }
 
-    /// Horizontal padding so custom chrome clears fold-like gaps.
-    /// Without ReservedRegion APIs, compact hinge mode adds symmetric edge padding.
-    func duoReservedHorizontalPadding() -> (leading: CGFloat, trailing: CGFloat) {
-        guard isViewLoaded else { return (0, 0) }
-        guard isHingeCompact else { return (0, 0) }
-        return (12, 12)
+    public func setHingeCompactChrome(_ compact: Bool) {
+        guard isHingeCompact != compact else { return }
+        isHingeCompact = compact
+        viewIfLoaded?.setNeedsLayout()
+    }
+
+    var hasFoldingDisplay: Bool {
+        guard isViewLoaded else { return false }
+        if #available(iOS 27.1, *) {
+            return !contentView.reservedRegions(kind: .division, options: .includeInactive).isEmpty
+        }
+        return false
+    }
+
+    func duoRegions() -> MPVDuoLayout.Regions? {
+        guard isViewLoaded else { return nil }
+        if #available(iOS 27.1, *) {
+            let insets = Self.playerOrientationSafeAreaInsets(
+                rootBounds: view.bounds, rootSafeAreaInsets: view.safeAreaInsets,
+                usesManualLandscape: isUsingManualLandscape && isLandscapeForced
+            )
+            return MPVDuoLayout.regions(
+                in: contentView.bounds.inset(by: insets),
+                divisions: contentView.reservedRegions(kind: .division).map(\.frame)
+            )
+        }
+        return nil
+    }
+
+    func updateDuoRegions(_ regions: MPVDuoLayout.Regions?) {
+        let bounds = contentView.bounds
+        let media = regions?.media ?? bounds
+        let controls = regions?.controls ?? bounds
+        let mediaValues = [media.minX, media.maxX - bounds.width, media.minY, media.maxY - bounds.height]
+        let topValues = [controls.minX, controls.maxX - bounds.width, controls.minY]
+        let controlValues = [controls.minX, controls.maxX - bounds.width, controls.maxY - bounds.height]
+        for (constraints, values) in [(duoMediaConstraints, mediaValues), (duoTopBarConstraints, topValues), (duoControlsConstraints, controlValues)] {
+            for (constraint, value) in zip(constraints, values) where constraint.constant != value {
+                constraint.constant = value
+            }
+        }
     }
 }
 
