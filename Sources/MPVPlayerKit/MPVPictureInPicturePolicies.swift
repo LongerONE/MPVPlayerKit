@@ -35,7 +35,13 @@ enum MPVPictureInPictureStartCancellationPolicy {
 
 enum MPVPictureInPictureTeardownPolicy {
     static func shouldStartSystemController(
+        isStartRequested: Bool,
+        allowsAutomaticStartFromInline: Bool,
         isStartCancellationRequested: Bool,
         isTearingDown: Bool
-    ) -> Bool { isStartCancellationRequested == false && isTearingDown == false }
+    ) -> Bool {
+        (isStartRequested || allowsAutomaticStartFromInline)
+            && isStartCancellationRequested == false
+            && isTearingDown == false
+    }
 }

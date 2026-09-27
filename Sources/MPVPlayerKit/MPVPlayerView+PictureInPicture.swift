@@ -182,9 +182,12 @@ final class MPVPictureInPictureCoordinator:
     ) {
         isStopping = false
         guard MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartRequested: isStarting,
+            allowsAutomaticStartFromInline: allowsAutomaticStartFromInline,
             isStartCancellationRequested: isStartCancellationRequested,
             isTearingDown: isTearingDown
         ) else {
+            isStartCancellationRequested = true
             isStarting = false
             pictureInPictureController.stopPictureInPicture()
             restorePlayerToInlineHierarchy()
@@ -197,9 +200,12 @@ final class MPVPictureInPictureCoordinator:
         _ pictureInPictureController: AVPictureInPictureController
     ) {
         guard MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartRequested: isStarting,
+            allowsAutomaticStartFromInline: allowsAutomaticStartFromInline,
             isStartCancellationRequested: isStartCancellationRequested,
             isTearingDown: isTearingDown
         ) else {
+            isStartCancellationRequested = true
             isStarting = false
             pictureInPictureController.stopPictureInPicture()
             restorePlayerToInlineHierarchy()

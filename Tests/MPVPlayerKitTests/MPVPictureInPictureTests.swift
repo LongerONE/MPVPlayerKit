@@ -196,16 +196,34 @@ final class MPVPictureInPictureTests: XCTestCase {
         ))
     }
 
-    func testTeardownStopsAStartThatHasNotReachedTheWindowYet() {
+    func testPictureInPictureStartRequiresIntentOrAutomaticOptIn() {
         XCTAssertTrue(MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartRequested: true,
+            allowsAutomaticStartFromInline: false,
             isStartCancellationRequested: false,
             isTearingDown: false
         ))
         XCTAssertFalse(MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartRequested: false,
+            allowsAutomaticStartFromInline: false,
+            isStartCancellationRequested: false,
+            isTearingDown: false
+        ))
+        XCTAssertTrue(MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartRequested: false,
+            allowsAutomaticStartFromInline: true,
+            isStartCancellationRequested: false,
+            isTearingDown: false
+        ))
+        XCTAssertFalse(MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartRequested: true,
+            allowsAutomaticStartFromInline: false,
             isStartCancellationRequested: false,
             isTearingDown: true
         ))
         XCTAssertFalse(MPVPictureInPictureTeardownPolicy.shouldStartSystemController(
+            isStartRequested: true,
+            allowsAutomaticStartFromInline: false,
             isStartCancellationRequested: true,
             isTearingDown: false
         ))
