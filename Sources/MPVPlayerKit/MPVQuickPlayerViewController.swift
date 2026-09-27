@@ -60,6 +60,8 @@ public final class MPVQuickPlayerViewController: UIViewController {
     let backwardButton = UIButton(type: .system)
     let playButton = UIButton(type: .system)
     let forwardButton = UIButton(type: .system)
+    let previousItemButton = UIButton(type: .system)
+    let nextItemButton = UIButton(type: .system)
     let transportStack = UIStackView()
     let progressSlider = UISlider()
     let timeLabel = UILabel()
@@ -69,6 +71,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     let subtitleButton = UIButton(type: .system)
     let pictureInPictureButton = UIButton(type: .system)
     let settingsButton = UIButton(type: .system)
+    let playlistButton = UIButton(type: .system)
     let loadingIndicator = UIActivityIndicatorView(style: .large)
     let systemVolumeView = MPVolumeView(frame: .zero)
     let gestureHUD = UIVisualEffectView(effect: UIBlurEffect(style: .systemChromeMaterialDark))
@@ -85,6 +88,13 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var panStartVolume: Float = 0
     var pinchStartScale: Double = 1.0
     var playbackState = MPVPlaybackState.paused
+    var playlistItems: [any MPVQuickPlayerPlaylistItem]?
+    var currentPlaylistIndex = 0
+    var currentPlaylistTitle: String?
+    var playlistConfiguration: MPVPlayerConfiguration?
+    var playlistSwitchTask: Task<Void, Never>?
+    var playlistSwitchGeneration: UInt64 = 0
+    var isPlaylistSwitching = false
     var idleTimerDisabledBeforePlayback: Bool?
     var decoderMode = MPVDecoderMode.initializing
     var bufferingProgress = 0
@@ -344,6 +354,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
             label: mpvLocalized("accessibility.playback_settings"),
             action: #selector(showSettings)
         )
+        configurePlaylistButton()
 
         systemVolumeView.alpha = 0.001
         systemVolumeView.isUserInteractionEnabled = false

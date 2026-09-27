@@ -84,7 +84,6 @@ extension MPVPlayerView {
         bufferedProgress = nil
         isPlaying = false
         currentSubtitleFontCapability = .noSubtitle
-        playbackSpeed = 1.0
         _ = nextPlaybackIntentGeneration()
         clearPendingPlaybackPositionUpdate()
         _ = nextBufferingSessionGeneration()

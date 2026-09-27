@@ -7,6 +7,9 @@
 "accessibility.audio_track" = "Audio track";
 "accessibility.subtitles" = "Subtitles";
 "accessibility.playback_settings" = "Playback settings";
+"accessibility.playlist" = "Playlist";
+"accessibility.previous_item" = "Previous item";
+"accessibility.next_item" = "Next item";
 "accessibility.picture_in_picture" = "Picture in Picture";
 "accessibility.force_landscape" = "Force landscape";
 "accessibility.enabled" = "On";
@@ -20,6 +23,11 @@
 
 "playback.error.title" = "Playback Error";
 "playback.error.message" = "The video could not be played.";
+
+"playlist.title" = "Playlist";
+"playlist.error.title" = "Playlist Error";
+"playlist.error.empty" = "The playlist is empty.";
+"playlist.error.invalid_index" = "The selected playlist item does not exist.";
 
 "settings.title" = "Playback Settings";
 "settings.playback_speed" = "Playback Speed";

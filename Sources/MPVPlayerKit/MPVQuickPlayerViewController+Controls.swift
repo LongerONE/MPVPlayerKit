@@ -8,6 +8,15 @@ extension MPVQuickPlayerViewController {
         controlsView.addSubview(transportStack)
 
         configureTransportButton(
+            previousItemButton,
+            symbol: .previousItem,
+            label: mpvLocalized("accessibility.previous_item"),
+            identifier: "MPVQuickPlayer.previousItemButton",
+            action: #selector(playPreviousPlaylistItem)
+        )
+        previousItemButton.isHidden = true
+
+        configureTransportButton(
             backwardButton,
             symbol: .skipBackward15,
             label: mpvLocalized("accessibility.skip_backward_15_seconds"),
@@ -28,6 +37,14 @@ extension MPVQuickPlayerViewController {
             identifier: "MPVQuickPlayer.forward15Button",
             action: #selector(skipForward15Seconds)
         )
+        configureTransportButton(
+            nextItemButton,
+            symbol: .nextItem,
+            label: mpvLocalized("accessibility.next_item"),
+            identifier: "MPVQuickPlayer.nextItemButton",
+            action: #selector(playNextPlaylistItem)
+        )
+        nextItemButton.isHidden = true
     }
 
     func configureTransportButton(

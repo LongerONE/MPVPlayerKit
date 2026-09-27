@@ -35,6 +35,7 @@ extension MPVPlayerView {
         refreshColorOutputForTargetScreen(reason: "play")
         recordDiagnosticEvent("请求播放")
         let generation = nextPlaybackIntentGeneration()
+        let requestedPlaybackSpeed = playbackSpeed
         mpvDebugLog("play requested stopped=\(isStopped()) setupFailed=\(isSetupFailed())")
         guard isStopped() == false, isSetupFailed() == false else {
             notifyState(.error)
@@ -69,6 +70,9 @@ extension MPVPlayerView {
             if isApplicationActive { self.restoreBackgroundHardwareDecodeIfNeeded() }
             self.updateBufferingPlaybackIntent(.playing)
             let isTimeAdvancing = self.bufferingStateMachine.state == .finished
+            if requestedPlaybackSpeed.isFinite, requestedPlaybackSpeed > 0.0 {
+                self.setDouble(MPVProperty.speed, requestedPlaybackSpeed)
+            }
             self.setFlag(MPVProperty.pause, false)
             self.startTimeTimer()
             let state: MPVPlayerState = self.isReadyToPlayReported() ? .bufferFinished : .buffering

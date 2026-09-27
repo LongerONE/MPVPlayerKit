@@ -62,6 +62,11 @@ extension MPVQuickPlayerViewController: MPVPlayerDelegate {
                 message: mpvLocalized("playback.error.message")
             )
         }
+        if state == .playedToTheEnd,
+           isPlaylistSwitching == false,
+           currentPlaylistIndex + 1 < (playlistItems?.count ?? 0) {
+            switchPlaylistItem(to: currentPlaylistIndex + 1)
+        }
     }
 
     public func player(
