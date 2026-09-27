@@ -301,7 +301,7 @@ iOS 16 及以上通过场景几何更新完成旋转；iOS 15 直接强制方向
 
 ### 手势
 
-单击切换顶栏与底栏控制层的显隐。内置三个全屏滑动手势：
+单击切换顶栏与底栏控制层的显隐。中央 40% 区域双击切换播放/暂停；左右各 30% 区域双击分别快退/快进 15 秒，并显示操作提示。内置三个全屏滑动手势：
 
 - **横向拖动** — 刮擦进度。满屏宽度的拖动覆盖媒体时长的 10%（钳制在 60–600 秒）；松手时才真正执行 seek，HUD 显示方向、目标时间与进度条。
 - **左半屏纵向拖动** — 屏幕亮度，HUD 显示百分比。
@@ -314,7 +314,7 @@ iOS 16 及以上通过场景几何更新完成旋转；iOS 15 直接强制方向
 playerViewController.gestureOptions = [.seeking, .volume]
 ```
 
-`MPVQuickPlayerGestureOptions` 是一个 `OptionSet`，包含 `.seeking`、`.brightness`、`.volume`、`.zoom` 与 `.all`（默认）。空集时只保留单击。
+`MPVQuickPlayerGestureOptions` 是一个 `OptionSet`，包含 `.seeking`、`.brightness`、`.volume`、`.zoom` 与 `.all`（默认），只控制滑动与捏合手势。单击和双击始终可用。
 
 ### 编程式设置
 
@@ -343,7 +343,7 @@ playerViewController.gestureOptions = [.seeking, .volume]
 - MPVKit 锁定在 `1.0.0` 版本，以保证原生运行时及其传递的二进制依赖可复现。
 - 包以动态库形式分发，使 MPVKit 的原生运行时与 App 的其他媒体依赖保持隔离。
 - 内置 Noto 字体用于一致的多语言字幕渲染，其原始许可文件位于 `Resources` 下。
-- 暂未包含：循环播放、长按倍速手势、双击手势、锁定屏幕手势、截图/录制 API，以及播放器级音量 API——快捷播放器的音量手势调节的是系统音量。
+- 暂未包含：循环播放、长按倍速手势、锁定屏幕手势、截图/录制 API，以及播放器级音量 API——快捷播放器的音量手势调节的是系统音量。
 
 ## 许可
 

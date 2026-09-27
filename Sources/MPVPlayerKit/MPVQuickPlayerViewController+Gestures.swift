@@ -121,6 +121,9 @@ extension MPVQuickPlayerViewController {
     }
 
     func showGestureHUD(icon: MPVQuickPlayerSymbol, text: String, progress: Float) {
+        gestureHUDDismissWorkItem?.cancel()
+        gestureHUDDismissWorkItem = nil
+        gestureHUDProgress.isHidden = false
         gestureHUDIcon.image = MPVQuickPlayerSymbol.image(icon, pointSize: 24)
         gestureHUDLabel.text = text
         gestureHUDProgress.setProgress(min(max(progress, 0), 1), animated: false)
@@ -131,8 +134,26 @@ extension MPVQuickPlayerViewController {
         }
     }
 
+    func showTapGestureFeedback(icon: MPVQuickPlayerSymbol, text: String) {
+        showGestureHUD(icon: icon, text: text, progress: 0)
+        gestureHUDProgress.isHidden = true
+
+        let dismissWorkItem = DispatchWorkItem { [weak self] in
+            self?.hideGestureHUD()
+        }
+        gestureHUDDismissWorkItem = dismissWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.3, execute: dismissWorkItem)
+    }
+
     func finishPan() {
         panDirection = .none
+        hideGestureHUD()
+    }
+
+    func hideGestureHUD() {
+        gestureHUDDismissWorkItem?.cancel()
+        gestureHUDDismissWorkItem = nil
+        gestureHUDProgress.isHidden = false
         UIView.animate(withDuration: 0.2) {
             self.gestureHUD.alpha = 0
         }

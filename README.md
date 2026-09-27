@@ -281,19 +281,20 @@ On iOS 16 or later the rotation goes through scene geometry updates; on iOS 15 t
 
 ### Gestures
 
-A single tap toggles the top and bottom control layers. Three full-screen pan gestures are built in:
+A single tap toggles the top and bottom control layers. Double-tap the center 40% to play or pause; double-tap the left or right 30% to seek backward or forward 15 seconds. Three full-screen pan gestures and a pinch gesture are also built in:
 
 - **Horizontal drag** — scrubbing. A full-screen-wide drag covers 10% of the media duration (clamped to 60–600 seconds); the seek is applied once when the finger is released, with a HUD showing the direction, the target time and a progress bar.
 - **Vertical drag on the left half** — screen brightness, with a percentage HUD.
 - **Vertical drag on the right half** — system volume, adjusted through a hidden `MPVolumeView`.
+- **Two-finger pinch** — resizes the picture in custom-scale mode, from 50% to 300% of fit, with a HUD showing the current scale.
 
-Each gesture can be disabled when the host app owns that interaction:
+Each pan or pinch gesture can be disabled when the host app owns that interaction:
 
 ```swift
 playerViewController.gestureOptions = [.seeking, .volume]
 ```
 
-`MPVQuickPlayerGestureOptions` is an `OptionSet` with `.seeking`, `.brightness`, `.volume` and `.all` (the default). An empty set keeps only the tap.
+`MPVQuickPlayerGestureOptions` is an `OptionSet` with `.seeking`, `.brightness`, `.volume` and `.all` (the default). It controls the pan and pinch gestures; single- and double-tap gestures remain enabled.
 
 ### Programmatic settings
 
@@ -322,7 +323,7 @@ Open `Demo/MPVPlayerKitDemo.xcodeproj` and run the `MPVPlayerKitDemo` scheme. Th
 - MPVKit is pinned to the `1.0.0` release so the native runtime and its transitive binary dependencies remain reproducible.
 - The package is distributed as a dynamic library so MPVKit's native runtime stays isolated from an app's other media dependencies.
 - The bundled Noto fonts are used for consistent multilingual subtitle rendering. Their original license files are included under `Resources`.
-- Not included (yet): loop/repeat playback, a long-press playback-rate gesture, double-tap gestures, a screen-lock gesture, screenshot or recording APIs, and a player-level volume API — the quick player's volume gesture adjusts the system volume.
+- Not included (yet): loop/repeat playback, a long-press playback-rate gesture, a screen-lock gesture, screenshot or recording APIs, and a player-level volume API — the quick player's volume gesture adjusts the system volume.
 
 ## License
 

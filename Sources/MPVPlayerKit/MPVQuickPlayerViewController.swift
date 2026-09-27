@@ -75,6 +75,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     let gestureHUDIcon = UIImageView()
     let gestureHUDLabel = UILabel()
     let gestureHUDProgress = UIProgressView(progressViewStyle: .default)
+    var gestureHUDDismissWorkItem: DispatchWorkItem?
     var isScrubbing = false
     var panDirection: PanDirection = .none
     var panStartLocation = CGPoint.zero
@@ -371,9 +372,20 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
 
     func configureGestures() {
+        let doubleTapGesture = UITapGestureRecognizer(
+            target: self,
+            action: #selector(handleContentDoubleTap(_:))
+        )
+        doubleTapGesture.numberOfTapsRequired = 2
+        doubleTapGesture.cancelsTouchesInView = false
+        doubleTapGesture.delegate = self
+
         let tapGesture = UITapGestureRecognizer(target: self, action: #selector(handleContentTap))
         tapGesture.cancelsTouchesInView = false
         tapGesture.delegate = self
+        tapGesture.require(toFail: doubleTapGesture)
+
+        contentView.addGestureRecognizer(doubleTapGesture)
         contentView.addGestureRecognizer(tapGesture)
 
         let panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePanGesture(_:)))
@@ -390,6 +402,32 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
     @objc private func handleContentTap() {
         setPlaybackControlsHidden(arePlaybackControlsHidden == false, animated: true)
+    }
+
+    @objc private func handleContentDoubleTap(_ gesture: UITapGestureRecognizer) {
+        let location = gesture.location(in: contentView)
+        let width = contentView.bounds.width
+
+        if location.x < width * 0.3 {
+            seek(by: -MPVSystemPlaybackControls.skipInterval)
+            showTapGestureFeedback(
+                icon: .skipBackward15,
+                text: mpvLocalized("accessibility.skip_backward_15_seconds")
+            )
+        } else if location.x > width * 0.7 {
+            seek(by: MPVSystemPlaybackControls.skipInterval)
+            showTapGestureFeedback(
+                icon: .skipForward15,
+                text: mpvLocalized("accessibility.skip_forward_15_seconds")
+            )
+        } else {
+            let wasPlaying = player.isPlaying
+            togglePlayback()
+            showTapGestureFeedback(
+                icon: wasPlaying ? .pause : .play,
+                text: mpvLocalized(wasPlaying ? "status.paused" : "status.playing")
+            )
+        }
     }
 
     func setPlaybackControlsHidden(_ hidden: Bool, animated: Bool) {
