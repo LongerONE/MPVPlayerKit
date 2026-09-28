@@ -348,13 +348,13 @@ public final class MPVQuickPlayerViewController: UIViewController {
             "MPVQuickPlayer.pictureInPictureButton"
         pictureInPictureButton.isEnabled = player.isPictureInPictureSupported
         updatePictureInPictureButton(isActive: player.isPictureInPictureActive)
+        configurePlaylistButton()
         configureControlButton(
             settingsButton,
             symbol: .settings,
             label: mpvLocalized("accessibility.playback_settings"),
             action: #selector(showSettings)
         )
-        configurePlaylistButton()
 
         systemVolumeView.alpha = 0.001
         systemVolumeView.isUserInteractionEnabled = false
