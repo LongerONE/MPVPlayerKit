@@ -75,6 +75,7 @@ extension MPVPlayerView {
         videoDisplayAspectRatioLock.lock()
         videoDisplayAspectRatio = MPVDisplayGeometry.defaultVideoAspectRatio
         videoDisplayAspectRatioLock.unlock()
+        updateDisplayPresentationMapping(reason: "configure")
         pictureInPictureGeometryResynchronizationTask?.cancel()
         pictureInPictureGeometryResynchronizationTask = nil
         pictureInPictureGeometryResynchronizationGeneration &+= 1
