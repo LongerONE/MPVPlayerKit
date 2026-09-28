@@ -41,8 +41,9 @@
 "settings.enable_debanding" = "启用色带抑制";
 "settings.disable_debanding" = "关闭色带抑制";
 "settings.display_mode" = "显示模式";
-"settings.fit_video" = "适应画面";
-"settings.fill_screen" = "填满屏幕";
+"settings.fit_video" = "适应";
+"settings.fill_screen" = "填充";
+"settings.display_mode.custom" = "自定义";
 "settings.custom_scale" = "自定义缩放";
 "settings.custom_scale.value" = "自定义缩放 · %d%%";
 "settings.reset_custom_scale" = "重置缩放";

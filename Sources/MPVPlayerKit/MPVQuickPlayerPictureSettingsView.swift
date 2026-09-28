@@ -86,7 +86,7 @@ final class MPVQuickPlayerPictureSettingsView: MPVQuickPlayerSettingsPanelView {
         let options: [(MPVVideoDisplayMode, MPVQuickPlayerSymbol, String)] = [
             (.fit, .displayFit, mpvLocalized("settings.fit_video")),
             (.fill, .zoom, mpvLocalized("settings.fill_screen")),
-            (.custom, .displayCustom, mpvLocalized("common.custom")),
+            (.custom, .displayCustom, mpvLocalized("settings.display_mode.custom")),
         ]
         for (mode, symbol, title) in options {
             var configuration = UIButton.Configuration.plain()

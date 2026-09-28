@@ -41,8 +41,9 @@
 "settings.enable_debanding" = "Enable Debanding";
 "settings.disable_debanding" = "Disable Debanding";
 "settings.display_mode" = "Display Mode";
-"settings.fit_video" = "Fit Video";
-"settings.fill_screen" = "Fill Screen";
+"settings.fit_video" = "Fit";
+"settings.fill_screen" = "Fill";
+"settings.display_mode.custom" = "Custom";
 "settings.custom_scale" = "Custom Scale";
 "settings.custom_scale.value" = "Custom Scale · %d%%";
 "settings.reset_custom_scale" = "Reset Scale";
