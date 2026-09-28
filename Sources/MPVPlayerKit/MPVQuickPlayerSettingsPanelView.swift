@@ -292,7 +292,7 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
             label.leadingAnchor.constraint(equalTo: row.leadingAnchor),
             label.centerYAnchor.constraint(equalTo: row.centerYAnchor),
             switchView.leadingAnchor.constraint(greaterThanOrEqualTo: label.trailingAnchor, constant: 12),
-            switchView.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            switchView.trailingAnchor.constraint(equalTo: row.trailingAnchor, constant: -8),
             switchView.centerYAnchor.constraint(equalTo: row.centerYAnchor),
         ])
         return row
