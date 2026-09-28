@@ -19,6 +19,8 @@ enum MPVQuickPlayerSymbol: String, CaseIterable {
     case playlist = "list.bullet"
     case playbackSpeed = "gauge"
     case pictureSettings = "display"
+    case displayFit = "arrow.down.right.and.arrow.up.left"
+    case displayCustom = "viewfinder"
     case cache = "externaldrive.fill"
     case seekBackward = "gobackward"
     case seekForward = "goforward"

@@ -299,22 +299,26 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
     }
 
     func makeSegmentRow(title: String, segmentedControl: UISegmentedControl) -> UIView {
+        makeSegmentRow(title: title, control: segmentedControl)
+    }
+
+    func makeSegmentRow(title: String, control: UIView) -> UIView {
         let row = UIView()
         row.translatesAutoresizingMaskIntoConstraints = false
         let label = makeRowLabel(title)
         row.addSubview(label)
-        row.addSubview(segmentedControl)
+        row.addSubview(control)
         label.translatesAutoresizingMaskIntoConstraints = false
-        segmentedControl.translatesAutoresizingMaskIntoConstraints = false
+        control.translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             row.heightAnchor.constraint(greaterThanOrEqualToConstant: 44),
             label.leadingAnchor.constraint(equalTo: row.leadingAnchor),
             label.topAnchor.constraint(equalTo: row.topAnchor, constant: 4),
             label.trailingAnchor.constraint(lessThanOrEqualTo: row.trailingAnchor),
-            segmentedControl.leadingAnchor.constraint(equalTo: row.leadingAnchor),
-            segmentedControl.trailingAnchor.constraint(equalTo: row.trailingAnchor),
-            segmentedControl.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 8),
-            segmentedControl.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -4),
+            control.leadingAnchor.constraint(equalTo: row.leadingAnchor),
+            control.trailingAnchor.constraint(equalTo: row.trailingAnchor),
+            control.topAnchor.constraint(equalTo: label.bottomAnchor, constant: 8),
+            control.bottomAnchor.constraint(equalTo: row.bottomAnchor, constant: -4),
         ])
         return row
     }
