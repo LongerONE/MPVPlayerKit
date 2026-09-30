@@ -87,8 +87,14 @@ extension MPVPlayerView {
         currentSubtitleFontCapability = .noSubtitle
         _ = nextPlaybackIntentGeneration()
         clearPendingPlaybackPositionUpdate()
-        _ = nextBufferingSessionGeneration()
+        let session = nextBufferingSessionGeneration()
+        let snapshot = configurationState.snapshot()
         queue.async { [weak self] in
+            self?.queueConfigurationGeneration = session
+            self?.queueConfiguration = snapshot
+            self?.setReadyToPlayReported(false)
+            self?.setPlaybackRestarted(false)
+            self?.replaceSetupProfiles([], activeIndex: 0)
             self?.resetBufferingStateOnMPVQueue(reason: "configure")
         }
         let colorHint = MPVColorMappingPolicy.contentHint(

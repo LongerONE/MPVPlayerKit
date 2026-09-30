@@ -166,15 +166,18 @@ final class MPVPlaybackUpdateTests: XCTestCase {
             playbackPositionGeneration: positionGeneration
         )
 
-        playerView.performOnMPVQueueSync {
+        let gate = DispatchSemaphore(value: 0)
+        playerView.queue.async {
+            gate.wait()
             transfer.value.bindMPVPlaybackUpdateSourceSession(sourceSession)
-            transfer.value.handleSeekReply(
-                request: request,
-                error: -1,
-                recoverySnapshot: MPVPlaybackTimeSnapshot(currentTime: 12, duration: 90)
-            )
+            transfer.value.handleSeekReply(request: request, error: -1, recoverySnapshot:
+                MPVPlaybackTimeSnapshot(currentTime: 12, duration: 90))
         }
         _ = playerView.nextBufferingSessionGeneration()
+        gate.signal()
+        await withCheckedContinuation { continuation in
+            playerView.queue.async { continuation.resume() }
+        }
         await Task.yield()
 
         XCTAssertEqual(playerView.currentTime, 120)
@@ -206,9 +209,10 @@ final class MPVPlaybackUpdateTests: XCTestCase {
 
         let result: (ranOnMPVQueue: Bool, hasNoHandleUpdate: Bool) = await withCheckedContinuation { continuation in
             playerView.queue.async {
+                dispatchPrecondition(condition: .onQueue(transfer.value.queue))
                 let update = transfer.value.readMPVPlaybackUpdate()
                 continuation.resume(returning: (
-                    DispatchQueue.getSpecific(key: transfer.value.queueSpecificKey) != nil,
+                    true,
                     update == nil
                 ))
             }

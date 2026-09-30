@@ -240,15 +240,17 @@ private extension MPVSubtitleDocument {
     }
 
     static func parseTimestamp(_ source: String) -> TimeInterval? {
-        let value = source
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .split(separator: " ", maxSplits: 1)[0]
-            .replacingOccurrences(of: ",", with: ".")
-        let components = value.split(separator: ":")
-        guard components.count == 3,
-              let hours = Double(components[0]),
-              let minutes = Double(components[1]),
-              let seconds = Double(components[2]) else { return nil }
-        return hours * 3600 + minutes * 60 + seconds
+        guard let token = source.split(whereSeparator: \.isWhitespace).first else { return nil }
+        let components = token.replacingOccurrences(of: ",", with: ".")
+            .split(separator: ":", omittingEmptySubsequences: false)
+        guard components.count == 2 || components.count == 3,
+              let minutes = Double(components[components.count - 2]),
+              let seconds = Double(components[components.count - 1]),
+              minutes.isFinite, seconds.isFinite,
+              minutes >= 0, minutes < 60, seconds >= 0, seconds < 60 else { return nil }
+        let hours = components.count == 3 ? Double(components[0]) : 0
+        guard let hours, hours.isFinite, hours >= 0 else { return nil }
+        let time = hours * 3600 + minutes * 60 + seconds
+        return time.isFinite ? time : nil
     }
 }

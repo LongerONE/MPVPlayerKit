@@ -73,6 +73,10 @@ public final class MPVPlayer: NSObject {
     private var observers: [NSObjectProtocol] = []
     private var pendingSubtitleLoads: [String: PendingSubtitleLoad] = [:]
     private var subtitleLoadGeneration: UInt64 = 0
+    private var subtitleDownloads: [String: Task<Void, Never>] = [:]
+    private(set) var subtitleFiles: [String: URL] = [:]
+    var subtitleDownloadSession = URLSession.shared
+    var subtitleLoadTimeout: TimeInterval = 10
 
     public init(configuration: MPVPlayerConfiguration) {
         playbackView = MPVPlayerView(frame: .zero)
@@ -103,6 +107,8 @@ public final class MPVPlayer: NSObject {
             load.timeout.cancel()
             load.completion(false)
         }
+        subtitleDownloads.values.forEach { $0.cancel() }
+        subtitleFiles.values.forEach { try? FileManager.default.removeItem(at: $0) }
         playbackView.stop()
     }
 
@@ -116,6 +122,9 @@ public final class MPVPlayer: NSObject {
 
     public func stop() {
         playbackView.stop()
+        Array(pendingSubtitleLoads.keys).compactMap(UUID.init(uuidString:)).forEach(cancelExternalSubtitleLoad)
+        subtitleFiles.values.forEach { try? FileManager.default.removeItem(at: $0) }
+        subtitleFiles.removeAll()
     }
 
     public func startPictureInPicture() {
@@ -212,11 +221,8 @@ public final class MPVPlayer: NSObject {
         subtitleLoadGeneration &+= 1
         let generation = subtitleLoadGeneration
         let timeout = DispatchWorkItem { [weak self] in
-            self?.finishSubtitleLoad(
-                requestID: requestID.uuidString,
-                success: false,
-                generation: generation
-            )
+            guard let self, self.pendingSubtitleLoads[requestID.uuidString]?.generation == generation else { return }
+            self.cancelExternalSubtitleLoad(requestID)
         }
         pendingSubtitleLoads[requestID.uuidString] = PendingSubtitleLoad(
             completion: completion,
@@ -229,7 +235,7 @@ public final class MPVPlayer: NSObject {
             "usesOriginalStyle": NSNumber(value: usesOriginalStyle),
         ] as NSDictionary
         playbackView.loadSubtitle(options)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeout)
+        DispatchQueue.main.asyncAfter(deadline: .now() + subtitleLoadTimeout, execute: timeout)
         return requestID
     }
 
@@ -243,30 +249,29 @@ public final class MPVPlayer: NSObject {
         subtitleLoadGeneration &+= 1
         let generation = subtitleLoadGeneration
         let timeout = DispatchWorkItem { [weak self] in
-            self?.finishSubtitleLoad(
-                requestID: requestID.uuidString,
-                success: false,
-                generation: generation
-            )
+            guard let self, self.pendingSubtitleLoads[requestID.uuidString]?.generation == generation else { return }
+            self.cancelExternalSubtitleLoad(requestID)
         }
         pendingSubtitleLoads[requestID.uuidString] = PendingSubtitleLoad(
             completion: completion,
             timeout: timeout,
             generation: generation
         )
-        playbackView.loadSubtitle([
-            "requestID": requestID.uuidString,
-            "url": url.absoluteString,
-            "usesOriginalStyle": NSNumber(value: false),
-        ] as NSDictionary)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 10, execute: timeout)
+        if headers.isEmpty || url.isFileURL {
+            playbackView.loadSubtitle([
+                "requestID": requestID.uuidString,
+                "url": url.absoluteString,
+                "usesOriginalStyle": NSNumber(value: false),
+            ] as NSDictionary)
+        } else {
+            startSubtitleDownload(url: url, headers: headers, requestID: requestID, generation: generation)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + subtitleLoadTimeout, execute: timeout)
         return requestID
     }
 
     public func cancelExternalSubtitleLoad(_ requestID: UUID) {
-        playbackView.cancelClientSubtitleLoad([
-            "requestID": requestID.uuidString,
-        ] as NSDictionary)
+        subtitleDownloads[requestID.uuidString]?.cancel()
         playbackView.cancelSubtitleLoad([
             "requestID": requestID.uuidString,
         ] as NSDictionary)
@@ -287,6 +292,50 @@ public final class MPVPlayer: NSObject {
 
     public func currentSubtitleText() -> String? {
         playbackView.currentSubtitleText() as String?
+    }
+
+    private func startSubtitleDownload(
+        url: URL, headers: [String: String], requestID: UUID, generation: UInt64
+    ) {
+        let session = playbackView.currentBufferingSessionGeneration()
+        playbackView.beginExternalSubtitleDownload()
+        let networkSession = subtitleDownloadSession
+        subtitleDownloads[requestID.uuidString] = Task { @MainActor [weak self] in
+            var localURL: URL?
+            defer {
+                if let localURL { try? FileManager.default.removeItem(at: localURL) }
+                self?.subtitleDownloads[requestID.uuidString] = nil
+            }
+            do {
+                var request = URLRequest(url: url)
+                headers.forEach { request.setValue($0.value, forHTTPHeaderField: $0.key) }
+                let (download, response) = try await networkSession.download(for: request)
+                defer { try? FileManager.default.removeItem(at: download) }
+                try Task.checkCancellation()
+                guard let self, self.pendingSubtitleLoads[requestID.uuidString]?.generation == generation,
+                      self.subtitleLoadGeneration == generation,
+                      self.playbackView.currentBufferingSessionGeneration() == session,
+                      !self.playbackView.isStopped(),
+                      let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
+                    self?.finishSubtitleLoad(requestID: requestID.uuidString, success: false)
+                    return
+                }
+                let destination = FileManager.default.temporaryDirectory
+                    .appendingPathComponent("mpv-subtitle-" + requestID.uuidString)
+                    .appendingPathExtension(url.pathExtension.isEmpty ? "srt" : url.pathExtension)
+                localURL = destination
+                try FileManager.default.moveItem(at: download, to: destination)
+                self.subtitleFiles[requestID.uuidString] = destination
+                localURL = nil
+                self.playbackView.loadSubtitle([
+                    "requestID": requestID.uuidString,
+                    "url": destination.absoluteString,
+                    "usesOriginalStyle": NSNumber(value: false),
+                ] as NSDictionary)
+            } catch {
+                self?.finishSubtitleLoad(requestID: requestID.uuidString, success: false)
+            }
+        }
     }
 
     private func observePlaybackEvents() {
@@ -399,6 +448,10 @@ public final class MPVPlayer: NSObject {
         }
         pendingSubtitleLoads.removeValue(forKey: requestID)
         pending.timeout.cancel()
+        subtitleDownloads[requestID]?.cancel()
+        if !success, let file = subtitleFiles.removeValue(forKey: requestID) {
+            try? FileManager.default.removeItem(at: file)
+        }
         pending.completion(success)
     }
 

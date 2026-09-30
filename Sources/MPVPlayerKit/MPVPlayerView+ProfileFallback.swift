@@ -28,42 +28,56 @@ extension MPVPlayerView {
             return false
         }
 
-        var nextIndex = profile.index + 1
+        let nextIndex = profile.index + 1
         guard nextIndex < profile.count else {
             mpvDebugLog("profile retry skipped no more profiles current=\(activeProfileDescription) error=\(errorCode)")
             return false
         }
 
-        if playbackHadStarted {
-            let resumeTime = max(currentTime, 0.0)
-            let shouldPlay = isPlaying
-            pendingProfileRetry = (resumeTime: resumeTime, shouldPlay: shouldPlay)
+        let session = currentBufferingSessionGeneration()
+        let intent = currentPlaybackIntentGeneration()
+        let resumeTime = playbackHadStarted ? max(currentTime, 0) : 0
+        let shouldPlay = isPlaying
+        queue.async { [weak self] in
+            guard let self, !self.isStopped(),
+                  self.currentBufferingSessionGeneration() == session else { return }
+            if playbackHadStarted {
+                self.pendingProfileRetry = (resumeTime, shouldPlay && self.isPlaybackIntentCurrent(intent))
+            }
+            let success = self.retryProfileOnMPVQueue(url: url, nextIndex: nextIndex,
+                count: profile.count, errorCode: errorCode)
+            if !success {
+                let failureSession = self.queueConfigurationGeneration
+                self.notifyOnMain {
+                    guard !self.isStopped(), self.currentBufferingSessionGeneration() == failureSession,
+                          self.isPlaybackIntentCurrent(intent) else { return }
+                    self.stopSystemPlaybackProgress(keepingOwner: true)
+                    self.notifyState(.error)
+                }
+            }
         }
+        return true
+    }
 
+    private nonisolated func retryProfileOnMPVQueue(
+        url: URL, nextIndex: Int, count: Int, errorCode: CInt
+    ) -> Bool {
+        dispatchPrecondition(condition: .onQueue(queue))
         let oldProfile = activeProfileDescription
         destroyMPVHandle(reason: "profile-\(oldProfile)-end-file-error-\(errorCode)", sendStopCommand: false)
-
-        while nextIndex < profile.count {
-            setActiveSetupProfileIndex(nextIndex)
+        var index = nextIndex
+        while index < count, !isStopped(), currentBufferingSessionGeneration() == queueConfigurationGeneration {
+            setActiveSetupProfileIndex(index)
             prepareProfilesForNextRenderer()
             setReadyToPlayReported(false)
             setPlaybackRestarted(false)
-            resetPictureInPictureVideoDisplaySize()
-            guard let nextProfile = setupProfile(at: nextIndex) else {
-                mpvDebugLog("profile retry skipped missing rebuilt profile next=\(nextIndex) error=\(errorCode)")
-                return false
-            }
-            mpvDebugLog("profile retry next old=\(oldProfile) next=\(nextProfile.name) error=\(errorCode)")
+            guard let nextProfile = setupProfile(at: index) else { return false }
             if setupMPV(url: url, profile: nextProfile) {
-                recordDiagnosticEvent(
-                    "解码配置回退",
-                    fields: ["原配置": oldProfile, "新配置": nextProfile.name]
-                )
+                recordDiagnosticEvent("解码配置回退", fields: ["原配置": oldProfile, "新配置": nextProfile.name])
                 return true
             }
-            nextIndex += 1
+            index += 1
         }
-
         return false
     }
 

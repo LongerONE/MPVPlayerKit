@@ -218,10 +218,17 @@ public final class MPVQuickPlayerViewController: UIViewController {
         updatePlaybackControlSafeAreaInsets()
     }
 
+    private var hasConsumedAutoplay = false
+    private var pendingPlaybackSessionExit = false
+    var isPlaybackSessionClosed = false
+
     public override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        pendingPlaybackSessionExit = false
         applyPreferredOrientationIfNeeded()
         updateIdleTimer(for: playbackState)
+        guard !isPlaybackSessionClosed, !hasConsumedAutoplay else { return }
+        hasConsumedAutoplay = true
         if autoplay, player.isPlaying == false {
             player.play()
         }
@@ -244,11 +251,30 @@ public final class MPVQuickPlayerViewController: UIViewController {
         settingsPanelOverlay?.updatePlayerSafeAreaInsets(playerOrientationSafeAreaInsets())
     }
 
+    public override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        if isBeingDismissed || isMovingFromParent || navigationController?.isBeingDismissed == true {
+            pendingPlaybackSessionExit = true
+            if transitionCoordinator?.isInteractive != true { finishPlaybackSession() }
+        }
+    }
+
+    func finishPlaybackSession() {
+        guard !isPlaybackSessionClosed else { return }
+        isPlaybackSessionClosed = true
+        playlistSwitchGeneration &+= 1
+        playlistSwitchTask?.cancel()
+        playlistSwitchTask = nil
+        isPlaylistSwitching = false
+        player.stop()
+        restoreIdleTimer()
+    }
+
     public override func viewDidDisappear(_ animated: Bool) {
         super.viewDidDisappear(animated)
         restoreIdleTimer()
-        if isBeingDismissed || navigationController?.isBeingDismissed == true {
-            player.stop()
+        if pendingPlaybackSessionExit || isBeingDismissed || isMovingFromParent || navigationController?.isBeingDismissed == true {
+            finishPlaybackSession()
         }
     }
 
@@ -466,7 +492,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
     }
 
     @objc private func closePlayer() {
-        player.stop()
+        finishPlaybackSession()
         if isLandscapeForced {
             setForceLandscape(false)
         }

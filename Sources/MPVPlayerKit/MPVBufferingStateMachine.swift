@@ -127,6 +127,12 @@ struct MPVBufferingStateMachine: Sendable {
             return action
         }
 
+        if snapshot.seeking {
+            let action = cancelFallbackIfNeeded()
+            finishBuffering(reason: .seeking)
+            return action
+        }
+
         if snapshot.pausedForCache == true {
             let action = cancelFallbackIfNeeded()
             enterBuffering(reason: .pausedForCache)

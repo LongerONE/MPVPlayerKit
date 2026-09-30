@@ -14,7 +14,8 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         let sampleURL = URL(string: "https://devstreaming-cdn.apple.com/videos/streaming/examples/adv_dv_atmos/main.m3u8")!
         let playerViewController = MPVQuickPlayerViewController(url: sampleURL)
         let window = UIWindow(windowScene: windowScene)
-        window.rootViewController = playerViewController
+        window.rootViewController = ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil
+            ? playerViewController : UIViewController()
         window.makeKeyAndVisible()
         self.window = window
     }

@@ -343,7 +343,7 @@ final class MPVQuickPlayerTests: XCTestCase {
         controller.loadViewIfNeeded()
 
         XCTAssertEqual(
-            controller.transportStack.arrangedSubviews,
+            controller.transportStack.arrangedSubviews.filter { !$0.isHidden },
             [controller.backwardButton, controller.playButton, controller.forwardButton]
         )
         XCTAssertEqual(

@@ -78,12 +78,6 @@ extension MPVPlayerView {
             MainActor.assumeIsolated {
                 self.stopPictureInPictureForPlayerTeardown()
             }
-        } else {
-            DispatchQueue.main.async { [weak self] in
-                MainActor.assumeIsolated {
-                    self?.stopPictureInPictureForPlayerTeardown()
-                }
-            }
         }
 
         if DispatchQueue.getSpecific(key: queueSpecificKey) != nil {
@@ -106,18 +100,24 @@ extension MPVPlayerView {
         }
         if reason == "stop" || reason == "setup-failed" { finishPowerDiagnostics(reason: reason) }
         diagnosticProbe?.clearStaticMPVFieldCache()
+        let sourceSession = currentMPVPlaybackUpdateSourceSession()
+        let teardownSession = sourceSession.flatMap { advanceBufferingSession(ifCurrent: $0) }
+        if let teardownSession, queueConfigurationGeneration == sourceSession {
+            queueConfigurationGeneration = teardownSession
+        }
         notifyOnMain {
+            guard self.currentBufferingSessionGeneration() == teardownSession else { return }
+            self.stopPictureInPictureForPlayerTeardown()
             MPVSystemPlaybackCoordinator.shared.deactivate(playerView: self)
         }
-        _ = nextBufferingSessionGeneration()
         setDecoderMode(.initializing)
         clearMPVPlaybackUpdateSourceSession()
-        clearPendingPlaybackPositionUpdate()
         resetBufferingStateOnMPVQueue(reason: "destroy-\(reason)", notifyFinish: true)
         stopTimeTimer()
         clearMediaTracksCache()
         clearSubtitleTextCache()
         notifyOnMain {
+            guard self.currentBufferingSessionGeneration() == teardownSession else { return }
             self.updatePictureInPictureVideoDisplaySize(.zero)
         }
         performOnMPVQueueSync {

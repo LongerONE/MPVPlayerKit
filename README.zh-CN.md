@@ -251,7 +251,9 @@ final class AppSubtitleRenderer: MPVSubtitleRenderer {
 }
 ```
 
-`cancelExternalSubtitleLoad` / `cancelClientSubtitleLoad` 会同时取消 client 与 libmpv 两条路径上以该 requestID 挂起的加载。
+`cancelExternalSubtitleLoad` / `cancelClientSubtitleLoad` 会取消该 requestID 的加载。超时会取消底层请求，合并请求中的其他订阅者继续等待。
+
+`MPVPlayer.loadClientSubtitle(from:headers:completion:)` 仍由 libmpv 渲染。远程字幕带独立请求头时，先下载到播放器管理的临时文件；失败、取消、停止或释放时清理。字幕头不会覆盖媒体头。自绘字幕隐藏再显示会保留选中的文档。
 
 ## 字幕字体
 
@@ -289,7 +291,7 @@ let playerViewController = MPVQuickPlayerViewController(
 present(playerViewController, animated: true)
 ```
 
-视图出现后自动开始播放，除非把 `autoplay` 设为 `false`。快捷界面提供播放/暂停、seek、时间显示、进出画中画窗口的画中画按钮、视频/音频/字幕轨道选择、外挂字幕加载与取消、字幕延迟与样式预设、倍速、画质、去色带、内存缓冲设置、fit/fill 显示模式、解码与缓冲状态、强制横屏控制，以及居中加载指示器。紧凑控制栏使用系统图标并带无障碍标签。宿主 App 仅声明竖屏时强制横屏同样可用：系统级场景旋转不可用时，快捷播放器自行旋转其内容。
+视图首次出现后自动开始播放，除非把 `autoplay` 设为 `false`；覆盖页返回时保留用户的暂停选择。快捷界面提供播放/暂停、seek、时间显示、进出画中画窗口的画中画按钮、视频/音频/字幕轨道选择、外挂字幕加载与取消、字幕延迟与样式预设、倍速、画质、去色带、内存缓冲设置、fit/fill 显示模式、解码与缓冲状态、强制横屏控制，以及居中加载指示器。紧凑控制栏使用系统图标并带无障碍标签。宿主 App 仅声明竖屏时强制横屏同样可用：系统级场景旋转不可用时，快捷播放器自行旋转其内容。
 
 播放器可见时也可以切换横屏锁定：
 
@@ -361,3 +363,15 @@ swiftc -module-cache-path /tmp/mpv-duo-module-cache Sources/MPVPlayerKit/MPVDuoL
 ```
 
 该检查不替代 Duo 实际开合、字幕、PiP 与宿主媒体连续性验收。
+
+## 回归测试
+
+Demo 的共享 scheme 包含真实 `MPVPlayerKitTests.xctest`，测试时不会自动播放网络示例。当前 Xcode 的 XCTest 运行时要求 iOS 17+；播放器本身仍支持 iOS 15+。
+
+```bash
+MPV_TEST_DESTINATION='platform=iOS Simulator,name=iPhone 18 Pro' bash Tests/run_ios_tests.sh
+bash Tests/run_subtitle_document_tests.sh
+bash Tests/run_hls_resolver_tests.sh
+```
+
+请把模拟器名称替换成 `xcrun simctl list devices available` 中已安装的设备。检查 XCTest 实际执行数量和 `.xcresult`，不能把 `build-for-testing` 当作测试已通过。真机 PiP、HDR、后台和 Duo 姿态仍需单独验收。

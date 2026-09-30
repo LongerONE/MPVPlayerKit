@@ -47,13 +47,15 @@ enum MPVHLSMasterResolver: Sendable {
     static func resolveMediaPlaylistSync(
         from masterURL: URL,
         session: URLSession = .shared,
+        headers: [String: String] = [:],
+        userAgent: String? = nil,
         shouldCancel: @Sendable () -> Bool = { false }
     ) -> URL {
         guard needsResolution(masterURL), !shouldCancel() else { return masterURL }
         let result = ResolutionResult()
         var request = URLRequest(url: masterURL)
         request.timeoutInterval = 15
-        request.setValue(defaultUserAgent, forHTTPHeaderField: "User-Agent")
+        applyRequestContext(to: &request, headers: headers, userAgent: userAgent)
         let task = session.dataTask(with: request) { data, response, _ in
             defer { result.semaphore.signal() }
             guard let data else { return }
@@ -61,9 +63,7 @@ enum MPVHLSMasterResolver: Sendable {
                 return
             }
             let text = String(decoding: data, as: UTF8.self)
-            let variants = parseVariants(in: text, baseURL: masterURL)
-            guard let picked = pickVariant(from: variants) else { return }
-            result.store(picked.url)
+            result.store(resolvedURL(in: text, baseURL: response?.url ?? masterURL, masterURL: masterURL))
         }
         task.resume()
         let deadline = DispatchTime.now() + 15
@@ -81,25 +81,47 @@ enum MPVHLSMasterResolver: Sendable {
     /// or cannot be parsed. Returns a concrete variant playlist on success.
     static func resolveMediaPlaylist(
         from masterURL: URL,
-        session: URLSession = .shared
+        session: URLSession = .shared,
+        headers: [String: String] = [:],
+        userAgent: String? = nil
     ) async -> URL {
         guard needsResolution(masterURL) else { return masterURL }
         do {
             var request = URLRequest(url: masterURL)
             request.timeoutInterval = 15
-            request.setValue(Self.defaultUserAgent, forHTTPHeaderField: "User-Agent")
+            applyRequestContext(to: &request, headers: headers, userAgent: userAgent)
             let (data, response) = try await session.data(for: request)
             if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
                 return masterURL
             }
             let text = String(decoding: data, as: UTF8.self)
-            let variants = parseVariants(in: text, baseURL: masterURL)
-            guard variants.isEmpty == false else { return masterURL }
-            guard let picked = pickVariant(from: variants) else { return masterURL }
-            return picked.url
+            return resolvedURL(in: text, baseURL: response.url ?? masterURL, masterURL: masterURL)
         } catch {
             return masterURL
         }
+    }
+
+    /// 外置音频、字幕或视频依赖 master 的组关联，不能直接降为视频 playlist。
+    static func resolvedURL(in playlist: String, baseURL: URL, masterURL: URL) -> URL {
+        let hasExternalRendition = playlist.split(whereSeparator: \.isNewline).contains { line in
+            let text = line.trimmingCharacters(in: .whitespaces)
+            return text.hasPrefix("#EXT-X-MEDIA:") && parseAttributes(from: text)["URI"]?.isEmpty == false
+        }
+        guard !hasExternalRendition else { return masterURL }
+        return pickVariant(from: parseVariants(in: playlist, baseURL: baseURL))?.url ?? masterURL
+    }
+
+    private static func applyRequestContext(
+        to request: inout URLRequest, headers: [String: String], userAgent: String?
+    ) {
+        for (key, value) in headers {
+            guard key.caseInsensitiveCompare("Authorization") != .orderedSame,
+                  key.caseInsensitiveCompare("X-Emby-Authorization") != .orderedSame else { continue }
+            request.setValue(value.replacingOccurrences(of: "\r", with: " ")
+                .replacingOccurrences(of: "\n", with: " "), forHTTPHeaderField: key)
+        }
+        request.setValue(userAgent?.isEmpty == false ? userAgent : defaultUserAgent,
+                         forHTTPHeaderField: "User-Agent")
     }
 
     static let defaultUserAgent =

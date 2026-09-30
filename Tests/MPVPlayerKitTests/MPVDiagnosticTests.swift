@@ -191,7 +191,8 @@ final class MPVDiagnosticTests: XCTestCase {
         let notification = expectation(description: "后台状态通知返回主线程")
         let observer = NotificationCenter.default.addObserver(
             forName: MPVPlayerKitNotification.didChangeState, object: view, queue: nil
-        ) { _ in
+        ) { event in
+            guard (event.userInfo?[MPVPlayerKitNotificationKey.state] as? Int) == MPVPlayerState.buffering.rawValue else { return }
             XCTAssertTrue(Thread.isMainThread)
             notification.fulfill()
         }

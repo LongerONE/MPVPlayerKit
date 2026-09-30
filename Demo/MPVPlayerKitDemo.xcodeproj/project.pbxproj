@@ -5,6 +5,58 @@
 	};
 	objectVersion = 60;
 	objects = {
+        B20000000000000000000206 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVPictureInPictureRendererTests.swift; sourceTree = "<group>"; };
+        B20000000000000000000207 = {isa = PBXBuildFile; fileRef = B20000000000000000000206; };
+        B20000000000000000000204 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVQuickPlayerModelTests.swift; sourceTree = "<group>"; };
+        B20000000000000000000205 = {isa = PBXBuildFile; fileRef = B20000000000000000000204; };
+        B20000000000000000000202 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVSubtitleRequestTests.swift; sourceTree = "<group>"; };
+        B20000000000000000000203 = {isa = PBXBuildFile; fileRef = B20000000000000000000202; };
+        B20000000000000000000200 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVRepairRegressionTests.swift; sourceTree = "<group>"; };
+        B20000000000000000000201 = {isa = PBXBuildFile; fileRef = B20000000000000000000200; };
+		B20000000000000000000064 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVBufferingStateMachineTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000065 = {isa = PBXBuildFile; fileRef = B20000000000000000000064; };
+		B20000000000000000000066 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVCacheConfigurationTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000067 = {isa = PBXBuildFile; fileRef = B20000000000000000000066; };
+		B20000000000000000000068 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVColorMappingPolicyTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000069 = {isa = PBXBuildFile; fileRef = B20000000000000000000068; };
+		B2000000000000000000006A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVDiagnosticTests.swift; sourceTree = "<group>"; };
+		B2000000000000000000006B = {isa = PBXBuildFile; fileRef = B2000000000000000000006A; };
+		B2000000000000000000006C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVDisplayGeometryTests.swift; sourceTree = "<group>"; };
+		B2000000000000000000006D = {isa = PBXBuildFile; fileRef = B2000000000000000000006C; };
+		B2000000000000000000006E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVHLSMasterResolverTests.swift; sourceTree = "<group>"; };
+		B2000000000000000000006F = {isa = PBXBuildFile; fileRef = B2000000000000000000006E; };
+		B20000000000000000000070 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVPictureInPictureTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000071 = {isa = PBXBuildFile; fileRef = B20000000000000000000070; };
+		B20000000000000000000072 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVPlaybackUpdateTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000073 = {isa = PBXBuildFile; fileRef = B20000000000000000000072; };
+		B20000000000000000000074 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVPlayerContractTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000075 = {isa = PBXBuildFile; fileRef = B20000000000000000000074; };
+		B20000000000000000000076 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVPlayerModelTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000077 = {isa = PBXBuildFile; fileRef = B20000000000000000000076; };
+		B20000000000000000000078 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVQuickPlayerTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000079 = {isa = PBXBuildFile; fileRef = B20000000000000000000078; };
+		B2000000000000000000007A = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVSubtitleDocumentTests.swift; sourceTree = "<group>"; };
+		B2000000000000000000007B = {isa = PBXBuildFile; fileRef = B2000000000000000000007A; };
+		B2000000000000000000007C = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVSubtitleStyleTests.swift; sourceTree = "<group>"; };
+		B2000000000000000000007D = {isa = PBXBuildFile; fileRef = B2000000000000000000007C; };
+		B2000000000000000000007E = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVSubtitleTrackNameTests.swift; sourceTree = "<group>"; };
+		B2000000000000000000007F = {isa = PBXBuildFile; fileRef = B2000000000000000000007E; };
+		B20000000000000000000080 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVSystemPlaybackControlsTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000081 = {isa = PBXBuildFile; fileRef = B20000000000000000000080; };
+		B20000000000000000000082 = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPVVideoQualityTests.swift; sourceTree = "<group>"; };
+		B20000000000000000000083 = {isa = PBXBuildFile; fileRef = B20000000000000000000082; };
+		B2000000000000000000000C = {isa = PBXBuildFile; productRef = B2000000000000000000000B; };
+		B2000000000000000000000B = {isa = XCSwiftPackageProductDependency; package = A10000000000000000000010; productName = MPVPlayerKit; };
+		B20000000000000000000002 = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; path = MPVPlayerKitTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		B20000000000000000000008 = {isa = PBXGroup; children = (B20000000000000000000206,B20000000000000000000204,B20000000000000000000202,B20000000000000000000200,B20000000000000000000064,B20000000000000000000066,B20000000000000000000068,B2000000000000000000006A,B2000000000000000000006C,B2000000000000000000006E,B20000000000000000000070,B20000000000000000000072,B20000000000000000000074,B20000000000000000000076,B20000000000000000000078,B2000000000000000000007A,B2000000000000000000007C,B2000000000000000000007E,B20000000000000000000080,B20000000000000000000082,); path = ../Tests/MPVPlayerKitTests; sourceTree = "<group>"; };
+		B20000000000000000000003 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (B20000000000000000000207,B20000000000000000000205,B20000000000000000000203,B20000000000000000000201,B20000000000000000000065,B20000000000000000000067,B20000000000000000000069,B2000000000000000000006B,B2000000000000000000006D,B2000000000000000000006F,B20000000000000000000071,B20000000000000000000073,B20000000000000000000075,B20000000000000000000077,B20000000000000000000079,B2000000000000000000007B,B2000000000000000000007D,B2000000000000000000007F,B20000000000000000000081,B20000000000000000000083,); runOnlyForDeploymentPostprocessing = 0; };
+		B20000000000000000000004 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (B2000000000000000000000C,); runOnlyForDeploymentPostprocessing = 0; };
+		B20000000000000000000009 = {isa = PBXContainerItemProxy; containerPortal = A1000000000000000000000E; proxyType = 1; remoteGlobalIDString = A1000000000000000000000A; remoteInfo = MPVPlayerKitDemo; };
+		B2000000000000000000000A = {isa = PBXTargetDependency; target = A1000000000000000000000A; targetProxy = B20000000000000000000009; };
+		B20000000000000000000001 = {isa = PBXNativeTarget; buildConfigurationList = B20000000000000000000005; buildPhases = (B20000000000000000000003,B20000000000000000000004,); buildRules = (); dependencies = (B2000000000000000000000A,); name = MPVPlayerKitTests; packageProductDependencies = (B2000000000000000000000B,); productName = MPVPlayerKitTests; productReference = B20000000000000000000002; productType = "com.apple.product-type.bundle.unit-test"; };
+		B20000000000000000000005 = {isa = XCConfigurationList; buildConfigurations = (B20000000000000000000006,B20000000000000000000007,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		B20000000000000000000006 = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MPVPlayerKitDemo.app/MPVPlayerKitDemo"; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = wan.long.MPVPlayerKitTests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 6.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; TARGETED_DEVICE_FAMILY = "1,2"; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)","@loader_path/Frameworks","@executable_path/Frameworks",);}; name = Debug; };
+		B20000000000000000000007 = {isa = XCBuildConfiguration; buildSettings = {BUNDLE_LOADER = "$(TEST_HOST)"; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/MPVPlayerKitDemo.app/MPVPlayerKitDemo"; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = wan.long.MPVPlayerKitTests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 6.0; IPHONEOS_DEPLOYMENT_TARGET = 17.0; TARGETED_DEVICE_FAMILY = "1,2"; LD_RUNPATH_SEARCH_PATHS = ("$(inherited)","@loader_path/Frameworks","@executable_path/Frameworks",);}; name = Release; };
 
 /* Begin PBXBuildFile section */
 		A10000000000000000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* AppDelegate.swift */; };
@@ -49,6 +101,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000008 /* MPVPlayerKitDemo */,
+                B20000000000000000000008,
 				A10000000000000000000009 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -66,6 +119,7 @@
 			isa = PBXGroup;
 			children = (
 				A10000000000000000000005 /* MPVPlayerKitDemo.app */,
+                B20000000000000000000002,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -126,6 +180,7 @@
 			projectRoot = "";
 			targets = (
 				A1000000000000000000000A /* MPVPlayerKitDemo */,
+                B20000000000000000000001,
 			);
 		};
 /* End PBXProject section */

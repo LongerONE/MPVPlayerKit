@@ -29,3 +29,7 @@
 - 日志候选核实：command/subtitle 请求日志不输出完整 args；redactedURLDescription 只去 query，仍保留 user/password、fragment 与路径，作为待确认风险。
 
 - 交付报告共 13 项修复事项（5 P1、8 P2），另有 7 项验证缺口/待确认风险；报告逐项注明源码或运行证据。
+
+- 实施真实 iOS 测试入口后，首轮 139 项 / 16 失败：PiP 原全屏断言、模拟器 gpu-next 假设、源码常量文件位置断言和 transport 隐藏导航按钮假设过期；seek 时序测试同步调用触发主线程内联回调。分别修正测试以覆盖实际契约。
+- 缓冲状态机在 seeking 时未更新 reason，已有测试实证；增加 seek 优先分支，取消 fallback 并保持 finished。
+- 播放源 generation 在当前句柄销毁时条件推进；旧配置 teardown 不得推进后来 configure 的 generation。

@@ -89,6 +89,7 @@ extension MPVQuickPlayerViewController {
     func switchPlaylistItem(to index: Int) {
         guard let playlistItems,
               playlistItems.indices.contains(index),
+              !isPlaybackSessionClosed,
               isPlaylistSwitching == false else { return }
 
         playlistSwitchTask?.cancel()
@@ -110,7 +111,9 @@ extension MPVQuickPlayerViewController {
                 try Task.checkCancellation()
                 guard let self,
                       self.playlistSwitchGeneration == generation,
-                      self.isBeingDismissed == false else { return }
+                      !self.isPlaybackSessionClosed,
+                      self.isBeingDismissed == false,
+                      self.isMovingFromParent == false else { return }
 
                 var configuration = self.playlistConfiguration
                     ?? MPVPlayerConfiguration(url: resource.url)

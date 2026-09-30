@@ -61,6 +61,7 @@ extension MPVPlayerView {
         queue.async { [weak self] in
             guard let self else { return }
             eventLoop: while let mpv = self.mpv {
+                guard !self.isStopped(), self.currentMPVPlaybackUpdateSourceSession() == self.currentBufferingSessionGeneration() else { break }
                 guard let event = mpv_wait_event(mpv, 0), event.pointee.event_id != MPV_EVENT_NONE else {
                     break
                 }
@@ -129,8 +130,9 @@ extension MPVPlayerView {
                     }
                     self.stopTimeTimer()
                     let shutdownGeneration = self.currentPlaybackIntentGeneration()
+                    let shutdownSession = self.currentMPVPlaybackUpdateSourceSession()
                     self.notifyOnMain {
-                        guard self.isPlaybackIntentCurrent(shutdownGeneration),
+                        guard self.currentBufferingSessionGeneration() == shutdownSession, self.isPlaybackIntentCurrent(shutdownGeneration),
                               self.isStopped() == false else {
                             return
                         }
@@ -468,13 +470,15 @@ extension MPVPlayerView {
     }
 
     nonisolated func notifySubtitleLoad(requestID: String, success: Bool) {
+        let session = currentMPVPlaybackUpdateSourceSession() ?? queueConfigurationGeneration
         notifyOnMain {
+            let accepted = success && self.currentBufferingSessionGeneration() == session && !self.isStopped()
             NotificationCenter.default.post(
                 name: MPVPlayerKitNotification.didLoadSubtitle,
                 object: self,
                 userInfo: [
                     MPVPlayerKitNotificationKey.requestID: requestID,
-                    MPVPlayerKitNotificationKey.success: success,
+                    MPVPlayerKitNotificationKey.success: accepted,
                 ]
             )
         }
@@ -484,15 +488,22 @@ extension MPVPlayerView {
         let endFile = event.pointee.data?.assumingMemoryBound(to: mpv_event_end_file.self).pointee
         let errorCode = endFile?.error ?? 0
         let reason = endFile?.reason
+        guard let session = currentMPVPlaybackUpdateSourceSession() else { return }
+        let intent = currentPlaybackIntentGeneration()
         resetBufferingStateOnMPVQueue(reason: "end-file")
         notifyOnMain {
-            self.handleEndFileOnMain(reason: reason, errorCode: errorCode)
+            self.handleEndFileOnMain(reason: reason, errorCode: errorCode,
+                                     sourceSession: session, intent: intent)
         }
     }
 
-    func handleEndFileOnMain(reason: mpv_end_file_reason?, errorCode: CInt) {
+    func handleEndFileOnMain(
+        reason: mpv_end_file_reason?, errorCode: CInt, sourceSession: UInt64, intent: UInt64
+    ) {
+        guard currentBufferingSessionGeneration() == sourceSession,
+              isPlaybackIntentCurrent(intent), !isStopped() else { return }
         let errorMessage = errorCode == 0 ? "none" : String(cString: mpv_error_string(errorCode))
-        let generation = currentPlaybackIntentGeneration()
+        let generation = intent
         guard let reason else {
             mpvDebugLog("event end-file missing reason error=\(errorCode) message=\(errorMessage) profile=\(activeProfileDescription)")
             if retryNextProfileAfterPlaybackFailure(errorCode: errorCode) { return }
@@ -520,7 +531,10 @@ extension MPVPlayerView {
         keepingOwner: Bool,
         state: MPVPlayerState?
     ) {
+        let session = currentBufferingSessionGeneration()
         notifyOnMain {
+            guard self.currentBufferingSessionGeneration() == session,
+                  self.isPlaybackIntentCurrent(generation), !self.isStopped() else { return }
             self.requestStopTimeTimer(generation: generation)
             self.stopSystemPlaybackProgress(keepingOwner: keepingOwner)
             if let state {

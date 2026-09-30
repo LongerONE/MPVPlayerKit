@@ -9,56 +9,6 @@ import libmpv
 #error("MPVPlayerKit requires MPVKit's Libmpv module.")
 #endif
 extension MPVPlayerView {
-    /// Keep decoded VideoToolbox surfaces on the GPU path first. The copy
-    /// profile remains available because some libmpv/MoltenVK combinations
-    /// cannot safely import the decoder surface for every HEVC/Dolby Vision
-    /// stream.
-    nonisolated static let deviceHardwareDecodeMethod = "videotoolbox"
-    nonisolated static let deviceCopyHardwareDecodeMethod = "videotoolbox-copy"
-    /// A hard safety cap for demuxer packet metadata. `cache-secs` is a time
-    /// target and can still represent a large byte range for high-bitrate
-    /// media, so keep a bounded memory budget as well.
-    nonisolated static let demuxerMaxBytes = "256MiB"
-    /// Do not retain an additional unbounded-looking past range while the
-    /// player is already using a forward cache.
-    nonisolated static let demuxerMaxBackBytes = "0"
-    nonisolated static let mpvErrorOptionNotFound: CInt = -5
-    /// Simulator / power-saving tuning knobs that may be absent in a given MPVKit build.
-    nonisolated static let optionalSetupOptionNames: Set<String> = [
-        "video-max-x",
-        "video-max-y",
-        "gpu-dumb-mode",
-        "vd-lavc-threads",
-        "demuxer-hysteresis-secs",
-        "demuxer-lavf-o",
-        "cache-on-disk",
-        "vf",
-        "network-timeout",
-        "stream-lavf-o",
-        "hls-bitrate",
-    ]
-    /// Portable resolution cap for simulator (video-max-x/y unavailable in MPVKit 1.0.0).
-    nonisolated static let simulatorResolutionLimitFilter =
-        "scale=1280:720"
-    /// Preferred runtime vf candidates when option-stage `vf` cannot be applied.
-    /// Simpler native scale first — lavfi may leave HEVC track unselected / vo empty on simulator.
-    nonisolated static let simulatorResolutionLimitCandidates = [
-        "scale=1280:720",
-        "scale=w=min(1280\\,iw):h=min(720\\,ih)",
-        "lavfi=[scale=w=min(1280,iw):h=min(720,ih)]",
-    ]
-    nonisolated static func safeDecodeOptions(
-        hardwareDecodeMethod: String
-    ) -> [(String, String)] {
-        let directRendering = hardwareDecodeMethod == deviceHardwareDecodeMethod ? "auto" : "no"
-        return [
-            ("hwdec", hardwareDecodeMethod),
-            // Direct VideoToolbox decoding avoids a 4K frame copy. The copy
-            // fallback explicitly disables direct rendering to keep the
-            // staging-buffer lifetime safe on older devices/builds.
-            ("vd-lavc-dr", directRendering),
-        ]
-    }
     nonisolated func setupMPV() {
         guard let url else {
             mpvDebugLog("setupMPV failed missing url")
@@ -74,7 +24,7 @@ extension MPVPlayerView {
         // Allocate the renderer surface before libmpv receives `wid`. The
         // surface remains fixed while UIKit animates portrait/landscape.
         prepareStableMetalCanvasForRendererSetup()
-        while !isStopped() {
+        while !isStopped(), currentBufferingSessionGeneration() == queueConfigurationGeneration {
             prepareProfilesForNextRenderer()
             let profile = activeSetupProfileSnapshot()
             guard profile.index < profile.count,
@@ -87,7 +37,7 @@ extension MPVPlayerView {
                 profile.index + 1
             )
         }
-        guard !isStopped() else { return }
+        guard !isStopped(), currentBufferingSessionGeneration() == queueConfigurationGeneration else { return }
         mpvDebugLog("setupMPV exhausted all profiles")
         failSetup()
     }
@@ -309,7 +259,8 @@ extension MPVPlayerView {
 
     private nonisolated func setupMPVOnMPVQueue(url: URL, profile: MPVSetupProfile) -> Bool {
         dispatchPrecondition(condition: .onQueue(queue))
-        let playbackUpdateSourceSession = currentBufferingSessionGeneration()
+        let playbackUpdateSourceSession = queueConfigurationGeneration
+        guard !isStopped(), currentBufferingSessionGeneration() == playbackUpdateSourceSession else { return false }
         let profileIndex = activeSetupProfileSnapshot().index
         recordDiagnosticEvent("尝试解码配置", fields: ["配置": profile.name, "序号": String(profileIndex)])
         mpvDebugLog("setupMPV profile begin name=\(profile.name) index=\(profileIndex + 1)")
@@ -340,10 +291,11 @@ extension MPVPlayerView {
         let originalURL = url.absoluteString
         let loadURL: String
         if MPVHLSMasterResolver.needsResolution(url) {
-            let resolved = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url) { [weak self] in
+            let resolved = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url, headers: headers, userAgent: userAgent) { [weak self] in
                 self?.isStopped() != false
+                    || self?.currentBufferingSessionGeneration() != playbackUpdateSourceSession
             }
-            guard !isStopped() else { return false }
+            guard !isStopped(), currentBufferingSessionGeneration() == playbackUpdateSourceSession else { return false }
             loadURL = resolved.absoluteString
             if loadURL != originalURL {
                 mpvDebugLog("setupMPV HLS master resolved variant=\(redactedURLDescription(resolved))")
@@ -356,6 +308,7 @@ extension MPVPlayerView {
             loadURL = originalURL
         }
 
+        guard !isStopped(), currentBufferingSessionGeneration() == playbackUpdateSourceSession else { return false }
         // 原始 mpv 日志可能包含媒体地址或字幕正文；只使用白名单结构化诊断。
         checkError(mpv_request_log_messages(mpv, "no"), operation: "request_log_messages", notifyOnFailure: false)
 
@@ -515,6 +468,7 @@ extension MPVPlayerView {
         )
         mpvDebugLog("setupMPV wakeup callback installed profile=\(profile.name)")
 
+        guard !isStopped(), currentBufferingSessionGeneration() == playbackUpdateSourceSession else { return false }
         notifyState(.buffering)
         let loadStatus = command("loadfile", args: [loadURL, "replace"], checkForErrors: false)
         guard loadStatus >= 0 else {

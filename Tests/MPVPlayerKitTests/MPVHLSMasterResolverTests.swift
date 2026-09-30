@@ -3,6 +3,32 @@ import XCTest
 @testable import MPVPlayerKit
 
 final class MPVHLSMasterResolverTests: XCTestCase {
+    func testSyncResolutionUsesHeadersUserAgentAndRedirectBase() {
+        let session = makeSession()
+        defer { session.invalidateAndCancel() }
+        let master = URL(string: "https://example.com/context.m3u8")!
+        let resolved = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: master, session: session,
+            headers: ["X-Emby-Token": "test-token", "Authorization": "excluded", "X-Emby-Authorization": "excluded"],
+            userAgent: "test-agent")
+        XCTAssertEqual(resolved, URL(string: "https://cdn.example.com/final/video.m3u8")!)
+    }
+
+    func testExternalRenditionsKeepMaster() {
+        let master = URL(string: "https://example.com/main.m3u8")!
+        for type in ["AUDIO", "SUBTITLES", "VIDEO"] {
+            let playlist = "#EXTM3U\n#EXT-X-MEDIA:TYPE=\(type),GROUP-ID=\"external\",URI=\"external.m3u8\"\n#EXT-X-STREAM-INF:BANDWIDTH=100,CODECS=\"avc1\"\nvideo.m3u8"
+            XCTAssertEqual(MPVHLSMasterResolver.resolvedURL(in: playlist, baseURL: master, masterURL: master), master)
+        }
+    }
+
+    func testVariantsUseFinalResponseBaseURL() {
+        let master = URL(string: "https://example.com/main.m3u8")!
+        let redirected = URL(string: "https://cdn.example.com/path/main.m3u8")!
+        let playlist = "#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=100,CODECS=\"avc1\"\nvideo.m3u8"
+        XCTAssertEqual(MPVHLSMasterResolver.resolvedURL(in: playlist, baseURL: redirected, masterURL: master),
+                       URL(string: "https://cdn.example.com/path/video.m3u8")!)
+    }
+
     func testSyncResolutionReturnsVariant() {
         let session = makeSession()
         defer { session.invalidateAndCancel() }
@@ -99,6 +125,18 @@ private final class ResolverURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         guard request.url?.lastPathComponent != "stalled.m3u8" else { return }
+        if request.url?.lastPathComponent == "context.m3u8" {
+            guard request.value(forHTTPHeaderField: "X-Emby-Token") == "test-token",
+                  request.value(forHTTPHeaderField: "User-Agent") == "test-agent",
+                  request.value(forHTTPHeaderField: "Authorization") == nil,
+                  request.value(forHTTPHeaderField: "X-Emby-Authorization") == nil else {
+                client?.urlProtocol(self, didFailWithError: URLError(.userAuthenticationRequired))
+                return
+            }
+            let response = HTTPURLResponse(url: URL(string: "https://cdn.example.com/final/master.m3u8")!,
+                                           statusCode: 200, httpVersion: nil, headerFields: nil)!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        }
         let playlist = """
         #EXTM3U
         #EXT-X-STREAM-INF:BANDWIDTH=1000,CODECS="avc1",RESOLUTION=1280x720

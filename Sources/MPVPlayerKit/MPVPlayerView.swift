@@ -203,6 +203,10 @@ enum MPVVideoQualityPreset: Int {
 
 @objc(MPVPlayerView)
 public final class MPVPlayerView: UIView {
+    nonisolated let configurationState = MPVPlaybackConfigurationState()
+    nonisolated(unsafe) var queueConfigurationGeneration: UInt64 = 0
+    nonisolated(unsafe) var queueConfiguration = MPVPlaybackConfigurationSnapshot()
+
     @objc public internal(set) var isPlaying = false
     @objc public internal(set) var duration: TimeInterval = 0.0
     @objc public internal(set) var currentTime: TimeInterval = 0.0
@@ -264,18 +268,15 @@ public final class MPVPlayerView: UIView {
     var usesExtendedDynamicRangeOutput = false
     let colorOutputStateLock = NSLock()
     nonisolated(unsafe) var colorOutputState = MPVColorOutputState()
-    nonisolated(unsafe) var url: URL?
     // libmpv setup consumes this immutable request snapshot on `queue`.
     // The host configures it before playback starts, so it must not inherit
     // UIView's main-actor isolation when the queue prepares HTTP headers.
-    nonisolated(unsafe) var headers: [String: String] = [:]
     nonisolated let queue = DispatchQueue(label: "com.mpvplayerkit.player", qos: .userInitiated)
     let queueSpecificKey = DispatchSpecificKey<Void>()
     // Resolve the resource bundle while the UIView is created on the main
     // thread. `setupMPV` runs on `queue`; querying Bundle from there can trip
     // Swift's executor assertion in a Swift package build.
     nonisolated let systemSubtitleFontDirectory: String?
-    nonisolated(unsafe) var customSubtitleFontName: String?
     let contentModeSnapshotLock = NSLock()
     var contentModeSnapshot: MPVContentModeSnapshot = .fit
     var displayModeState = MPVDisplayModeState()
@@ -314,18 +315,12 @@ public final class MPVPlayerView: UIView {
     nonisolated(unsafe) var playbackPositionGeneration: UInt64 = 0
     nonisolated(unsafe) var pendingPlaybackPositionGeneration: UInt64?
     // 配置快照字段：主线程 configure 写入，MPV 队列 setup 读取。
-    nonisolated(unsafe) var forceSoftwareDecode = false
     /// Host metadata hint retained for diagnostics. Frame metadata and display
     /// capability, not this value, control color mapping.
-    nonisolated(unsafe) var isDolbyVisionPlayback = false
-    nonisolated(unsafe) var userAgent: String?
     nonisolated(unsafe) var currentSubtitleUsesOriginalStyle = false
     // Runtime playback updates are serialized on `queue`, not the UIView's
     // main-actor executor. Keep these snapshots available to those queue-bound
     // helpers; configuration writes happen before the MPV handle is started.
-    nonisolated(unsafe) var videoQualityPreset = MPVVideoQualityPreset.balanced
-    nonisolated(unsafe) var debandEnabled = false
-    nonisolated(unsafe) var cacheConfiguration = MPVCacheConfiguration.default
     // Buffering state is reduced on the MPV queue. The work item is kept
     // queue-bound as well, so an obsolete core-idle fallback cannot publish
     // after a new playback intent or handle teardown.

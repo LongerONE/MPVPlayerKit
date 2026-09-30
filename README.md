@@ -269,7 +269,7 @@ let playerViewController = MPVQuickPlayerViewController(
 present(playerViewController, animated: true)
 ```
 
-Playback starts automatically when the view appears unless `autoplay` is set to `false`. The quick interface provides play/pause, seeking, time display, a Picture in Picture button that enters and leaves the window, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, memory buffer settings, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
+Playback starts automatically on the first appearance, preserving a user pause when returning from an overlay, unless `autoplay` is set to `false`. The quick interface provides play/pause, seeking, time display, a Picture in Picture button that enters and leaves the window, video/audio/subtitle track selection, external subtitle loading and cancellation, subtitle delay and style presets, playback speed, video quality, debanding, memory buffer settings, fit/fill display modes, decoder and buffering status, forced-landscape control, and a centered loading indicator. Its compact control bar uses system icons with accessibility labels. Forced landscape also works when the host app declares only portrait support: the quick player rotates its own content when system-level scene rotation is unavailable.
 
 Landscape lock can also be changed while the player is visible:
 
@@ -316,7 +316,7 @@ State changes are also broadcast as `NSNotification` objects. Prefer the public 
 
 ## Demo
 
-Open `Demo/MPVPlayerKitDemo.xcodeproj` and run the `MPVPlayerKitDemo` scheme. The Demo references this checkout as a local Swift Package and launches the quick player with a public HLS sample. Replace `sampleURL` in `Demo/MPVPlayerKitDemo/AppDelegate.swift` to test media with custom audio or subtitle tracks.
+Open `Demo/MPVPlayerKitDemo.xcodeproj` and run the `MPVPlayerKitDemo` scheme. The Demo references this checkout as a local Swift Package and launches the quick player with a public HLS sample. Replace `sampleURL` in `Demo/MPVPlayerKitDemo/SceneDelegate.swift` to test media with custom audio or subtitle tracks.
 
 ## Notes
 

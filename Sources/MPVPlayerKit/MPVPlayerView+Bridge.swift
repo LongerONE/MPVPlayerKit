@@ -17,6 +17,15 @@ extension MPVPlayerView {
         return bufferingSessionGeneration
     }
 
+    nonisolated func advanceBufferingSession(ifCurrent expected: UInt64) -> UInt64? {
+        playbackStateLock.lock()
+        defer { playbackStateLock.unlock() }
+        guard bufferingSessionGeneration == expected else { return nil }
+        pendingPlaybackPositionGeneration = nil
+        bufferingSessionGeneration &+= 1
+        return bufferingSessionGeneration
+    }
+
     nonisolated func currentBufferingSessionGeneration() -> UInt64 {
         playbackStateLock.lock()
         defer { playbackStateLock.unlock() }
@@ -308,8 +317,12 @@ extension MPVPlayerView {
         guard let url else { return "nil" }
         var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
         let queryItemCount = components?.queryItems?.count ?? 0
+        components?.user = nil
+        components?.password = nil
         components?.query = nil
-        return "\(components?.string ?? url.absoluteString) queryItems=\(queryItemCount)"
+        components?.fragment = nil
+        if components?.path.isEmpty == false { components?.path = "/redacted" }
+        return "\(components?.string ?? "unavailable") queryItems=\(queryItemCount)"
     }
 
     nonisolated var activeProfileDescription: String {
@@ -344,7 +357,11 @@ extension MPVPlayerView {
     }
 
     nonisolated func notifyState(_ state: MPVPlayerState) {
+        let sourceSession = DispatchQueue.getSpecific(key: queueSpecificKey) != nil
+            ? currentMPVPlaybackUpdateSourceSession() ?? queueConfigurationGeneration
+            : currentBufferingSessionGeneration()
         notifyOnMain {
+            guard self.currentBufferingSessionGeneration() == sourceSession else { return }
             // 初始化和失败回调也会从 MPV 队列进入，系统诊断必须在主线程采集。
             self.requestDiagnosticSnapshot("播放状态变化", fields: ["状态": String(describing: state)])
             self.mpvDebugLog(
@@ -362,7 +379,9 @@ extension MPVPlayerView {
         let rawValue = decoderMode.rawValue
         // 只绑定解码会话代次。play/pause 会推进 playbackIntentGeneration，
         // 若一并校验会把合法的解码模式更新误判为过期并静默丢弃。
-        let sessionGeneration = currentBufferingSessionGeneration()
+        let sessionGeneration = DispatchQueue.getSpecific(key: queueSpecificKey) != nil
+            ? currentMPVPlaybackUpdateSourceSession() ?? queueConfigurationGeneration
+            : currentBufferingSessionGeneration()
         notifyOnMain {
             guard self.currentBufferingSessionGeneration() == sessionGeneration else {
                 return

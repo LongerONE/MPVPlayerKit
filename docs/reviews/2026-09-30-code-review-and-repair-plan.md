@@ -241,8 +241,6 @@ loadClientSubtitle(from:headers:completion:) 未引用 headers，直接调用 li
 
 原始日志位于临时目录：`/tmp/mpv-review-build.log`、`/tmp/mpv-review-device-build.log`、`/tmp/mpv-review-test-build.log`、`/tmp/mpv-review-hls.log`、`/tmp/mpv-review-subtitle-crash.log`。临时文件可能被系统清理，因此关键结果已保存在本报告。
 
-## 8. 开发开始前需要落实的决定
+## 8. 实施授权与决定
 
-用户本次授权为审查和修复计划，尚未授权上述修复实施。实施前按项目要求先完成需求沟通并获得明确确认，重点敲定 HLS 保留 master 的 fallback、字幕 headers 获取方案及首次 autoplay 的产品语义；不自动采用推荐方案继续开发。
-
-当前可以先确认 A 批作为最小开始范围；B 批涉及播放会话与回退边界，应单独审阅方案。审查报告本身不构成生产修改已完成或设备验证通过的承诺。
+用户随后明确要求“按照计划实施”，已授权 A—F 批次。采用最小方案：含外置 rendition 的 HLS 保留 master；带独立头的字幕下载到受控临时文件后继续 libmpv 渲染；autoplay 只在首次出现时生效。实施结果和验证边界见 [修复实施记录](2026-09-30-repair-implementation.md)。

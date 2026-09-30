@@ -21,6 +21,7 @@ final class MPVCacheConfigurationTests: XCTestCase {
         XCTAssertEqual(configuration.demuxerHysteresisSeconds, 3)
     }
 
+    @MainActor
     func testMPVCacheOptionsHaveExplicitDemuxerMemoryLimits() throws {
         let packageRoot = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent()
@@ -36,8 +37,9 @@ final class MPVCacheConfigurationTests: XCTestCase {
         XCTAssertTrue(setupSource.contains("(\"cache-on-disk\", \"no\")"))
         XCTAssertTrue(setupSource.contains("cacheConfiguration.isEnabled ? cacheConfiguration.duration : 0"))
         XCTAssertTrue(setupSource.contains("configuration.isEnabled ? configuration.duration : 0"))
-        XCTAssertTrue(setupSource.contains("nonisolated static let demuxerMaxBytes = \"256MiB\""))
-        XCTAssertTrue(setupSource.contains("nonisolated static let demuxerMaxBackBytes = \"0\""))
+
+        XCTAssertEqual(MPVPlayerView.demuxerMaxBytes, "256MiB")
+        XCTAssertEqual(MPVPlayerView.demuxerMaxBackBytes, "0")
         let colorPolicySource = try String(
             contentsOf: packageRoot.appendingPathComponent("Sources/MPVPlayerKit/MPVColorMappingPolicy.swift"),
             encoding: .utf8

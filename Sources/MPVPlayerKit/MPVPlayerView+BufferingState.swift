@@ -181,7 +181,7 @@ extension MPVPlayerView {
             || (forceFinishNotification && isBuffering == false)
         let shouldNotifyProgress = decision.progressChanged || shouldNotifyState
         guard shouldNotifyState || shouldNotifyProgress else { return }
-        let sessionGeneration = currentBufferingSessionGeneration()
+        let sessionGeneration = queueConfigurationGeneration
         let intentGeneration = currentPlaybackIntentGeneration()
         mpvDebugLog(
             "buffering decision state=\(isBuffering ? "buffering" : "finished") "

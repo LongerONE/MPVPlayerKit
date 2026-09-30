@@ -19,7 +19,8 @@ final class MPVPictureInPictureViewPlacement {
     private var originalConstraints: [NSLayoutConstraint] = []
     private var sourceConstraints: [NSLayoutConstraint] = []
     private var pictureInPictureConstraints: [NSLayoutConstraint] = []
-    private var restoredFullscreenConstraints: [NSLayoutConstraint] = []
+    private var originalTranslatesAutoresizingMask = true
+    private var originalAutoresizingMask: UIView.AutoresizingMask = []
     private(set) var isPlayerInPictureInPictureContainer = false
 
     init?(playerView: MPVPlayerView) {
@@ -49,8 +50,8 @@ final class MPVPictureInPictureViewPlacement {
             return false
         }
 
-        restoredFullscreenConstraints.forEach { $0.isActive = false }
-        restoredFullscreenConstraints.removeAll()
+        originalTranslatesAutoresizingMask = playerView.translatesAutoresizingMaskIntoConstraints
+        originalAutoresizingMask = playerView.autoresizingMask
         originalConstraints.forEach { $0.isActive = false }
         playerView.removeFromSuperview()
         playerView.translatesAutoresizingMaskIntoConstraints = false
@@ -85,20 +86,12 @@ final class MPVPictureInPictureViewPlacement {
         playerView.removeFromSuperview()
         let insertionIndex = min(originalSubviewIndex, originalSuperview.subviews.count)
         originalSuperview.insertSubview(playerView, at: insertionIndex)
-        // A PiP return may restore the old, PiP-sized frame before the host
-        // gets another layout pass. Do not wait for a rotation to repair it:
-        // the renderer always returns as the full inline playback surface.
-        originalConstraints.forEach { $0.isActive = false }
-        playerView.translatesAutoresizingMaskIntoConstraints = false
-        restoredFullscreenConstraints = [
-            playerView.leadingAnchor.constraint(equalTo: originalSuperview.leadingAnchor),
-            playerView.trailingAnchor.constraint(equalTo: originalSuperview.trailingAnchor),
-            playerView.topAnchor.constraint(equalTo: originalSuperview.topAnchor),
-            playerView.bottomAnchor.constraint(equalTo: originalSuperview.bottomAnchor),
-        ]
-        NSLayoutConstraint.activate(restoredFullscreenConstraints)
-        originalSuperview.layoutIfNeeded()
+        playerView.translatesAutoresizingMaskIntoConstraints = originalTranslatesAutoresizingMask
+        playerView.autoresizingMask = originalAutoresizingMask
+        playerView.frame = sourceView.frame
+        NSLayoutConstraint.activate(originalConstraints)
         isPlayerInPictureInPictureContainer = false
+        originalSuperview.layoutIfNeeded()
         return true
     }
 

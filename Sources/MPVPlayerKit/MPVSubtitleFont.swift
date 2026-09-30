@@ -119,7 +119,9 @@ extension MPVPlayerView {
 
     nonisolated func publishSubtitleFontCapability(for trackID: Int64?) {
         let capability = selectedSubtitleFontCapability(for: trackID)
+        let session = currentMPVPlaybackUpdateSourceSession()
         notifyOnMain {
+            guard self.currentBufferingSessionGeneration() == session else { return }
             self.currentSubtitleFontCapability = capability
         }
     }
@@ -134,8 +136,10 @@ extension MPVPlayerView {
         clientSubtitleController.style = style
         clientSubtitleController.update(at: currentTime, force: true)
 
+        let fontName = customSubtitleFontName
         queue.async { [weak self] in
             guard let self else { return }
+            self.customSubtitleFontName = fontName
             let isBold = self.subtitleStyleValues[MPVProperty.subtitleBold] == "yes"
             let fontName = self.subtitleFontName(isBold: isBold)
             self.subtitleStyleValues[MPVProperty.subtitleFont] = fontName

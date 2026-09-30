@@ -61,6 +61,7 @@ extension MPVPlayerView {
                   self.mpv != nil
             else {
                 self.notifyOnMain {
+                    guard self.isPlaybackIntentCurrent(generation) else { return }
                     self.isPlaying = false
                 }
                 return
@@ -116,6 +117,7 @@ extension MPVPlayerView {
 
     @objc public func stop() {
         _ = nextPlaybackIntentGeneration()
+        _ = nextBufferingSessionGeneration()
         clearPendingPlaybackPositionUpdate()
         clientSubtitleController.clear()
         stopPictureInPictureForPlayerTeardown()
@@ -235,6 +237,7 @@ extension MPVPlayerView {
 
     @objc public func updateVideoQuality(_ value: NSNumber) {
         let preset = MPVVideoQualityPreset(rawValue: value.intValue) ?? .balanced
+        videoQualityPreset = preset
         queue.async { [weak self] in
             guard let self else { return }
             self.videoQualityPreset = preset
@@ -246,6 +249,7 @@ extension MPVPlayerView {
 
     @objc public func updateVideoRenderOptions(_ options: NSDictionary) {
         let debandEnabled = boolValue(options["debandEnabled"])
+        self.debandEnabled = debandEnabled
         queue.async { [weak self] in
             guard let self else { return }
             self.debandEnabled = debandEnabled
@@ -259,6 +263,7 @@ extension MPVPlayerView {
             isEnabled: boolValue(options["cacheEnabled"], default: true),
             duration: (options["cacheDuration"] as? NSNumber)?.doubleValue ?? MPVCacheConfiguration.defaultDuration
         )
+        cacheConfiguration = configuration
         queue.async { [weak self] in
             guard let self else { return }
             self.cacheConfiguration = configuration
@@ -327,8 +332,14 @@ extension MPVPlayerView {
         }
         clearClientSubtitle()
         let usesOriginalStyle = boolValue(options["usesOriginalStyle"])
+        let session = currentBufferingSessionGeneration()
         queue.async { [weak self] in
-            self?.loadSubtitleOnMPVQueue(
+            guard let self else { return }
+            guard !self.isStopped(), self.currentBufferingSessionGeneration() == session else {
+                self.notifySubtitleLoad(requestID: requestID, success: false)
+                return
+            }
+            self.loadSubtitleOnMPVQueue(
                 requestID: requestID,
                 urlString: urlString,
                 usesOriginalStyle: usesOriginalStyle
@@ -402,7 +413,10 @@ extension MPVPlayerView {
 
     @objc public func setSubtitleVisible(_ options: NSDictionary) {
         let visible = boolValue(options["visible"])
-        clearClientSubtitle()
+        if clientSubtitleController.hasSelection {
+            applyClientSubtitleVisibility(visible)
+            return
+        }
         queue.async { [weak self] in
             guard let self else { return }
             _ = self.beginNewSubtitleSelection(reason: visible ? "visibility-on" : "visibility-off")

@@ -18,6 +18,7 @@ extension MPVPlayerView {
         guard document != nil else { return }
         queue.async { [weak self] in
             guard let self, self.mpv != nil else { return }
+            _ = self.beginNewSubtitleSelection(reason: "client-selection")
             let snapshot = self.logicalSubtitleSelection()
             _ = self.performSubtitleSelectionTransaction(
                 previous: snapshot,
@@ -52,6 +53,13 @@ extension MPVPlayerView {
     /// 同时取消 client/libmpv 两条路径上以该 requestID 挂起的加载。
     @objc public func cancelClientSubtitleLoad(_ options: NSDictionary) {
         cancelSubtitleLoad(options)
+    }
+
+    func beginExternalSubtitleDownload() {
+        clearClientSubtitle()
+        queue.async { [weak self] in
+            _ = self?.beginNewSubtitleSelection(reason: "subtitle-download")
+        }
     }
 
     func updateClientSubtitle(at time: TimeInterval) {
