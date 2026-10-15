@@ -53,7 +53,7 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         let hostBounds = view.superview?.bounds ?? view.bounds
-        let widthScale = max(hostBounds.width, 320) / 1080
+        let widthScale = max(hostBounds.height, 180) / 720
         let fontSize = max(8, CGFloat(style.fontSize) * widthScale)
         let font = subtitleFont(named: style.fontName, size: fontSize, bold: style.bold)
         let outlineSize = max(0, CGFloat(style.outlineSize) * widthScale)

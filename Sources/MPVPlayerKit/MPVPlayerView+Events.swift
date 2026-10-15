@@ -351,9 +351,10 @@ extension MPVPlayerView {
             args: [MPVProperty.subtitleID, targetSubtitleID.map(String.init) ?? "no"],
             checkForErrors: false
         ) >= 0
+        let usesOverlay = shouldRenderDecodedSubtitleText(id: targetSubtitleID, usesOriginalStyle: targetUsesOriginalStyle)
         let visibilitySucceeded = command(
             "set",
-            args: [MPVProperty.subtitleVisibility, targetVisibility ? "yes" : "no"],
+            args: [MPVProperty.subtitleVisibility, targetVisibility && !usesOverlay ? "yes" : "no"],
             checkForErrors: false
         ) >= 0
         guard styleSucceeded, sidSucceeded, visibilitySucceeded else {
@@ -362,6 +363,7 @@ extension MPVPlayerView {
             }
             return false
         }
+        rendersDecodedSubtitleText = usesOverlay
         currentSubtitleUsesOriginalStyle = targetUsesOriginalStyle
         committedSubtitleSelection = SubtitleSelectionSnapshot(
             usesOriginalStyle: targetUsesOriginalStyle,
@@ -381,12 +383,14 @@ extension MPVPlayerView {
             args: [MPVProperty.subtitleID, snapshot.subtitleID.map(String.init) ?? "no"],
             checkForErrors: false
         ) >= 0
+        let usesOverlay = shouldRenderDecodedSubtitleText(id: snapshot.subtitleID, usesOriginalStyle: snapshot.usesOriginalStyle)
         let visibilitySucceeded = command(
             "set",
-            args: [MPVProperty.subtitleVisibility, snapshot.isVisible ? "yes" : "no"],
+            args: [MPVProperty.subtitleVisibility, snapshot.isVisible && !usesOverlay ? "yes" : "no"],
             checkForErrors: false
         ) >= 0
         guard hideSucceeded, styleSucceeded, sidSucceeded, visibilitySucceeded else { return false }
+        rendersDecodedSubtitleText = usesOverlay
         currentSubtitleUsesOriginalStyle = snapshot.usesOriginalStyle
         committedSubtitleSelection = snapshot
         refreshSubtitleTextCache()
@@ -408,6 +412,7 @@ extension MPVPlayerView {
         } else {
             committedSubtitleSelection = nil
         }
+        rendersDecodedSubtitleText = false
         refreshSubtitleTextCache()
         mpvDebugLog("subtitle entered safe state reason=\(reason) hidden=\(hidden) disabled=\(disabled)")
         // Subtitle recovery failures are non-fatal to video playback. Keep the
@@ -550,6 +555,8 @@ extension MPVPlayerView {
         let property = data.assumingMemoryBound(to: mpv_event_property.self).pointee
         let propertyName = String(cString: property.name)
         switch propertyName {
+        case MPVProperty.subtitleText:
+            refreshSubtitleTextCache()
         case MPVProperty.videoOutputDisplayWidth, MPVProperty.videoOutputDisplayHeight,
              MPVProperty.videoDisplayWidth, MPVProperty.videoDisplayHeight:
             refreshVideoDisplayAspectRatio()

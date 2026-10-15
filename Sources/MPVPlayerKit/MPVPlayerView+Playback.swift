@@ -119,6 +119,7 @@ extension MPVPlayerView {
         _ = nextPlaybackIntentGeneration()
         _ = nextBufferingSessionGeneration()
         clearPendingPlaybackPositionUpdate()
+        decodedSubtitleText = nil
         clientSubtitleController.clear()
         stopPictureInPictureForPlayerTeardown()
         setDecoderMode(.initializing)

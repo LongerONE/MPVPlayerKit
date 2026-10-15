@@ -238,6 +238,16 @@ extension MPVPlayerView {
         subtitleTextCacheLock.lock()
         cachedSubtitleText = value
         subtitleTextCacheLock.unlock()
+        let session = currentBufferingSessionGeneration()
+        let usesOverlay = rendersDecodedSubtitleText
+        let visible = committedSubtitleSelection?.isVisible == true
+        let text = usesOverlay ? (visible ? value ?? "" : "") : nil
+        notifyOnMain {
+            guard self.currentBufferingSessionGeneration() == session,
+                  !self.isStopped(), !self.clientSubtitleController.hasSelection else { return }
+            self.decodedSubtitleText = text
+            self.renderDecodedSubtitleText()
+        }
     }
 
     nonisolated func cachedSubtitleTextValue() -> String? {

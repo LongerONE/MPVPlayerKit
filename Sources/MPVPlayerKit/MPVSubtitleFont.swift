@@ -135,6 +135,7 @@ extension MPVPlayerView {
         style.fontName = customSubtitleFontName
         clientSubtitleController.style = style
         clientSubtitleController.update(at: currentTime, force: true)
+        if decodedSubtitleText != nil { renderDecodedSubtitleText() }
 
         let fontName = customSubtitleFontName
         queue.async { [weak self] in

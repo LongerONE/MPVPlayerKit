@@ -7,6 +7,7 @@ extension MPVPlayerView {
 
     public func useClientSubtitleRenderer(_ renderer: any MPVSubtitleRenderer) {
         clientSubtitleController.useRenderer(renderer)
+        if decodedSubtitleText != nil { renderDecodedSubtitleText() }
     }
 
     /// 选择宿主自备的客户端字幕文档进行自定义 UI 渲染。
@@ -30,6 +31,7 @@ extension MPVPlayerView {
     }
 
     public func clearClientSubtitle() {
+        decodedSubtitleText = nil
         clientSubtitleController.clear()
     }
 
@@ -63,7 +65,37 @@ extension MPVPlayerView {
     }
 
     func updateClientSubtitle(at time: TimeInterval) {
-        clientSubtitleController.update(at: time)
+        if decodedSubtitleText != nil {
+            renderDecodedSubtitleText()
+        } else {
+            clientSubtitleController.update(at: time)
+        }
+    }
+
+    func renderDecodedSubtitleText() {
+        guard !clientSubtitleController.hasSelection else { return }
+        let text = decodedSubtitleText ?? ""
+        clientSubtitleController.renderer.render(MPVSubtitlePresentation(
+            cues: text.isEmpty ? [] : [MPVSubtitleCue(startTime: 0, endTime: .greatestFiniteMagnitude, text: text)],
+            style: clientSubtitleController.style
+        ))
+    }
+
+    nonisolated static func supportsDecodedSubtitleText(codec: String?, usesOriginalStyle: Bool) -> Bool {
+        guard !usesOriginalStyle, let codec = codec?.lowercased() else { return false }
+        return ["subrip", "srt", "webvtt", "vtt", "text", "mov_text"].contains(codec)
+    }
+
+    nonisolated func shouldRenderDecodedSubtitleText(id: Int64?, usesOriginalStyle: Bool) -> Bool {
+        guard let id else { return false }
+        let count = Int(getInt64("track-list/count") ?? 0)
+        for index in 0..<count where getInt64("track-list/\(index)/id") == id
+            && getString("track-list/\(index)/type") == "sub" {
+            return Self.supportsDecodedSubtitleText(
+                codec: getString("track-list/\(index)/codec"), usesOriginalStyle: usesOriginalStyle
+            )
+        }
+        return false
     }
 
     func applyClientSubtitleVisibility(_ visible: Bool) {
@@ -79,5 +111,6 @@ extension MPVPlayerView {
     func applyClientSubtitleStyle(_ style: MPVSubtitleStyle) {
         clientSubtitleController.style = style
         clientSubtitleController.update(at: currentTime, force: true)
+        if decodedSubtitleText != nil { renderDecodedSubtitleText() }
     }
 }

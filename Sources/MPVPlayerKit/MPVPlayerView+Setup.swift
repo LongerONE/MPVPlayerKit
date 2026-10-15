@@ -270,6 +270,7 @@ extension MPVPlayerView {
         resetBufferingStateOnMPVQueue(reason: "setup")
         lastMPVTimeSnapshot = nil
         currentSubtitleUsesOriginalStyle = false
+        rendersDecodedSubtitleText = false
         clearSubtitleTextCache()
         loadedExternalSubtitleIDs.removeAll(keepingCapacity: true)
         pendingExternalSubtitleLoad = nil
@@ -407,6 +408,7 @@ extension MPVPlayerView {
         applyContentModeOnMPVQueue(currentContentModeSnapshotForRendererSetup())
         mpvDebugLog("setupMPV initialized profile=\(profile.name)")
         recordDiagnosticSnapshot("渲染初始化")
+        _ = mpv_observe_property(mpv, 0, MPVProperty.subtitleText, MPV_FORMAT_STRING)
         _ = mpv_observe_property(mpv, 0, MPVProperty.hwdecCurrent, MPV_FORMAT_STRING)
         checkError(
             mpv_observe_property(mpv, 0, MPVProperty.pausedForCache, MPV_FORMAT_FLAG),
