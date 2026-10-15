@@ -14,6 +14,15 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     private let boldSwitch = UISwitch()
     private let shadowSlider = UISlider()
     private let shadowValueLabel = UILabel()
+    private let radiusSlider = UISlider()
+    private let radiusValueLabel = UILabel()
+    private let radiusNote = UILabel()
+    var isShadowRadiusEditable = true {
+        didSet {
+            radiusSlider.isEnabled = isShadowRadiusEditable
+            radiusNote.isHidden = isShadowRadiusEditable
+        }
+    }
     private let bottomOffsetValueLabel = UILabel()
     private let bottomOffsetStepper = UIStepper()
     private var style = MPVSubtitleStyle.defaultStyle
@@ -23,7 +32,7 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     var onDelayTap: ((UIView) -> Void)?
 
     override class var cardWidth: CGFloat { 340 }
-    override class var cardHeight: CGFloat { 460 }
+    override class var cardHeight: CGFloat { 560 }
     override class var titleKey: String { "settings.subtitle" }
     override class var accessibilityIdentifierKey: String { "MPVQuickPlayer.subtitleSettings" }
 
@@ -63,6 +72,19 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         shadowSlider.accessibilityIdentifier = "MPVQuickPlayer.subtitleShadowStrength"
         shadowSlider.addTarget(self, action: #selector(shadowChanged(_:)), for: .valueChanged)
         contentStack.addArrangedSubview(makeShadowRow())
+        radiusSlider.minimumValue = 0
+        radiusSlider.maximumValue = 20
+        radiusSlider.isContinuous = true
+        radiusSlider.accessibilityLabel = mpvLocalized("subtitle.shadow_radius")
+        radiusSlider.accessibilityIdentifier = "MPVQuickPlayer.subtitleShadowRadius"
+        radiusSlider.addTarget(self, action: #selector(radiusChanged(_:)), for: .valueChanged)
+        contentStack.addArrangedSubview(makeShadowRow(radius: true))
+        radiusNote.text = mpvLocalized("subtitle.shadow_radius.unsupported")
+        radiusNote.font = .preferredFont(forTextStyle: .footnote)
+        radiusNote.textColor = .secondaryLabel
+        radiusNote.numberOfLines = 0
+        radiusNote.isHidden = isShadowRadiusEditable
+        contentStack.addArrangedSubview(radiusNote)
 
         bottomOffsetStepper.minimumValue = 0
         bottomOffsetStepper.maximumValue = 300
@@ -89,18 +111,24 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         fontSizeStepper.value = style.fontSize
         fontSizeValueLabel.text = "\(Int(style.fontSize.rounded()))"
         boldSwitch.isOn = style.bold
-        let strength = style.shadowRadius > 0 ? style.shadowRadius / 8 : style.shadowOffset / 4
+        let strength = style.shadowOffset / 4
         shadowSlider.value = Float(min(max(strength, 0), 1) * 100)
         let shadowText = mpvLocalized("subtitle.shadow_strength.value", Int(shadowSlider.value.rounded()))
         shadowValueLabel.text = shadowText
         shadowSlider.accessibilityValue = shadowText
+        radiusSlider.value = Float(style.shadowRadius)
+        let radiusText = String(format: "%.1f pt", style.shadowRadius)
+        radiusValueLabel.text = radiusText
+        radiusSlider.accessibilityValue = radiusText
         bottomOffsetStepper.value = style.bottomOffset
         bottomOffsetValueLabel.text = "\(Int(style.bottomOffset.rounded()))"
     }
 
-    private func makeShadowRow() -> UIView {
+    private func makeShadowRow(radius: Bool = false) -> UIView {
+        let shadowSlider = radius ? radiusSlider : shadowSlider
+        let shadowValueLabel = radius ? radiusValueLabel : shadowValueLabel
         let label = UILabel()
-        label.text = mpvLocalized("subtitle.shadow_strength")
+        label.text = mpvLocalized(radius ? "subtitle.shadow_radius" : "subtitle.shadow_strength")
         label.font = .preferredFont(forTextStyle: .body)
         label.adjustsFontForContentSizeCategory = true
         label.textColor = .label
@@ -163,10 +191,16 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     @objc private func shadowChanged(_ sender: UISlider) {
         let strength = Double(sender.value) / 100
         var updated = style
-        updated.shadowRadius = 8 * strength
         updated.shadowOffset = 4 * strength
         let alpha = strength == 0 ? 0 : 0.15 + 0.85 * strength
         updated.shadowColor = String(format: "#%02X000000", Int((alpha * 255).rounded()))
+        applyStyle(updated)
+    }
+
+    @objc private func radiusChanged(_ sender: UISlider) {
+        guard isShadowRadiusEditable else { return }
+        var updated = style
+        updated.shadowRadius = Double((sender.value * 2).rounded() / 2)
         applyStyle(updated)
     }
 

@@ -103,3 +103,6 @@
 "status.hardware_decoding" = "硬件解码";
 "status.hardware_decoding_copy" = "硬件解码（拷贝）";
 "status.software_decoding" = "软件解码";
+
+"subtitle.shadow_radius" = "阴影扩散半径";
+"subtitle.shadow_radius.unsupported" = "当前字幕渲染不支持扩散半径";

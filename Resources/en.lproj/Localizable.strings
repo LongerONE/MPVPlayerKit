@@ -103,3 +103,6 @@
 "status.hardware_decoding" = "Hardware decoding";
 "status.hardware_decoding_copy" = "Hardware decoding (copy)";
 "status.software_decoding" = "Software decoding";
+
+"subtitle.shadow_radius" = "Shadow Radius";
+"subtitle.shadow_radius.unsupported" = "Current subtitle rendering does not support shadow radius";

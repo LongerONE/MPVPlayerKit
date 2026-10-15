@@ -150,6 +150,7 @@ extension MPVQuickPlayerViewController {
 
     func showSubtitleSettings() {
         let settingsView = MPVQuickPlayerSubtitleSettingsView()
+        settingsView.isShadowRadiusEditable = player.playbackView.clientSubtitleController.hasSelection
         settingsView.onStyleChange = { [weak self] style in
             self?.setSubtitleStyle(style)
         }
@@ -196,6 +197,7 @@ extension MPVQuickPlayerViewController {
 
     public func setSubtitleStyle(_ style: MPVSubtitleStyle) {
         subtitleStyle = style
+        UserDefaults.standard.set(style.shadowRadius, forKey: "MPVQuickPlayer.subtitleShadowRadius")
         player.updateSubtitleStyle(style)
     }
 

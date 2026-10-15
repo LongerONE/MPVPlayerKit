@@ -33,27 +33,41 @@ final class MPVSubtitleStyleTests: XCTestCase {
             .flatMap({ $0.subviews }).compactMap({ $0 as? UISlider }).first else {
             return XCTFail("Subtitle settings should contain a shadow slider")
         }
+        panel.update(style: MPVSubtitleStyle(shadowRadius: 6), delay: 0)
         var changedStyle: MPVSubtitleStyle?
         panel.onStyleChange = { changedStyle = $0 }
         slider.value = 50
         slider.sendActions(for: .valueChanged)
-        XCTAssertEqual(changedStyle?.shadowRadius, 4)
+        XCTAssertEqual(changedStyle?.shadowRadius, 6)
         XCTAssertEqual(changedStyle?.shadowOffset, 2)
         XCTAssertEqual(changedStyle?.shadowColor, "#93000000")
         slider.value = 100
         slider.sendActions(for: .valueChanged)
-        XCTAssertEqual(changedStyle?.shadowRadius, 8)
+        XCTAssertEqual(changedStyle?.shadowRadius, 6)
         XCTAssertEqual(changedStyle?.shadowOffset, 4)
         XCTAssertEqual(changedStyle?.shadowColor, "#FF000000")
         slider.value = 0
         slider.sendActions(for: .valueChanged)
-        XCTAssertEqual(changedStyle?.shadowRadius, 0)
+        XCTAssertEqual(changedStyle?.shadowRadius, 6)
         XCTAssertEqual(changedStyle?.shadowOffset, 0)
         XCTAssertEqual(changedStyle?.shadowColor, "#00000000")
         panel.update(style: MPVSubtitleStyle(shadowRadius: 6), delay: 0)
-        XCTAssertEqual(slider.value, 75)
+        XCTAssertEqual(slider.value, 0)
         panel.update(style: MPVSubtitleStyle(shadowOffset: 1), delay: 0)
         XCTAssertEqual(slider.value, 25)
+        let radius = panel.contentStack.arrangedSubviews.flatMap { $0.subviews }
+            .compactMap { $0 as? UISlider }.first { $0.accessibilityIdentifier == "MPVQuickPlayer.subtitleShadowRadius" }!
+        radius.value = 7.3
+        radius.sendActions(for: .valueChanged)
+        XCTAssertEqual(changedStyle?.shadowRadius, 7.5)
+        XCTAssertEqual(changedStyle?.shadowOffset, 1)
+        radius.value = 0
+        radius.sendActions(for: .valueChanged)
+        XCTAssertEqual(changedStyle?.shadowOffset, 1)
+        XCTAssertEqual(changedStyle?.shadowRadius, 0)
+        XCTAssertTrue(radius.isContinuous)
+        panel.isShadowRadiusEditable = false
+        XCTAssertFalse(radius.isEnabled)
     }
 
     @MainActor
@@ -69,6 +83,18 @@ final class MPVSubtitleStyleTests: XCTestCase {
         XCTAssertEqual(label.layer.shadowRadius, 4)
         XCTAssertEqual(label.layer.shadowOpacity, 0.6)
         XCTAssertEqual(label.layer.shadowOffset, CGSize(width: 0, height: 2))
+        renderer.render(MPVSubtitlePresentation(
+            cues: [MPVSubtitleCue(startTime: 0, endTime: 1, text: "Subtitle")],
+            style: MPVSubtitleStyle(shadowOffset: 2, shadowRadius: 12.5)
+        ))
+        XCTAssertEqual(label.layer.shadowRadius, 12.5)
+        XCTAssertEqual(label.layer.shadowOffset, CGSize(width: 0, height: 2))
+        renderer.render(MPVSubtitlePresentation(
+            cues: [MPVSubtitleCue(startTime: 0, endTime: 1, text: "Subtitle")],
+            style: MPVSubtitleStyle(shadowOffset: 2, shadowRadius: 0)
+        ))
+        XCTAssertEqual(label.layer.shadowRadius, 0)
+        XCTAssertEqual(label.layer.shadowOpacity, 0.6)
     }
 
     func testSubtitleStyleCarriesCustomFontName() {

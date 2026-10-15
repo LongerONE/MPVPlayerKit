@@ -40,7 +40,13 @@ public final class MPVQuickPlayerViewController: UIViewController {
     /// The quick player's app-local global cache preference.
     public internal(set) var cacheConfiguration: MPVCacheConfiguration
     public internal(set) var subtitleDelay: TimeInterval = 0
-    public internal(set) var subtitleStyle = MPVSubtitleStyle.defaultStyle
+    public internal(set) var subtitleStyle: MPVSubtitleStyle = {
+        var style = MPVSubtitleStyle.defaultStyle
+        if let radius = UserDefaults.standard.object(forKey: "MPVQuickPlayer.subtitleShadowRadius") as? Double {
+            style.shadowRadius = min(20, max(0, radius))
+        }
+        return style
+    }()
 
     public var diagnosticSessionID: UUID? { player.diagnosticSessionID }
     public func diagnosticLogFiles() async throws -> [URL] {
@@ -149,6 +155,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         super.init(nibName: nil, bundle: nil)
         modalPresentationCapturesStatusBarAppearance = true
         player.delegate = self
+        player.updateSubtitleStyle(subtitleStyle)
     }
 
     public convenience init(
