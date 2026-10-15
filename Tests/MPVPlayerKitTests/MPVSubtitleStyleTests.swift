@@ -1,9 +1,64 @@
 import XCTest
 import UIKit
 import AVFoundation
+import CoreText
 @testable import MPVPlayerKit
 
 final class MPVSubtitleStyleTests: XCTestCase {
+    @MainActor
+    func testLiveEpisodeCustomFontOutline() async throws {
+        let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        let configuration = directory.appendingPathComponent("subtitle-live.json")
+        guard FileManager.default.fileExists(atPath: configuration.path) else {
+            throw XCTSkip("真实片源验证需在宿主 Documents 提供私有播放配置")
+        }
+        let values = try JSONDecoder().decode([String: String].self, from: Data(contentsOf: configuration))
+        let url = try XCTUnwrap(values["url"])
+        CTFontManagerRegisterFontsForURL(directory.appendingPathComponent("validation-font.ttf") as CFURL, .process, nil)
+        XCTAssertNotNil(UIFont(name: "LXGWWenKai-Regular", size: 64))
+        let window = UIWindow(frame: UIScreen.main.bounds)
+        let controller = UIViewController()
+        window.rootViewController = controller
+        window.makeKeyAndVisible()
+        let player = MPVPlayerView(frame: controller.view.bounds)
+        player.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        controller.view.addSubview(player)
+        player.configure(["url": url, "forceSoftwareDecode": true, "diagnosticsEnabled": false])
+        player.play()
+        defer { player.stop(); window.isHidden = true }
+        for _ in 0..<200 where player.currentTime < 0.1 { try await Task.sleep(for: .milliseconds(100)) }
+        XCTAssertGreaterThan(player.currentTime, 0)
+        let subtitle = try XCTUnwrap(player.mediaTracks(["mediaType": "sub"]).compactMap { $0 as? [String: Any] }.first {
+            ($0["name"] as? String)?.contains("Simplified") == true
+        })
+        player.selectTrack(["trackID": try XCTUnwrap(subtitle["trackID"]), "mediaType": "sub",
+            "usesNativeSubtitleRendering": true, "usesOriginalStyle": false])
+        _ = player.seek(["time": 120, "autoPlay": true])
+        for _ in 0..<150 where player.currentTime < 119 { try await Task.sleep(for: .milliseconds(100)) }
+        for _ in 0..<150 where player.decodedSubtitleText?.isEmpty != false { try await Task.sleep(for: .milliseconds(100)) }
+        player.pause()
+        try await Task.sleep(for: .milliseconds(200))
+        XCTAssertFalse(player.decodedSubtitleText?.isEmpty ?? true)
+        for bold in [false, true] {
+            player.updateSubtitleStyle(["fontName": "LXGWWenKai-Regular", "fontSize": 64,
+                "bold": bold, "outlineSize": 5, "outlineColor": "#FF000000", "textColor": "#FFFFFFFF", "bottomOffset": 250])
+            controller.view.layoutIfNeeded()
+            player.layoutIfNeeded()
+            player.clientSubtitleRenderer.view.layoutIfNeeded()
+            try await Task.sleep(for: .milliseconds(500))
+            let label = try XCTUnwrap(player.clientSubtitleRenderer.view.subviews.compactMap { $0 as? UILabel }.first)
+            print("字幕验证 text=\(label.text ?? "nil") frame=\(label.frame) host=\(player.bounds) font=\(String(describing: label.attributedText?.attribute(.font, at: 0, effectiveRange: nil)))")
+            let image = UIGraphicsImageRenderer(bounds: controller.view.bounds).image { _ in
+                controller.view.drawHierarchy(in: controller.view.bounds, afterScreenUpdates: true)
+            }
+            try image.pngData()?.write(to: directory.appendingPathComponent("live-outline-\(bold ? "bold" : "regular").png"))
+            let attachment = XCTAttachment(image: image)
+            attachment.name = "幸运女神-S1E1-\(bold ? "加粗" : "常规")"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+    }
+
     @MainActor
     func testRealMPVDecodedTextShadowWhilePaused() async throws {
         let directory = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -83,6 +138,45 @@ final class MPVSubtitleStyleTests: XCTestCase {
         view.loadSubtitle(["requestID": "back-to-srt", "url": subtitle.absoluteString, "usesOriginalStyle": false])
         for _ in 0..<50 where view.decodedSubtitleText != originalText { try await Task.sleep(for: .milliseconds(100)) }
         XCTAssertEqual(label.attributedText?.string, originalText)
+    }
+
+    @MainActor
+    func testOutlinePreservesFillAndSyntheticBoldExpandsOriginalFont() throws {
+        let renderer = MPVDefaultSubtitleRenderer()
+        renderer.view.frame = CGRect(x: 0, y: 0, width: 720, height: 720)
+        func pixels(outline: Double, bold: Bool) throws -> Int {
+            renderer.render(MPVSubtitlePresentation(
+                cues: [MPVSubtitleCue(startTime: 0, endTime: 1, text: "Outline 字形")],
+                style: MPVSubtitleStyle(fontSize: 64, fontName: "Papyrus", bold: bold,
+                    outlineSize: outline, outlineColor: "#FF000000")
+            ))
+            renderer.view.layoutIfNeeded()
+            let label = try XCTUnwrap(renderer.view.subviews.compactMap { $0 as? UILabel }.first)
+            let font = try XCTUnwrap(label.attributedText?.attribute(.font, at: 0, effectiveRange: nil) as? UIFont)
+            XCTAssertEqual(font.familyName, UIFont(name: "Papyrus", size: 64)?.familyName)
+            let format = UIGraphicsImageRendererFormat()
+            format.scale = 1
+            let image = UIGraphicsImageRenderer(bounds: renderer.view.bounds, format: format).image { context in
+                renderer.view.layer.render(in: context.cgContext)
+            }
+            let cgImage = try XCTUnwrap(image.cgImage)
+            let data = try XCTUnwrap(cgImage.dataProvider?.data)
+            let bytes = try XCTUnwrap(CFDataGetBytePtr(data))
+            var white = 0
+            for y in 0..<cgImage.height {
+                for x in 0..<cgImage.width {
+                    let offset = y * cgImage.bytesPerRow + x * 4
+                    if bytes[offset] > 220 && bytes[offset + 1] > 220 && bytes[offset + 2] > 220 { white += 1 }
+                }
+            }
+            return white
+        }
+        let plain = try pixels(outline: 0, bold: false)
+        let outlined = try pixels(outline: 5, bold: false)
+        let bold = try pixels(outline: 5, bold: true)
+        XCTAssertGreaterThan(plain, 100)
+        XCTAssertGreaterThanOrEqual(outlined, Int(Double(plain) * 0.98))
+        XCTAssertGreaterThan(bold, Int(Double(outlined) * 1.1))
     }
 
     @MainActor

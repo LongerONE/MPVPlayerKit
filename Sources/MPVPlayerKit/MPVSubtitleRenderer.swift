@@ -22,7 +22,7 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
     private static let shadowOpacity: Float = 0.6
 
     public let view = UIView()
-    private let label = UILabel()
+    private let label = MPVSubtitleLabel()
     private var bottomConstraint: NSLayoutConstraint!
 
     public init() {
@@ -57,12 +57,15 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
         let fontSize = max(8, CGFloat(style.fontSize) * widthScale)
         let font = subtitleFont(named: style.fontName, size: fontSize, bold: style.bold)
         let outlineSize = max(0, CGFloat(style.outlineSize) * widthScale)
-        let strokeWidth = outlineSize > 0 ? -(outlineSize / fontSize * 100) : 0
+        let fillColor = UIColor(mpvHex: style.textColor, fallback: .white)
+        let syntheticBold = style.bold && !font.fontDescriptor.symbolicTraits.contains(.traitBold)
+        label.outlineWidth = outlineSize
+        label.outlineColor = UIColor(mpvHex: style.outlineColor, fallback: .black)
         label.attributedText = NSAttributedString(string: text, attributes: [
             .font: font,
-            .foregroundColor: UIColor(mpvHex: style.textColor, fallback: .white),
-            .strokeColor: UIColor(mpvHex: style.outlineColor, fallback: .black),
-            .strokeWidth: strokeWidth,
+            .foregroundColor: fillColor,
+            .strokeColor: fillColor,
+            .strokeWidth: syntheticBold ? -3 : 0,
             .backgroundColor: UIColor(mpvHex: style.backgroundColor, fallback: .clear),
             .paragraphStyle: paragraph,
         ])
@@ -98,6 +101,35 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
             return baseFont
         }
         return UIFont(descriptor: descriptor, size: size)
+    }
+}
+
+@MainActor
+private final class MPVSubtitleLabel: UILabel {
+    var outlineWidth: CGFloat = 0
+    var outlineColor: UIColor = .black
+
+    override func drawText(in rect: CGRect) {
+        guard let original = attributedText, outlineWidth > 0 else {
+            super.drawText(in: rect)
+            return
+        }
+        let outline = NSMutableAttributedString(attributedString: original)
+        let fullRange = NSRange(location: 0, length: outline.length)
+        original.enumerateAttributes(in: fullRange) { attributes, range, _ in
+            guard let font = attributes[.font] as? UIFont else { return }
+            let boldWidth = abs((attributes[.strokeWidth] as? NSNumber)?.doubleValue ?? 0)
+            outline.addAttributes([
+                .strokeColor: outlineColor,
+                .strokeWidth: outlineWidth * 200 / font.pointSize + boldWidth,
+                .foregroundColor: outlineColor,
+            ], range: range)
+        }
+        // CoreText 的复合 fill/stroke 会让描边覆盖细笔画；先画轮廓，再覆盖完整填充。
+        attributedText = outline
+        super.drawText(in: rect)
+        attributedText = original
+        super.drawText(in: rect)
     }
 }
 
