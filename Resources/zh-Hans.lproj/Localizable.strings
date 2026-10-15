@@ -71,6 +71,8 @@
 "subtitle.style.high_contrast" = "高对比度";
 "subtitle.font_size" = "字号";
 "subtitle.bold" = "加粗";
+"subtitle.shadow_strength" = "阴影强度";
+"subtitle.shadow_strength.value" = "%d%%";
 "subtitle.bottom_offset" = "底部偏移";
 "subtitle.style.use_file" = "使用字幕文件样式";
 "subtitle.style.use_player" = "使用播放器样式";

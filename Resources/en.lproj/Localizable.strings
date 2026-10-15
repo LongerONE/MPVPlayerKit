@@ -71,6 +71,8 @@
 "subtitle.style.high_contrast" = "High Contrast";
 "subtitle.font_size" = "Font Size";
 "subtitle.bold" = "Bold";
+"subtitle.shadow_strength" = "Shadow Strength";
+"subtitle.shadow_strength.value" = "%d%%";
 "subtitle.bottom_offset" = "Bottom Offset";
 "subtitle.style.use_file" = "Use Subtitle File Style";
 "subtitle.style.use_player" = "Use Player Style";

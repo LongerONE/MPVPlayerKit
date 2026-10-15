@@ -454,7 +454,8 @@ extension MPVPlayerView {
             shadowOffset: shadowOffset,
             backgroundColor: options["backgroundColor"] as? String ?? "#00000000",
             bottomOffset: (options["bottomOffset"] as? NSNumber)?.doubleValue ?? 34,
-            shadowColor: shadowColor
+            shadowColor: shadowColor,
+            shadowRadius: (options["shadowRadius"] as? NSNumber)?.doubleValue ?? 0
         ))
         let values = [
             MPVProperty.subtitleFont: fontName,

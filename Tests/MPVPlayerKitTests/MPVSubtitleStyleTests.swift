@@ -15,6 +15,62 @@ final class MPVSubtitleStyleTests: XCTestCase {
         XCTAssertFalse(MPVPlayerView.isImageSubtitleCodec("subrip"))
     }
 
+    func testShadowRadiusDefaultsClampsAndBridges() {
+        XCTAssertEqual(MPVSubtitleStyle().shadowRadius, 0)
+        XCTAssertEqual(MPVSubtitleStyle(shadowRadius: -1).shadowRadius, 0)
+        XCTAssertEqual(MPVSubtitleStyle(shadowRadius: 21).shadowRadius, 20)
+        XCTAssertEqual(MPVSubtitleStyle(shadowRadius: .nan).shadowRadius, 0)
+        XCTAssertEqual(MPVSubtitleStyle(shadowRadius: .infinity).shadowRadius, 0)
+        let style = MPVSubtitleStyle(shadowRadius: 8)
+        XCTAssertEqual(style.bridgeDictionary["shadowRadius"] as? Double, 8)
+        XCTAssertNotEqual(style, MPVSubtitleStyle())
+    }
+
+    @MainActor
+    func testShadowSliderAppliesStrengthAndRestoresLegacyOffset() {
+        let panel = MPVQuickPlayerSubtitleSettingsView(frame: .zero)
+        guard let slider = panel.contentStack.arrangedSubviews
+            .flatMap({ $0.subviews }).compactMap({ $0 as? UISlider }).first else {
+            return XCTFail("Subtitle settings should contain a shadow slider")
+        }
+        var changedStyle: MPVSubtitleStyle?
+        panel.onStyleChange = { changedStyle = $0 }
+        slider.value = 50
+        slider.sendActions(for: .valueChanged)
+        XCTAssertEqual(changedStyle?.shadowRadius, 4)
+        XCTAssertEqual(changedStyle?.shadowOffset, 2)
+        XCTAssertEqual(changedStyle?.shadowColor, "#93000000")
+        slider.value = 100
+        slider.sendActions(for: .valueChanged)
+        XCTAssertEqual(changedStyle?.shadowRadius, 8)
+        XCTAssertEqual(changedStyle?.shadowOffset, 4)
+        XCTAssertEqual(changedStyle?.shadowColor, "#FF000000")
+        slider.value = 0
+        slider.sendActions(for: .valueChanged)
+        XCTAssertEqual(changedStyle?.shadowRadius, 0)
+        XCTAssertEqual(changedStyle?.shadowOffset, 0)
+        XCTAssertEqual(changedStyle?.shadowColor, "#00000000")
+        panel.update(style: MPVSubtitleStyle(shadowRadius: 6), delay: 0)
+        XCTAssertEqual(slider.value, 75)
+        panel.update(style: MPVSubtitleStyle(shadowOffset: 1), delay: 0)
+        XCTAssertEqual(slider.value, 25)
+    }
+
+    @MainActor
+    func testRendererAppliesShadowRadiusWithExistingOpacity() {
+        let renderer = MPVDefaultSubtitleRenderer()
+        renderer.render(MPVSubtitlePresentation(
+            cues: [MPVSubtitleCue(startTime: 0, endTime: 1, text: "Subtitle")],
+            style: MPVSubtitleStyle(shadowOffset: 2, shadowRadius: 4)
+        ))
+        guard let label = renderer.view.subviews.compactMap({ $0 as? UILabel }).first else {
+            return XCTFail("Renderer should create a subtitle label")
+        }
+        XCTAssertEqual(label.layer.shadowRadius, 4)
+        XCTAssertEqual(label.layer.shadowOpacity, 0.6)
+        XCTAssertEqual(label.layer.shadowOffset, CGSize(width: 0, height: 2))
+    }
+
     func testSubtitleStyleCarriesCustomFontName() {
         let style = MPVSubtitleStyle(fontName: "Example-Regular")
         XCTAssertEqual(style.fontName, "Example-Regular")

@@ -12,6 +12,8 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     private let fontSizeValueLabel = UILabel()
     private let fontSizeStepper = UIStepper()
     private let boldSwitch = UISwitch()
+    private let shadowSlider = UISlider()
+    private let shadowValueLabel = UILabel()
     private let bottomOffsetValueLabel = UILabel()
     private let bottomOffsetStepper = UIStepper()
     private var style = MPVSubtitleStyle.defaultStyle
@@ -54,6 +56,14 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
             makeSwitchRow(title: mpvLocalized("subtitle.bold"), switchView: boldSwitch)
         )
 
+        shadowSlider.minimumValue = 0
+        shadowSlider.maximumValue = 100
+        shadowSlider.isContinuous = true
+        shadowSlider.accessibilityLabel = mpvLocalized("subtitle.shadow_strength")
+        shadowSlider.accessibilityIdentifier = "MPVQuickPlayer.subtitleShadowStrength"
+        shadowSlider.addTarget(self, action: #selector(shadowChanged(_:)), for: .valueChanged)
+        contentStack.addArrangedSubview(makeShadowRow())
+
         bottomOffsetStepper.minimumValue = 0
         bottomOffsetStepper.maximumValue = 300
         bottomOffsetStepper.stepValue = 2
@@ -79,8 +89,32 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         fontSizeStepper.value = style.fontSize
         fontSizeValueLabel.text = "\(Int(style.fontSize.rounded()))"
         boldSwitch.isOn = style.bold
+        let strength = style.shadowRadius > 0 ? style.shadowRadius / 8 : style.shadowOffset / 4
+        shadowSlider.value = Float(min(max(strength, 0), 1) * 100)
+        let shadowText = mpvLocalized("subtitle.shadow_strength.value", Int(shadowSlider.value.rounded()))
+        shadowValueLabel.text = shadowText
+        shadowSlider.accessibilityValue = shadowText
         bottomOffsetStepper.value = style.bottomOffset
         bottomOffsetValueLabel.text = "\(Int(style.bottomOffset.rounded()))"
+    }
+
+    private func makeShadowRow() -> UIView {
+        let label = UILabel()
+        label.text = mpvLocalized("subtitle.shadow_strength")
+        label.font = .preferredFont(forTextStyle: .body)
+        label.adjustsFontForContentSizeCategory = true
+        label.textColor = .label
+        shadowValueLabel.font = .monospacedDigitSystemFont(ofSize: 15, weight: .medium)
+        shadowValueLabel.textColor = .label
+        shadowValueLabel.textAlignment = .right
+        shadowValueLabel.setContentHuggingPriority(.required, for: .horizontal)
+        let header = UIStackView(arrangedSubviews: [label, shadowValueLabel])
+        header.spacing = 8
+        let row = UIStackView(arrangedSubviews: [header, shadowSlider])
+        row.axis = .vertical
+        row.spacing = 6
+        shadowSlider.heightAnchor.constraint(greaterThanOrEqualToConstant: 44).isActive = true
+        return row
     }
 
     private static func presetIndex(for style: MPVSubtitleStyle) -> Int {
@@ -123,6 +157,16 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     @objc private func boldChanged(_ sender: UISwitch) {
         var updated = style
         updated.bold = sender.isOn
+        applyStyle(updated)
+    }
+
+    @objc private func shadowChanged(_ sender: UISlider) {
+        let strength = Double(sender.value) / 100
+        var updated = style
+        updated.shadowRadius = 8 * strength
+        updated.shadowOffset = 4 * strength
+        let alpha = strength == 0 ? 0 : 0.15 + 0.85 * strength
+        updated.shadowColor = String(format: "#%02X000000", Int((alpha * 255).rounded()))
         applyStyle(updated)
     }
 
