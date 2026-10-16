@@ -143,3 +143,11 @@
 "subtitle.original_ass.position_note" = "Original ASS keeps the file positioning and layout. Position controls are unavailable until player styling is restored; your position is retained.";
 
 "common.details" = "Details";
+
+"subtitle.shadow_radius.no_subtitle" = "No active text subtitle supports shadow radius.";
+"subtitle.shadow_radius.separator" = ", ";
+"subtitle.shadow_radius.applies_to" = "Applies only to %@.";
+"subtitle.shadow_radius.nativeRenderer" = "%@: MPV native rendering does not support a separate shadow radius.";
+"subtitle.shadow_radius.originalStyle" = "%@: Original subtitle styling does not support a separate shadow radius.";
+"subtitle.shadow_radius.imageSubtitle" = "%@: Image subtitles do not support text shadow styling.";
+"subtitle.shadow_radius.unsupportedRenderer" = "%@: The current custom renderer does not support shadow radius.";

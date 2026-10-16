@@ -20,9 +20,10 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     var isShadowRadiusEditable = true {
         didSet {
             radiusSlider.isEnabled = isShadowRadiusEditable
-            radiusNote.isHidden = false
         }
     }
+    var shadowRadiusAvailabilityProvider: (() -> MPVSubtitleShadowRadiusAvailability)?
+    private var shadowRadiusAvailabilityTask: Task<Void, Never>?
     private var style = MPVSubtitleStyle.defaultStyle
     private var delay: TimeInterval = 0
 
@@ -86,14 +87,37 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         radiusSlider.accessibilityIdentifier = "MPVQuickPlayer.subtitleShadowRadius"
         radiusSlider.addTarget(self, action: #selector(radiusChanged(_:)), for: .valueChanged)
         contentStack.addArrangedSubview(makeShadowRow(radius: true))
-        radiusNote.text = mpvLocalized("subtitle.primary.shadow_radius.note")
         radiusNote.font = .preferredFont(forTextStyle: .footnote)
         radiusNote.textColor = .secondaryLabel
         radiusNote.numberOfLines = 0
-        radiusNote.isHidden = false
+        radiusNote.isHidden = true
+        radiusNote.accessibilityIdentifier = "MPVQuickPlayer.subtitleShadowRadiusNote"
         contentStack.addArrangedSubview(radiusNote)
 
         update(style: style, delay: 0)
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        shadowRadiusAvailabilityTask?.cancel()
+        shadowRadiusAvailabilityTask = nil
+        guard window != nil, shadowRadiusAvailabilityProvider != nil else { return }
+        refreshShadowRadiusAvailability()
+        shadowRadiusAvailabilityTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(nanoseconds: 250_000_000) } catch { return }
+                guard let self, self.window != nil else { return }
+                self.refreshShadowRadiusAvailability()
+            }
+        }
+    }
+
+    func refreshShadowRadiusAvailability() {
+        guard let availability = shadowRadiusAvailabilityProvider?() else { return }
+        isShadowRadiusEditable = availability.isEditable
+        radiusNote.text = availability.explanation { mpvLocalized($0) }
+        radiusNote.isHidden = radiusNote.text == nil
+        radiusSlider.accessibilityHint = radiusNote.text
     }
 
     func update(style: MPVSubtitleStyle, delay: TimeInterval) {
@@ -118,7 +142,7 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         let shadowSlider = radius ? radiusSlider : shadowSlider
         let shadowValueLabel = radius ? radiusValueLabel : shadowValueLabel
         let label = UILabel()
-        label.text = mpvLocalized(radius ? "subtitle.primary.shadow_radius" : "subtitle.shadow_strength")
+        label.text = mpvLocalized(radius ? "subtitle.shadow_radius" : "subtitle.shadow_strength")
         label.font = .preferredFont(forTextStyle: .body)
         label.adjustsFontForContentSizeCategory = true
         label.textColor = .label
@@ -188,7 +212,11 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     }
 
     @objc private func radiusChanged(_ sender: UISlider) {
-        guard isShadowRadiusEditable else { return }
+        refreshShadowRadiusAvailability()
+        guard isShadowRadiusEditable else {
+            sender.value = Float(style.shadowRadius)
+            return
+        }
         var updated = style
         updated.shadowRadius = Double((sender.value * 2).rounded() / 2)
         applyStyle(updated)

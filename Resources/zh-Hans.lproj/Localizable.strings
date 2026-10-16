@@ -143,3 +143,11 @@
 "subtitle.original_ass.position_note" = "原始 ASS 优先字幕文件的定位与排版，垂直位置暂不可调；切回播放器样式后恢复已设位置。";
 
 "common.details" = "详情";
+
+"subtitle.shadow_radius.no_subtitle" = "当前没有可调整阴影扩散半径的文本字幕。";
+"subtitle.shadow_radius.separator" = "、";
+"subtitle.shadow_radius.applies_to" = "仅对%@生效。";
+"subtitle.shadow_radius.nativeRenderer" = "%@：MPV 原生渲染不支持单独调整阴影扩散半径。";
+"subtitle.shadow_radius.originalStyle" = "%@：保留字幕原始样式，不支持单独调整阴影扩散半径。";
+"subtitle.shadow_radius.imageSubtitle" = "%@：图片字幕不支持文字阴影样式。";
+"subtitle.shadow_radius.unsupportedRenderer" = "%@：当前自定义渲染器不支持阴影扩散半径。";

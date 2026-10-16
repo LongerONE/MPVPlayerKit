@@ -46,6 +46,8 @@ extension MPVPlayer {
         state.sourceID = (values["sourceID"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         state.isNative = (values["isNative"] as? NSNumber)?.boolValue ?? true
         state.supportsTextStyle = (values["supportsTextStyle"] as? NSNumber)?.boolValue ?? false
+        state.shadowRadiusCapability = (values["shadowRadiusCapability"] as? String)
+            .flatMap(MPVSubtitleShadowRadiusCapability.init(rawValue:)) ?? .inactive
         return state
     }
 

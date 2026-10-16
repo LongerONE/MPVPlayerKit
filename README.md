@@ -352,3 +352,9 @@ Open `Demo/MPVPlayerKitDemo.xcodeproj` and run the `MPVPlayerKitDemo` scheme. Th
 ## License
 
 This package's source code is available under the MIT License. MPVKit is an LGPL-3.0 dependency and its native libraries have their own distribution requirements; applications should review those terms before shipping. Bundled fonts retain their own OFL licenses.
+
+## Shadow radius capability
+
+Read `subtitleState(in:).shadowRadiusCapability` for each slot's actual rendering capability. Shared style enables the radius when at least one active renderer supports it and explains incompatible slots. Switching routes preserves the shared value; a gap between cues does not disable support.
+
+Custom `MPVSubtitleRenderer` implementations default to unsupported. Renderers that apply `MPVSubtitleStyle.shadowRadius` can declare `supportsShadowRadius == true`; the default renderer already does. Hosts can summarize slots with `MPVSubtitleShadowRadiusAvailability` and supply their own localization for its explanation.

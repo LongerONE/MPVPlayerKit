@@ -17,7 +17,13 @@ public enum MPVSubtitleASSOverride: String, CaseIterable, Sendable {
     case no, yes, scale, force, strip
 }
 
+/// 当前实际渲染路径的能力；inactive 包括未选择、隐藏和正在加载的字幕。
+public enum MPVSubtitleShadowRadiusCapability: String, Sendable {
+    case inactive, supported, nativeRenderer, originalStyle, imageSubtitle, unsupportedRenderer
+}
+
 public struct MPVSubtitleState: Equatable, Sendable {
+    public var shadowRadiusCapability: MPVSubtitleShadowRadiusCapability = .inactive
     public var assOverride: MPVSubtitleASSOverride = .strip
     public var trackID: Int64?
     public var visible: Bool
@@ -41,12 +47,20 @@ public struct MPVSubtitleState: Equatable, Sendable {
         supportsTextStyle = false
     }
 
+    mutating func updateShadowRadiusCapability(isImageSubtitle: Bool) {
+        guard trackID != nil, visible else { shadowRadiusCapability = .inactive; return }
+        if isImageSubtitle { shadowRadiusCapability = .imageSubtitle }
+        else if usesOriginalStyle { shadowRadiusCapability = .originalStyle }
+        else { shadowRadiusCapability = isNative ? .nativeRenderer : .supported }
+    }
+
     var dictionary: NSDictionary {
         ["trackID": trackID.map(NSNumber.init(value:)) ?? NSNull(),
          "visible": visible, "nativeVisible": nativeVisible, "delay": delay,
          "position": position, "usesOriginalStyle": usesOriginalStyle, "assOverride": assOverride.rawValue,
          "sourceID": sourceID ?? "", "isNative": isNative,
-         "supportsTextStyle": supportsTextStyle] as NSDictionary
+         "supportsTextStyle": supportsTextStyle,
+         "shadowRadiusCapability": shadowRadiusCapability.rawValue] as NSDictionary
     }
 }
 

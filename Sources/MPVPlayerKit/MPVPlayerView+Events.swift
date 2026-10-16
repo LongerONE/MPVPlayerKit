@@ -375,6 +375,7 @@ extension MPVPlayerView {
             isVisible: targetVisibility
         )
         refreshSubtitleTextCache()
+        subtitleSlots.publish(slotState(.primary), slot: .primary)
         return true
     }
 

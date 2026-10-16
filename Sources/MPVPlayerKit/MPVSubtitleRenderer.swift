@@ -13,8 +13,13 @@ public struct MPVSubtitlePresentation: Equatable, Sendable {
 @MainActor
 public protocol MPVSubtitleRenderer: AnyObject {
     var view: UIView { get }
+    var supportsShadowRadius: Bool { get }
     func render(_ presentation: MPVSubtitlePresentation)
     func clear()
+}
+
+public extension MPVSubtitleRenderer {
+    var supportsShadowRadius: Bool { false }
 }
 
 @MainActor
@@ -22,6 +27,7 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
     private static let shadowOpacity: Float = 0.6
 
     public let view = UIView()
+    public var supportsShadowRadius: Bool { true }
     private let label = MPVSubtitleLabel()
     private var bottomConstraint: NSLayoutConstraint!
     var verticalPosition: Double = 100

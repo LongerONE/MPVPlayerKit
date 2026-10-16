@@ -19,6 +19,11 @@ extension MPVPlayerView {
             state.isNative = false
             state.visible = clientSubtitleController.isVisible
             state.supportsTextStyle = true
+            state.usesOriginalStyle = false
+            state.shadowRadiusCapability = state.visible ? .supported : .inactive
+        }
+        if state.shadowRadiusCapability == .supported, !clientSubtitleController.renderer.supportsShadowRadius {
+            state.shadowRadiusCapability = .unsupportedRenderer
         }
         return state.dictionary
     }
@@ -99,7 +104,13 @@ extension MPVPlayerView {
         }
         state.nativeVisible = getFlag(slot.visibilityProperty) ?? false
         if let id = state.trackID {
-            state.supportsTextStyle = !isImageTrack(id) && !state.usesOriginalStyle
+            let image = isImageTrack(id)
+            state.supportsTextStyle = !image && !state.usesOriginalStyle
+            state.updateShadowRadiusCapability(isImageSubtitle: image)
+        }
+        if state.trackID == nil || !state.visible { state.shadowRadiusCapability = .inactive }
+        if subtitleSlots.pending.values.contains(where: { $0.slot == slot }) {
+            state.shadowRadiusCapability = .inactive
         }
         return state
     }
@@ -151,7 +162,9 @@ extension MPVPlayerView {
         var published = target
         published.nativeVisible = getFlag(slot.visibilityProperty) ?? false
         published.isNative = slot == .secondary || !rendersDecodedSubtitleText
-        published.supportsTextStyle = id.map { !isImageTrack($0) && !original } ?? false
+        let image = id.map { isImageTrack($0) } ?? false
+        published.supportsTextStyle = id != nil && !image && !original
+        published.updateShadowRadiusCapability(isImageSubtitle: image)
         subtitleSlots.states[slot] = target
         subtitleSlots.publish(published, slot: slot)
         return true
@@ -234,6 +247,7 @@ extension MPVPlayerView {
             }
             let userdata = self.allocateMPVCommandUserdata()
             self.subtitleSlots.pending[userdata] = load
+            self.subtitleSlots.publish(self.slotState(slot), slot: slot)
             self.queue.asyncAfter(deadline: .now() + 10) { [weak self] in
                 guard let self, self.subtitleSlots.pending[userdata]?.requestID == request else { return }
                 self.subtitleSlots.pending.removeValue(forKey: userdata)
@@ -289,6 +303,9 @@ extension MPVPlayerView {
     nonisolated func finishSlotLoad(_ load: MPVSubtitleSlotRuntime.Load, success: Bool, error: String?) {
         subtitleSlots.restorationRequests.remove(load.requestID)
         guard subtitleSlots.completedRequests.insert(load.requestID).inserted else { return }
+        if load.session == currentBufferingSessionGeneration(), !isStopped() {
+            subtitleSlots.publish(slotState(load.slot), slot: load.slot)
+        }
         let slot = load.slot.rawValue
         let revision = subtitleSlots.selectionRevision[load.slot, default: 0]
         notifyOnMain {

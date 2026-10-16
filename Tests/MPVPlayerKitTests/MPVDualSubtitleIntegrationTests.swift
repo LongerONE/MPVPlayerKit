@@ -61,6 +61,74 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
 
     private enum WaitFailure: Error { case timeout }
 
+    @MainActor func testQuickPlayerShadowRadiusFollowsActualRoutesWhilePaused() async throws {
+        let saved = MPVQuickPlayerSubtitlePreferences.style()
+        defer { cleanUp(); MPVQuickPlayerSubtitlePreferences.save(saved) }
+        let quick = MPVQuickPlayerViewController(configuration: MPVPlayerConfiguration(
+            url: try fixture("dual-subtitles.mp4"), forceSoftwareDecode: true))
+        let host = UIWindow(frame: UIScreen.main.bounds)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene { host.windowScene = scene }
+        host.rootViewController = quick
+        host.makeKeyAndVisible()
+        window = host
+        let value = quick.player
+        player = value
+        try await eventually("QuickPlayer 加载视频") { value.duration > 0 }
+        value.pause()
+        quick.showSharedSubtitleStyle()
+        let panel = try XCTUnwrap(quick.settingsPanelOverlay as? MPVQuickPlayerSubtitleSettingsView)
+        let slider = try XCTUnwrap(descendants(panel).first { $0.accessibilityIdentifier == "MPVQuickPlayer.subtitleShadowRadius" } as? UISlider)
+        let note = try XCTUnwrap(descendants(panel).first { $0.accessibilityIdentifier == "MPVQuickPlayer.subtitleShadowRadiusNote" } as? UILabel)
+        XCTAssertFalse(slider.isEnabled)
+        XCTAssertFalse(note.isHidden)
+        try await load("primary.srt", in: .primary, on: value)
+        try await eventually("仅自绘时允许设置") { slider.isEnabled && note.isHidden }
+        XCTAssertEqual(value.subtitleState(in: .primary).shadowRadiusCapability, .supported)
+        try await load("secondary.vtt", in: .secondary, on: value)
+        try await eventually("混合渲染提示") { slider.isEnabled && !note.isHidden }
+        XCTAssertEqual(value.subtitleState(in: .secondary).shadowRadiusCapability, .nativeRenderer)
+        try await seek(2, on: value)
+        try await eventually("第一路自绘文本") { value.currentSubtitleText(in: .primary)?.contains("PRIMARY_ALPHA") == true }
+        var style = saved
+        style.shadowOffset = 4
+        style.shadowRadius = 0
+        quick.setSubtitleStyle(style)
+        panel.update(style: style, delay: 0)
+        let label = try XCTUnwrap(value.playbackView.clientSubtitleRenderer.view.subviews.first as? UILabel)
+        let text = label.attributedText?.string
+        attach("半径-0-混合渲染")
+        slider.value = 14
+        slider.sendActions(for: .valueChanged)
+        XCTAssertEqual(label.layer.shadowRadius, 14)
+        XCTAssertEqual(label.attributedText?.string, text)
+        XCTAssertEqual(MPVQuickPlayerSubtitlePreferences.style().shadowRadius, 14)
+        XCTAssertTrue(value.subtitleState(in: .secondary).nativeVisible)
+        attach("半径-14-仅第一字幕生效")
+        value.setSubtitleUsesOriginalStyle(true, in: .primary)
+        try await eventually("切换原生后禁用") { !slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .originalStyle }
+        XCTAssertEqual(MPVQuickPlayerSubtitlePreferences.style().shadowRadius, 14)
+        attach("原生字幕-禁用并解释")
+        value.setSubtitleUsesOriginalStyle(false, in: .primary)
+        try await eventually("切回自绘恢复能力") { slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .supported }
+        XCTAssertEqual(label.layer.shadowRadius, 14)
+        try await load("original.ass", in: .primary, on: value, original: true)
+        try await eventually("原始 ASS 不支持半径") { !slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .originalStyle }
+        value.setSubtitleUsesOriginalStyle(false, in: .primary)
+        try await eventually("ASS 公共样式仍走原生渲染") { !slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .nativeRenderer }
+        try await load("primary.srt", in: .primary, on: value)
+        try await eventually("切回 SRT 恢复半径") { slider.isEnabled }
+        XCTAssertEqual(label.layer.shadowRadius, 14)
+        value.setSubtitlesVisible(false, in: .secondary)
+        try await eventually("隐藏的第二路不参与限制") { note.isHidden }
+        value.setSubtitlesVisible(false, in: .primary)
+        try await eventually("全部隐藏后没有可用字幕") { !slider.isEnabled && !note.isHidden }
+        XCTAssertEqual(MPVQuickPlayerSubtitlePreferences.style().shadowRadius, 14)
+    }
+
+    @MainActor private func descendants(_ view: UIView) -> [UIView] {
+        [view] + view.subviews.flatMap { descendants($0) }
+    }
+
     @MainActor private func load(
         _ name: String, in slot: MPVSubtitleSlot, on player: MPVPlayer,
         succeeds: Bool = true, original: Bool = false
@@ -84,6 +152,14 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
 
     @MainActor private func attach(_ name: String) {
         guard let view = window else { return }
+        view.layoutIfNeeded()
+        if let note = descendants(view).first(where: {
+            $0.accessibilityIdentifier == "MPVQuickPlayer.subtitleShadowRadiusNote" && !$0.isHidden
+        }) {
+            for scroll in descendants(view).compactMap({ $0 as? UIScrollView }) where note.isDescendant(of: scroll) {
+                scroll.scrollRectToVisible(note.convert(note.bounds, to: scroll).insetBy(dx: 0, dy: -12), animated: false)
+            }
+        }
         let renderer = UIGraphicsImageRenderer(bounds: view.bounds)
         let image = renderer.image { _ in view.drawHierarchy(in: view.bounds, afterScreenUpdates: true) }
         let attachment = XCTAttachment(image: image)

@@ -399,3 +399,9 @@ bash Tests/run_hls_resolver_tests.sh
 ```
 
 请把模拟器名称替换成 `xcrun simctl list devices available` 中已安装的设备。检查 XCTest 实际执行数量和 `.xcresult`，不能把 `build-for-testing` 当作测试已通过。真机 PiP、HDR、后台和 Duo 姿态仍需单独验收。
+
+## 阴影扩散半径能力
+
+通过 `subtitleState(in:).shadowRadiusCapability` 获取每路实际渲染能力，区分活动自绘、原生、原始样式、图片、自定义渲染器未支持及未活动状态。公共面板只在至少一路支持时启用半径，并解释未支持路的原因；切换路径保留公共设置。没有当前台词不代表不支持。
+
+自定义 `MPVSubtitleRenderer` 默认不声明支持；确实应用了 `MPVSubtitleStyle.shadowRadius` 的实现可提供 `supportsShadowRadius == true`。默认渲染器已支持。宿主可用 `MPVSubtitleShadowRadiusAvailability` 汇总两路能力并通过自身本地化生成提示。
