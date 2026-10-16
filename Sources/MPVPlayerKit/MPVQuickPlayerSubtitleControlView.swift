@@ -3,7 +3,8 @@ import UIKit
 @MainActor
 final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
     let sourceButton = UIButton(type: .system)
-    let delayButton = UIButton(type: .system)
+    private let delayStepper = UIStepper()
+    private let delayLabel = UILabel()
     private let visibleSwitch = UISwitch()
     private let positionSlider = UISlider()
     private let positionLabel = UILabel()
@@ -20,7 +21,7 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
     private let resetButton = UIButton(type: .system)
     private let note = UILabel()
     var onSource: ((UIView) -> Void)?
-    var onDelay: ((UIView) -> Void)?
+    var onDelay: ((TimeInterval) -> Void)?
     var onVisibility: ((Bool) -> Void)?
     var onPosition: ((Double) -> Void)?
     var onOriginalStyle: ((Bool) -> Void)?
@@ -39,9 +40,14 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
         contentStack.addArrangedSubview(makeValueButtonRow(title: mpvLocalized("subtitle.source"), button: sourceButton))
         visibleSwitch.addTarget(self, action: #selector(visibilityChanged), for: .valueChanged)
         contentStack.addArrangedSubview(makeSwitchRow(title: mpvLocalized("subtitle.visible"), switchView: visibleSwitch))
-        delayButton.addTarget(self, action: #selector(delayTapped), for: .touchUpInside)
-        delayButton.accessibilityIdentifier = "MPVQuickPlayer.subtitleDelay"
-        contentStack.addArrangedSubview(makeValueButtonRow(title: mpvLocalized("subtitle.delay"), button: delayButton))
+        let delayRow = makeStepperRow(title: mpvLocalized("subtitle.delay"), valueLabel: delayLabel, stepper: delayStepper)
+        delayStepper.minimumValue = -60
+        delayStepper.maximumValue = 60
+        delayStepper.stepValue = 0.1
+        delayStepper.accessibilityIdentifier = "MPVQuickPlayer.subtitleDelay"
+        delayStepper.accessibilityLabel = mpvLocalized("subtitle.delay")
+        delayStepper.addTarget(self, action: #selector(delayChanged), for: .valueChanged)
+        contentStack.addArrangedSubview(delayRow)
         positionSlider.minimumValue = 0
         positionSlider.maximumValue = 150
         positionSlider.accessibilityLabel = mpvLocalized("subtitle.position")
@@ -75,33 +81,38 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
     }
 
     func update(slot: MPVSubtitleSlot, state: MPVSubtitleState,
-                control: MPVQuickPlayerSubtitlePreferences.Control, source: String) {
+                control: MPVQuickPlayerSubtitlePreferences.Control, source: String, usesOriginalASS: Bool) {
         titleLabel.text = mpvLocalized(slot == .primary ? "subtitle.primary" : "subtitle.secondary")
         sourceButton.setTitle(source, for: .normal)
         sourceButton.accessibilityLabel = mpvLocalized("subtitle.source")
         sourceButton.accessibilityValue = source
-        delayButton.setTitle(MPVQuickPlayerViewController.delayTitle(state.delay), for: .normal)
-        delayButton.accessibilityLabel = mpvLocalized("subtitle.delay")
-        delayButton.accessibilityValue = MPVQuickPlayerViewController.delayTitle(state.delay)
+        delayStepper.value = state.delay
+        delayLabel.text = MPVQuickPlayerViewController.delayTitle(state.delay)
+        delayStepper.accessibilityValue = delayLabel.text
         visibleSwitch.isOn = state.visible
         positionSlider.value = Float(control.position)
         positionSlider.accessibilityValue = String(Int(control.position.rounded()))
         positionLabel.text = mpvLocalized("subtitle.position.value", Int(control.position.rounded()))
         positionPresets.selectedSegmentIndex = control.position == 0 ? 0 : control.position == 100 ? 1 : UISegmentedControl.noSegment
-        positionSlider.isEnabled = !control.usesOriginalStyle
-        positionPresets.isEnabled = !control.usesOriginalStyle
-        positionSlider.accessibilityHint = control.usesOriginalStyle ? mpvLocalized("subtitle.original_ass.position_note") : nil
+        positionSlider.isEnabled = !usesOriginalASS
+        positionPresets.isEnabled = !usesOriginalASS
+        positionSlider.accessibilityHint = usesOriginalASS ? mpvLocalized("subtitle.original_ass.position_note") : nil
         originalSwitch.isOn = control.usesOriginalStyle
         automaticSwitch.isOn = control.automatic
         let languages: [MPVSubtitleLanguage] = [.simplifiedChinese, .traditionalChinese, .english]
         languageControl.selectedSegmentIndex = languages.firstIndex(of: control.language) ?? 0
         let baseNote = mpvLocalized(slot == .secondary ? "subtitle.secondary.note" : "subtitle.primary.note")
-        note.text = control.usesOriginalStyle
+        note.text = usesOriginalASS
             ? mpvLocalized("subtitle.original_ass.position_note") + "\n" + baseNote : baseNote
     }
 
     @objc private func sourceTapped() { onSource?(sourceButton) }
-    @objc private func delayTapped() { onDelay?(delayButton) }
+    @objc private func delayChanged() {
+        let delay = (delayStepper.value * 10).rounded() / 10
+        delayLabel.text = MPVQuickPlayerViewController.delayTitle(delay)
+        delayStepper.accessibilityValue = delayLabel.text
+        onDelay?(delay)
+    }
     @objc private func visibilityChanged() { onVisibility?(visibleSwitch.isOn) }
     @objc private func originalChanged() { onOriginalStyle?(originalSwitch.isOn) }
     @objc private func automaticChanged() { onAutomatic?(automaticSwitch.isOn) }

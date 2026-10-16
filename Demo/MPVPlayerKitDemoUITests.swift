@@ -17,11 +17,24 @@ final class MPVPlayerKitDemoUITests: XCTestCase {
         for name in ["第一字幕", "第二字幕"] {
             if !subtitleButton.isHittable { app.tap() }
             subtitleButton.tap()
-            let item = app.buttons[name]
+            let item = app.cells.containing(.staticText, identifier: name).firstMatch
             XCTAssertTrue(item.waitForExistence(timeout: 3))
             item.tap()
             let panel = app.otherElements["MPVQuickPlayer.subtitleControl"]
             XCTAssertTrue(panel.waitForExistence(timeout: 3))
+            let delay = app.steppers["MPVQuickPlayer.subtitleDelay"]
+            XCTAssertTrue(delay.exists)
+            let initialDelay = delay.value as? String
+            delay.buttons["MPVQuickPlayer.subtitleDelay-Increment"].tap()
+            XCTAssertNotEqual(delay.value as? String, initialDelay)
+            delay.buttons["MPVQuickPlayer.subtitleDelay-Decrement"].tap()
+            XCTAssertEqual(delay.value as? String, initialDelay)
+            let position = app.sliders["MPVQuickPlayer.subtitlePosition"]
+            XCTAssertTrue(position.isEnabled)
+            let initialPosition = position.value as? String
+            position.adjust(toNormalizedSliderPosition: 0.35)
+            XCTAssertNotEqual(position.value as? String, initialPosition)
+            XCTAssertTrue(panel.exists)
             capture("QuickPlayer-\(name)控制")
             let cancel = app.buttons["取消"].firstMatch
             XCTAssertTrue(cancel.exists)
@@ -29,7 +42,7 @@ final class MPVPlayerKitDemoUITests: XCTestCase {
         }
         if !subtitleButton.isHittable { app.tap() }
         subtitleButton.tap()
-        app.buttons["字幕公共样式"].tap()
+        app.cells.containing(.staticText, identifier: "字幕公共样式").firstMatch.tap()
         XCTAssertTrue(app.otherElements["MPVQuickPlayer.subtitleSettings"].waitForExistence(timeout: 3))
         capture("QuickPlayer-字幕公共样式")
         XCTAssertFalse(app.alerts.firstMatch.exists)

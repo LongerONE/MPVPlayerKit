@@ -34,8 +34,8 @@ extension MPVQuickPlayerViewController {
             self.refreshSubtitleControl(panel, in: slot)
         }
         panel.onSource = { [weak self] view in self?.showSubtitleSource(in: slot, from: view) }
-        panel.onDelay = { [weak self, weak panel] view in
-            self?.showSubtitleDelayPicker(in: slot, from: view, panel: panel)
+        panel.onDelay = { [weak self] delay in
+            self?.setSubtitleDelay(delay, in: slot)
         }
         panel.onVisibility = { [weak self] visible in
             self?.player.setSubtitlesVisible(visible, in: slot)
@@ -86,7 +86,9 @@ extension MPVQuickPlayerViewController {
         let state = player.subtitleState(in: slot)
         let track = player.tracks(ofType: .subtitle).first { Int64($0.id) == state.trackID }
         let source = track?.name ?? (state.sourceID == nil ? mpvLocalized("common.off") : mpvLocalized("subtitle.external"))
-        panel.update(slot: slot, state: state, control: control, source: source)
+        let codec = track?.codec.lowercased()
+        let usesOriginalASS = control.usesOriginalStyle && (codec == "ass" || codec == "ssa" || codec == "substation_alpha")
+        panel.update(slot: slot, state: state, control: control, source: source, usesOriginalASS: usesOriginalASS)
     }
 
     func updateSubtitleControl(in slot: MPVSubtitleSlot,
@@ -139,43 +141,6 @@ extension MPVQuickPlayerViewController {
         let value = min(60, max(-60, delay))
         if slot == .primary { subtitleDelay = value }
         player.setSubtitleDelay(value, in: slot)
-    }
-
-    func showSubtitleDelayPicker(in slot: MPVSubtitleSlot, from sourceView: UIView,
-                                 panel: MPVQuickPlayerSubtitleControlView?) {
-        let current = player.subtitleState(in: slot).delay
-        var options = [-2.0, -1, -0.5, 0, 0.5, 1, 2].map { value in
-            MPVQuickPlayerActionSheetOption(title: Self.delayTitle(value), isSelected: abs(value - current) < 0.001) {
-                [weak self, weak panel] in
-                guard let self else { return }
-                self.setSubtitleDelay(value, in: slot)
-                if let panel { self.refreshSubtitleControl(panel, in: slot) }
-            }
-        }
-        options.append(.init(title: mpvLocalized("common.custom")) { [weak self, weak panel] in
-            self?.presentAfterCurrentSheet { $0.showCustomSubtitleDelay(in: slot, panel: panel) }
-        })
-        presentActionSheet(title: mpvLocalized("subtitle.delay"), sourceView: sourceView,
-                           options: options, cancelTitle: mpvLocalized("common.cancel"))
-    }
-
-    private func showCustomSubtitleDelay(in slot: MPVSubtitleSlot, panel: MPVQuickPlayerSubtitleControlView?) {
-        let alert = UIAlertController(title: mpvLocalized("subtitle.delay"), message: mpvLocalized("subtitle.delay.prompt"), preferredStyle: .alert)
-        let current = player.subtitleState(in: slot).delay
-        alert.addTextField {
-            $0.keyboardType = .numbersAndPunctuation
-            $0.text = String(format: "%.2f", current)
-            $0.accessibilityLabel = mpvLocalized("subtitle.delay")
-        }
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.apply"), style: .default) {
-            [weak self, weak alert, weak panel] _ in
-            guard let self, let text = alert?.textFields?.first?.text,
-                  let number = Double(text.replacingOccurrences(of: ",", with: ".")), number.isFinite else { return }
-            self.setSubtitleDelay(number, in: slot)
-            if let panel { self.refreshSubtitleControl(panel, in: slot) }
-        })
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        presentInPlayerOrientation(alert)
     }
 
     func showSubtitleSource(in slot: MPVSubtitleSlot, from sourceView: UIView) {
