@@ -71,6 +71,7 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
         let text = presentation.cues.map(\.text).joined(separator: "\n")
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
+        paragraph.lineHeightMultiple = 0.9
         let hostBounds = view.superview?.bounds ?? view.bounds
         let videoRect: CGRect
         if let player = view.superview as? MPVPlayerView {

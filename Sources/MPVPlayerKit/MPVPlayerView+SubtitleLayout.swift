@@ -78,7 +78,7 @@ extension MPVPlayerView {
         let first = isSubtitleLayoutSlotActive(.primary)
             ? (clientSubtitleController.renderer as? MPVDefaultSubtitleRenderer)?.textHeight(for: width) ?? 0 : 0
         let second = isSubtitleLayoutSlotActive(.secondary) ? secondarySubtitleRenderer.textHeight(for: width) : 0
-        let gap = first > 0 && second > 0 ? max(2, subtitleLayoutVideoRect().height / 180) : 0
+        let gap = first > 0 && second > 0 ? max(1, subtitleLayoutVideoRect().height / 360) : 0
         return (first, second, gap)
     }
 
