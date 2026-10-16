@@ -47,7 +47,7 @@ extension MPVPlayerView {
             if playbackHadStarted {
                 self.pendingProfileRetry = (resumeTime, shouldPlay && self.isPlaybackIntentCurrent(intent))
             }
-            self.subtitleSlots.restorationASSOverrides.removeAll()
+            self.subtitleSlots.pendingControls.removeAll()
             self.subtitleSlots.restoreSnapshot = subtitles.values
             let success = self.retryProfileOnMPVQueue(url: url, nextIndex: nextIndex,
                 count: profile.count, errorCode: errorCode)

@@ -53,7 +53,10 @@ extension MPVPlayerView {
             self.cancelSlotLoads(slot)
             success = self.selectSlot(slot, id: id > 0 ? id : nil, sourceID: source, original: original ?? self.slotState(slot).usesOriginalStyle)
         }
-        if success, slot == .primary { clearClientSubtitle() }
+        if success {
+            if slot == .primary { clearClientSubtitle() }
+            else { secondaryDecodedSubtitleText = nil; secondarySubtitleRenderer.clear() }
+        }
         return success
     }
 
@@ -72,12 +75,8 @@ extension MPVPlayerView {
         }
         queue.async { [weak self] in
             guard let self else { return }
-            if let mode = override ?? original.map({ $0 ? MPVSubtitleASSOverride.no : .strip }),
-               self.subtitleSlots.restoreSnapshot != nil || self.subtitleSlots.pending.values.contains(where: {
-                   $0.slot == slot && self.subtitleSlots.restorationRequests.contains($0.requestID)
-               }) {
-                self.subtitleSlots.restorationASSOverrides[slot] = mode
-            }
+            self.recordPendingSubtitleControls(slot: slot, delay: delay, position: position,
+                assOverride: override ?? original.map { $0 ? .no : .strip })
             var state = self.slotState(slot)
             let previous = state
             if let delay, delay.isFinite { state.delay = delay }
@@ -89,8 +88,6 @@ extension MPVPlayerView {
                 _ = self.applySlotState(previous, slot: slot)
                 return
             }
-            self.subtitleSlots.states[slot] = state
-            self.subtitleSlots.publish(self.slotState(slot), slot: slot)
             if slot == .primary {
                 let appliedDelay = state.delay
                 self.notifyOnMain { self.applyClientSubtitleDelay(appliedDelay) }
@@ -153,35 +150,30 @@ extension MPVPlayerView {
     }
 
     @discardableResult nonisolated func selectSlot(
-        _ slot: MPVSubtitleSlot, id: Int64?, sourceID: String? = nil, original: Bool = false
+        _ slot: MPVSubtitleSlot, id: Int64?, sourceID: String? = nil, original: Bool = false,
+        restoring: MPVSubtitleState? = nil
     ) -> Bool {
         let previous = slotState(slot)
         let other = slotState(slot.other)
         let source = id.map { sourceID ?? sourceIdentity($0) }
         guard id == nil || (other.trackID != id && (source == nil || other.sourceID != source)) else { return false }
         guard id == nil || subtitleTrackIDs().contains(id!) else { return false }
-        var target = previous
+        var target = restoring ?? previous
         target.trackID = id
         target.sourceID = source
-        target.visible = id != nil
-        target.usesOriginalStyle = original
-        target.assOverride = original == previous.usesOriginalStyle ? previous.assOverride : (original ? .no : .strip)
-        target = resolvedSubtitleStyleMode(target)
         if let old = previous.sourceID { subtitleSlots.delays[old] = previous.delay }
-        target.delay = source.flatMap { subtitleSlots.delays[$0] } ?? 0
+        if restoring == nil {
+            target.visible = id != nil
+            target.usesOriginalStyle = original
+            target.assOverride = original == previous.usesOriginalStyle ? previous.assOverride : (original ? .no : .strip)
+            target.delay = source.flatMap { subtitleSlots.delays[$0] } ?? 0
+        }
+        applyPendingSubtitleControls(to: &target, slot: slot)
+        target = resolvedSubtitleStyleMode(target)
         guard applySlotState(target, slot: slot) else {
             _ = applySlotState(previous, slot: slot)
             return false
         }
-        var published = target
-        published.nativeVisible = getFlag(slot.visibilityProperty) ?? false
-        published.isNative = slot == .primary ? !rendersDecodedSubtitleText
-            : !shouldRenderDecodedSubtitleText(id: id, usesOriginalStyle: target.usesOriginalStyle)
-        let image = id.map { isImageTrack($0) } ?? false
-        published.supportsTextStyle = id != nil && !image && !target.usesOriginalStyle
-        published.updateShadowRadiusCapability(isImageSubtitle: image)
-        subtitleSlots.states[slot] = target
-        subtitleSlots.publish(published, slot: slot)
         return true
     }
 
@@ -190,13 +182,14 @@ extension MPVPlayerView {
         guard mpv != nil else {
             subtitleSlots.states[slot] = state
             if slot == .primary { subtitleDelayValue = state.delay }
+            subtitleSlots.publish(slotState(slot), slot: slot)
             return true
         }
         if slot == .primary {
             let previous = logicalSubtitleSelection()
             guard performSubtitleSelectionTransaction(previous: previous,
                 targetUsesOriginalStyle: state.usesOriginalStyle, targetSubtitleID: state.trackID,
-                targetVisibility: state.visible) else { return false }
+                targetVisibility: state.visible, publishChanges: false) else { return false }
             guard command("set", args: [slot.overrideProperty, state.assOverride.rawValue], checkForErrors: false) >= 0 else { return false }
             subtitleDelayValue = state.delay
         } else {
@@ -212,7 +205,11 @@ extension MPVPlayerView {
         for (key, value) in [(slot.delayProperty, state.delay), (slot.positionProperty, state.position)] {
             guard command("set", args: [key, String(value)], checkForErrors: false) >= 0 else { return false }
         }
-        if slot == .secondary { refreshSecondarySubtitleText(state: state) }
+        // 轨道、模式、延迟和显隐全部提交后再发布，禁止主线程读取到恢复中间态。
+        subtitleSlots.states[slot] = state
+        subtitleSlots.publish(slotState(slot), slot: slot)
+        if slot == .primary { refreshSubtitleTextCache() }
+        else { refreshSecondarySubtitleText(state: state) }
         return true
     }
 
@@ -301,16 +298,14 @@ extension MPVPlayerView {
             preferringIDsNotIn: load.before) : nil
         // sub-add auto 在首条字幕时也可能自动选择第一路，始终恢复已提交状态再显式选目标。
         _ = restoreSubtitleSelection(logicalSubtitleSelection())
-        let success = id.map { selectSlot(load.slot, id: $0, sourceID: load.sourceID, original: load.original) } ?? false
+        let restoring = subtitleSlots.restorationRequests.contains(load.requestID) ? load.previous : nil
+        let success = id.map {
+            selectSlot(load.slot, id: $0, sourceID: load.sourceID, original: load.original, restoring: restoring)
+        } ?? false
         if success, let id {
             subtitleSlots.externalSources[id] = load.sourceID
             subtitleSlots.externalSourceURLs[load.sourceID] = load.url
-            if subtitleSlots.restorationRequests.remove(load.requestID) != nil {
-                var restored = load.previous
-                applyRestorationASSOverride(to: &restored, slot: load.slot)
-                restored.trackID = id
-                if applySlotState(restored, slot: load.slot) { subtitleSlots.states[load.slot] = restored; subtitleSlots.publish(slotState(load.slot), slot: load.slot) }
-            }
+            subtitleSlots.delays[load.sourceID] = slotState(load.slot).delay
         }
         if !success, let id, !load.before.contains(id),
            !MPVSubtitleSlot.allCases.contains(where: { slotState($0).trackID == id }) {
@@ -323,6 +318,9 @@ extension MPVPlayerView {
 
     nonisolated func finishSlotLoad(_ load: MPVSubtitleSlotRuntime.Load, success: Bool, error: String?) {
         subtitleSlots.restorationRequests.remove(load.requestID)
+        if subtitleSlots.restoreSnapshot == nil && !subtitleSlots.pending.values.contains(where: { $0.slot == load.slot }) {
+            subtitleSlots.pendingControls.removeValue(forKey: load.slot)
+        }
         guard subtitleSlots.completedRequests.insert(load.requestID).inserted else { return }
         if load.session == currentBufferingSessionGeneration(), !isStopped() {
             subtitleSlots.publish(slotState(load.slot), slot: load.slot)

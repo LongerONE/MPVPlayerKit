@@ -49,7 +49,7 @@ extension MPVPlayerView {
         }
         let transfer = MPVSubtitleSessionTransfer(values: values)
         queue.async { [weak self] in
-            self?.subtitleSlots.restorationASSOverrides.removeAll()
+            self?.subtitleSlots.pendingControls.removeAll()
             self?.subtitleSlots.restoreSnapshot = transfer.values
             self?.restoreSubtitleSlotsIfNeeded()
         }
@@ -68,7 +68,7 @@ extension MPVPlayerView {
             state.visible = values["visible"] as? Bool ?? false
             state.usesOriginalStyle = values["usesOriginalStyle"] as? Bool ?? false
             state.assOverride = (values["assOverride"] as? String).flatMap(MPVSubtitleASSOverride.init(rawValue:)) ?? (state.usesOriginalStyle ? .no : .strip)
-            applyRestorationASSOverride(to: &state, slot: slot)
+            applyPendingSubtitleControls(to: &state, slot: slot)
             state.sourceID = (values["sourceID"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             if let source = state.sourceID {
                 state.trackID = subtitleTrackIDs().first { sourceIdentity($0) == source }
@@ -88,23 +88,34 @@ extension MPVPlayerView {
                     finishSlotLoad(load, success: false, error: "恢复字幕失败")
                 }
             } else if applySlotState(state, slot: slot) {
-                subtitleSlots.states[slot] = state
-                subtitleSlots.publish(slotState(slot), slot: slot)
+                if let source = state.sourceID { subtitleSlots.delays[source] = state.delay }
+                subtitleSlots.pendingControls.removeValue(forKey: slot)
             }
         }
     }
 
-    /// 恢复等待期间的明确设置优先于旧会话快照，不写入长期偏好。
-    nonisolated func applyRestorationASSOverride(to state: inout MPVSubtitleState, slot: MPVSubtitleSlot) {
-        guard let mode = subtitleSlots.restorationASSOverrides[slot] else { return }
-        state.assOverride = mode
-        state.usesOriginalStyle = mode == .no
+    /// 正在恢复或加载时，明确的新设置优先于旧快照；不写入长期偏好。
+    nonisolated func recordPendingSubtitleControls(
+        slot: MPVSubtitleSlot, delay: Double? = nil, position: Double? = nil,
+        visible: Bool? = nil, assOverride: MPVSubtitleASSOverride? = nil
+    ) {
+        guard subtitleSlots.restoreSnapshot != nil || subtitleSlots.pending.values.contains(where: { $0.slot == slot }) else { return }
+        var controls = subtitleSlots.pendingControls[slot] ?? .init()
+        if let delay, delay.isFinite { controls.delay = delay }
+        if let position, position.isFinite { controls.position = min(150, max(0, position)) }
+        if let visible { controls.visible = visible }
+        if let assOverride { controls.assOverride = assOverride }
+        subtitleSlots.pendingControls[slot] = controls
+    }
+
+    nonisolated func applyPendingSubtitleControls(to state: inout MPVSubtitleState, slot: MPVSubtitleSlot) {
+        subtitleSlots.pendingControls[slot]?.apply(to: &state)
     }
 
     nonisolated func resetSubtitleSlotSession() {
         subtitleSlots.generation &+= 1
         subtitleSlots.restoreSnapshot = nil
-        subtitleSlots.restorationASSOverrides.removeAll()
+        subtitleSlots.pendingControls.removeAll()
         subtitleSlots.fileLoaded = false
         subtitleSlots.restorationRequests.removeAll()
         let pending = Array(subtitleSlots.pending.values)

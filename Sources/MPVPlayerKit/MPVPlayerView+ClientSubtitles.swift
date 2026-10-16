@@ -13,6 +13,7 @@ extension MPVPlayerView {
     /// 选择宿主自备的客户端字幕文档进行自定义 UI 渲染。
     /// 会把当前原生/libmpv 字幕轨设为不可见，避免双重绘制。
     public func selectClientSubtitle(_ document: MPVSubtitleDocument?) {
+        if document != nil { decodedSubtitleText = nil }
         clientSubtitleController.select(document)
         clientSubtitleController.update(at: currentTime, force: true)
         currentSubtitleFontCapability = document == nil ? .noSubtitle : .supported
@@ -77,7 +78,8 @@ extension MPVPlayerView {
 
     func renderDecodedSubtitleText() {
         guard !clientSubtitleController.hasSelection else { return }
-        let text = decodedSubtitleText ?? ""
+        let state = subtitleSlots.snapshot(.primary)
+        let text = state.visible && !state.isNative && state.trackID != nil ? decodedSubtitleText ?? "" : ""
         clientSubtitleController.renderer.render(MPVSubtitlePresentation(
             cues: text.isEmpty ? [] : [MPVSubtitleCue(startTime: 0, endTime: .greatestFiniteMagnitude, text: text)],
             style: clientSubtitleController.style
@@ -108,7 +110,11 @@ extension MPVPlayerView {
 
     func applyClientSubtitleDelay(_ delay: TimeInterval) {
         clientSubtitleController.delay = delay
-        clientSubtitleController.update(at: currentTime, force: true)
+        if clientSubtitleController.hasSelection || decodedSubtitleText == nil {
+            clientSubtitleController.update(at: currentTime, force: true)
+        } else {
+            renderDecodedSubtitleText()
+        }
     }
 
     func applyClientSubtitleStyle(_ style: MPVSubtitleStyle) {

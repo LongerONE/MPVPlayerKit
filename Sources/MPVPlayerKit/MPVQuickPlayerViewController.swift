@@ -46,6 +46,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         .secondary: MPVQuickPlayerSubtitlePreferences.control(in: .secondary),
     ]
     var subtitlePanelSlot = MPVSubtitleSlot.primary
+    var subtitleASSPreferenceRevisions: [MPVSubtitleSlot: UInt64] = [:]
     var subtitleImportSlot = MPVSubtitleSlot.primary
     var subtitleImportIsFont = false
     var subtitleRequests: [MPVSubtitleSlot: UUID] = [:]

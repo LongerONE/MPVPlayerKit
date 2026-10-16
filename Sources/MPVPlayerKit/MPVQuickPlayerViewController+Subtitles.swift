@@ -42,7 +42,7 @@ extension MPVQuickPlayerViewController {
             refresh()
         }
         panel.onOriginalStyle = { [weak self] original in
-            self?.updateSubtitleControl(in: slot) { $0.usesOriginalStyle = original }
+            self?.updateSubtitleControl(in: slot, changesASSPreference: true) { $0.usesOriginalStyle = original }
             refresh()
         }
         panel.onAutomatic = { [weak self] enabled in
@@ -89,10 +89,14 @@ extension MPVQuickPlayerViewController {
         panel.update(slot: slot, state: state, control: control, source: source, usesOriginalASS: usesOriginalASS)
     }
 
-    func updateSubtitleControl(in slot: MPVSubtitleSlot,
+    func updateSubtitleControl(in slot: MPVSubtitleSlot, changesASSPreference: Bool = false,
                                _ update: (inout MPVQuickPlayerSubtitlePreferences.Control) -> Void) {
         var control = subtitleControls[slot] ?? .init(position: slot == .primary ? 100 : 0)
+        let previousOriginalStyle = control.usesOriginalStyle
         update(&control)
+        if changesASSPreference || control.usesOriginalStyle != previousOriginalStyle {
+            subtitleASSPreferenceRevisions[slot, default: 0] &+= 1
+        }
         subtitleControls[slot] = control
         MPVQuickPlayerSubtitlePreferences.save(control, in: slot)
         player.setSubtitlePosition(control.position, in: slot)
@@ -201,6 +205,7 @@ extension MPVQuickPlayerViewController {
         subtitleLoadGeneration[slot] = generation
         loadingIndicator.startAnimating()
         statusLabel.text = mpvLocalized("subtitle.loading")
+        let preferenceRevision = subtitleASSPreferenceRevisions[slot, default: 0]
         let original = saveASSPreference ? usesOriginalStyle : (subtitleControls[slot]?.usesOriginalStyle ?? usesOriginalStyle)
         subtitleRequests[slot] = player.loadExternalSubtitle(from: url, in: slot, usesOriginalStyle: original) {
             [weak self] success in
@@ -211,10 +216,10 @@ extension MPVQuickPlayerViewController {
             } else { self.loadingIndicator.stopAnimating() }
             self.updateStatusLabel()
             if success {
-                if saveASSPreference, self.player.subtitleState(in: slot).supportsASSMode {
+                if saveASSPreference, self.player.subtitleState(in: slot).supportsASSMode,
+                   self.subtitleASSPreferenceRevisions[slot, default: 0] == preferenceRevision {
                     self.updateSubtitleControl(in: slot) { $0.usesOriginalStyle = usesOriginalStyle }
                 }
-                self.player.setSubtitlesVisible(true, in: slot)
                 self.refreshActiveSubtitleControl()
             } else {
                 self.presentMessage(title: mpvLocalized("subtitle.error.title"),

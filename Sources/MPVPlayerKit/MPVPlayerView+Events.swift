@@ -345,7 +345,8 @@ extension MPVPlayerView {
         previous: SubtitleSelectionSnapshot,
         targetUsesOriginalStyle: Bool,
         targetSubtitleID: Int64?,
-        targetVisibility: Bool
+        targetVisibility: Bool,
+        publishChanges: Bool = true
     ) -> Bool {
         dispatchPrecondition(condition: .onQueue(queue))
         _ = command("set", args: [MPVProperty.subtitleVisibility, "no"], checkForErrors: false)
@@ -374,8 +375,10 @@ extension MPVPlayerView {
             subtitleID: targetSubtitleID,
             isVisible: targetVisibility
         )
-        refreshSubtitleTextCache()
-        subtitleSlots.publish(slotState(.primary), slot: .primary)
+        if publishChanges {
+            refreshSubtitleTextCache()
+            subtitleSlots.publish(slotState(.primary), slot: .primary)
+        }
         return true
     }
 

@@ -88,7 +88,8 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         table.delegate?.tableView?(table, didSelectRowAt: IndexPath(row: 0, section: 0))
         quick.subtitleImportSlot = .secondary
         try await eventually("延迟菜单操作完成") {
-            MPVSubtitleSlot.allCases.contains { quick.player.subtitleState(in: $0).supportsASSMode }
+            MPVSubtitleSlot.allCases.contains { quick.player.subtitleState(in: $0).supportsASSMode } &&
+                MPVSubtitleSlot.allCases.allSatisfy { quick.subtitleRequests[$0] == nil }
         }
         XCTAssertTrue(quick.player.subtitleState(in: .primary).supportsASSMode)
         XCTAssertNil(quick.player.subtitleState(in: .secondary).trackID)

@@ -411,12 +411,10 @@ extension MPVPlayerView {
         if slot == .primary, clientSubtitleController.hasSelection { applyClientSubtitleVisibility(visible) }
         queue.async { [weak self] in
             guard let self else { return }
+            self.recordPendingSubtitleControls(slot: slot, visible: visible)
             var state = self.slotState(slot)
             state.visible = visible
-            if self.applySlotState(state, slot: slot) {
-                self.subtitleSlots.states[slot] = state
-                self.subtitleSlots.publish(self.slotState(slot), slot: slot)
-            }
+            _ = self.applySlotState(state, slot: slot)
         }
     }
 

@@ -243,9 +243,11 @@ extension MPVPlayerView {
         let usesOverlay = rendersDecodedSubtitleText
         let visible = committedSubtitleSelection?.isVisible == true
         let text = usesOverlay ? (visible ? value ?? "" : "") : nil
+        let revision = subtitleSlots.nextTextRevision(.primary)
         notifyOnMain {
             guard self.currentBufferingSessionGeneration() == session,
-                  !self.isStopped(), !self.clientSubtitleController.hasSelection else { return }
+                  !self.isStopped(), !self.clientSubtitleController.hasSelection,
+                  self.subtitleSlots.isCurrentTextRevision(revision, slot: .primary) else { return }
             self.decodedSubtitleText = text
             self.renderDecodedSubtitleText()
         }

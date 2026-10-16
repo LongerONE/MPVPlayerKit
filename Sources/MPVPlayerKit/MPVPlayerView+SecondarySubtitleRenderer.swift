@@ -19,8 +19,10 @@ extension MPVPlayerView {
         let usesOverlay = shouldRenderDecodedSubtitleText(id: state.trackID, usesOriginalStyle: state.usesOriginalStyle)
         let text = usesOverlay && state.visible ? getString(MPVSubtitleSlot.secondary.textProperty) ?? "" : nil
         let session = currentBufferingSessionGeneration()
+        let revision = subtitleSlots.nextTextRevision(.secondary)
         notifyOnMain {
-            guard self.currentBufferingSessionGeneration() == session, !self.isStopped() else { return }
+            guard self.currentBufferingSessionGeneration() == session, !self.isStopped(),
+                  self.subtitleSlots.isCurrentTextRevision(revision, slot: .secondary) else { return }
             self.secondaryDecodedSubtitleText = text
             self.secondarySubtitleRenderer.verticalPosition = state.position
             self.renderSecondarySubtitleText()
@@ -28,7 +30,8 @@ extension MPVPlayerView {
     }
 
     func renderSecondarySubtitleText() {
-        let text = secondaryDecodedSubtitleText ?? ""
+        let state = subtitleSlots.snapshot(.secondary)
+        let text = state.visible && !state.isNative && state.trackID != nil ? secondaryDecodedSubtitleText ?? "" : ""
         secondarySubtitleRenderer.render(MPVSubtitlePresentation(
             cues: text.isEmpty ? [] : [MPVSubtitleCue(startTime: 0, endTime: .greatestFiniteMagnitude, text: text)],
             style: clientSubtitleController.style

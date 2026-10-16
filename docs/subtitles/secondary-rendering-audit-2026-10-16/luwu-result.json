@@ -1,0 +1,120 @@
+{
+  "checks": [
+    {
+      "detail": "真实 LuWu QuickPlayer 已加载媒体",
+      "id": "host-local",
+      "passed": "true"
+    },
+    {
+      "detail": "5秒两路文本回读正确；可见呈现需截图核对",
+      "id": "dual-text",
+      "passed": "true"
+    },
+    {
+      "detail": "第二路2秒，第一路0秒",
+      "id": "independent-delay",
+      "passed": "true"
+    },
+    {
+      "detail": "隐藏第一路后第二路仍开启",
+      "id": "independent-visibility",
+      "passed": "true"
+    },
+    {
+      "detail": "渲染选项更新后第二路来源连续",
+      "id": "render-options",
+      "passed": "true"
+    },
+    {
+      "detail": "实际模式与入口按格式切换，已保存原始 ASS 偏好保持 true",
+      "id": "ass-mode-0-original.ass",
+      "passed": "true"
+    },
+    {
+      "detail": "实际模式与入口按格式切换，已保存原始 ASS 偏好保持 true",
+      "id": "ass-mode-1-primary.srt",
+      "passed": "true"
+    },
+    {
+      "detail": "实际模式与入口按格式切换，已保存原始 ASS 偏好保持 true",
+      "id": "ass-mode-2-original.ssa",
+      "passed": "true"
+    },
+    {
+      "detail": "实际模式与入口按格式切换，已保存原始 ASS 偏好保持 true",
+      "id": "ass-mode-3-secondary.vtt",
+      "passed": "true"
+    },
+    {
+      "detail": "实际模式与入口按格式切换，已保存原始 ASS 偏好保持 true",
+      "id": "ass-mode-4-original.ass",
+      "passed": "true"
+    },
+    {
+      "detail": "第二路已保存偏好未受第一路导入影响",
+      "id": "ass-preference-independent",
+      "passed": "true"
+    },
+    {
+      "detail": "真实公共样式面板允许调整，两路均支持",
+      "id": "shadow-both",
+      "passed": "true"
+    },
+    {
+      "detail": "两路自绘图层半径14，第二路原生绘制已关闭",
+      "id": "shadow-render",
+      "passed": "true"
+    },
+    {
+      "detail": "第一路原始 ASS，第二路自绘仍可设置半径",
+      "id": "shadow-mixed",
+      "passed": "true"
+    },
+    {
+      "detail": "暂停切换原始样式后置灰并说明原因",
+      "id": "shadow-native-disabled",
+      "passed": "true"
+    },
+    {
+      "detail": "切回自绘恢复半径14且偏好值保留",
+      "id": "shadow-preserved",
+      "passed": "true"
+    },
+    {
+      "detail": "隐藏路不参与限制，两路均隐藏时禁用并提示",
+      "id": "shadow-inactive",
+      "passed": "true"
+    },
+    {
+      "detail": "实际两路字幕层在5秒分别显示新句和延迟旧句",
+      "id": "render-positive-delay",
+      "passed": "true"
+    },
+    {
+      "detail": "第二路提前1秒显示下一句，第一路未受影响",
+      "id": "render-negative-delay",
+      "passed": "true"
+    },
+    {
+      "detail": "六轮快速切换后实际两路台词和延迟一致",
+      "id": "render-rapid-switch",
+      "passed": "true"
+    },
+    {
+      "detail": "关闭第二路无自绘残留，第一路保留",
+      "id": "render-clear",
+      "passed": "true"
+    },
+    {
+      "detail": "两路持久化字幕控制字典保持不变",
+      "id": "render-saved-preferences",
+      "passed": "true"
+    },
+    {
+      "detail": "标准与App Group偏好中无临时HTTP地址",
+      "id": "no-persistent-stream",
+      "passed": "true"
+    }
+  ],
+  "mode": "local"
+}

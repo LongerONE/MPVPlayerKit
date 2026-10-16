@@ -120,6 +120,16 @@ final class MPVSubtitleSlotRuntime: @unchecked Sendable {
     let snapshotLock = NSLock()
     private var published: [MPVSubtitleSlot: MPVSubtitleState] = [:]
     private var publishedRevision: [MPVSubtitleSlot: UInt64] = [:]
+    private var textRevisions: [MPVSubtitleSlot: UInt64] = [:]
+    func nextTextRevision(_ slot: MPVSubtitleSlot) -> UInt64 {
+        snapshotLock.lock(); defer { snapshotLock.unlock() }
+        textRevisions[slot, default: 0] &+= 1
+        return textRevisions[slot, default: 0]
+    }
+    func isCurrentTextRevision(_ revision: UInt64, slot: MPVSubtitleSlot) -> Bool {
+        snapshotLock.lock(); defer { snapshotLock.unlock() }
+        return textRevisions[slot, default: 0] == revision
+    }
     func publishRevision(_ value: UInt64, slot: MPVSubtitleSlot) {
         snapshotLock.lock(); publishedRevision[slot] = value; snapshotLock.unlock()
     }
@@ -148,7 +158,21 @@ final class MPVSubtitleSlotRuntime: @unchecked Sendable {
     var externalSourceURLs: [String: String] = [:]
     var restoreSnapshot: [String: Any]?
     var restorationRequests: Set<String> = []
-    var restorationASSOverrides: [MPVSubtitleSlot: MPVSubtitleASSOverride] = [:]
+    var pendingControls: [MPVSubtitleSlot: PendingControls] = [:]
+
+    struct PendingControls {
+        var delay: Double?
+        var position: Double?
+        var visible: Bool?
+        var assOverride: MPVSubtitleASSOverride?
+
+        func apply(to state: inout MPVSubtitleState) {
+            if let delay { state.delay = delay }
+            if let position { state.position = position }
+            if let visible { state.visible = visible }
+            if let assOverride { state.assOverride = assOverride; state.usesOriginalStyle = assOverride == .no }
+        }
+    }
     var fileLoaded = false
     var selectionRevision: [MPVSubtitleSlot: UInt64] = [.primary: 0, .secondary: 0]
 
