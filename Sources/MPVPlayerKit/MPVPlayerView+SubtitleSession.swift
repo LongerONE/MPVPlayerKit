@@ -83,7 +83,7 @@ extension MPVPlayerView {
                 }
             } else if applySlotState(state, slot: slot) {
                 subtitleSlots.states[slot] = state
-                subtitleSlots.publish(state, slot: slot)
+                subtitleSlots.publish(slotState(slot), slot: slot)
             }
         }
     }

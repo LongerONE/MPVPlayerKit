@@ -58,8 +58,11 @@ extension MPVQuickPlayerViewController {
             refresh()
         }
         panel.onReset = { [weak self] in
+            let supportsASS = self?.player.subtitleState(in: slot).supportsASSMode ?? false
             self?.updateSubtitleControl(in: slot) {
+                let originalStyle = $0.usesOriginalStyle
                 $0 = .init(position: slot == .primary ? 100 : 0)
+                if !supportsASS { $0.usesOriginalStyle = originalStyle }
             }
             refresh()
         }
@@ -82,8 +85,7 @@ extension MPVQuickPlayerViewController {
         let state = player.subtitleState(in: slot)
         let track = player.tracks(ofType: .subtitle).first { Int64($0.id) == state.trackID }
         let source = track?.name ?? (state.sourceID == nil ? mpvLocalized("common.off") : mpvLocalized("subtitle.external"))
-        let codec = track?.codec.lowercased()
-        let usesOriginalASS = control.usesOriginalStyle && (codec == "ass" || codec == "ssa" || codec == "substation_alpha")
+        let usesOriginalASS = state.supportsASSMode && control.usesOriginalStyle
         panel.update(slot: slot, state: state, control: control, source: source, usesOriginalASS: usesOriginalASS)
     }
 
@@ -168,7 +170,7 @@ extension MPVQuickPlayerViewController {
                     return
                 }
                 self.subtitleManualSlots.insert(slot)
-                if self.player.select(track: track, in: slot) {
+                if self.player.select(track: track, in: slot, usesOriginalStyle: self.subtitleControls[slot]?.usesOriginalStyle) {
                     self.applySubtitlePreferences()
                     self.player.setSubtitlesVisible(true, in: slot)
                 }
@@ -188,18 +190,19 @@ extension MPVQuickPlayerViewController {
         presentInPlayerOrientation(picker)
     }
 
-    func loadExternalSubtitle(from url: URL, usesOriginalStyle: Bool) {
-        loadExternalSubtitle(from: url, in: subtitleImportSlot, usesOriginalStyle: usesOriginalStyle)
+    func loadExternalSubtitle(from url: URL, usesOriginalStyle: Bool, saveASSPreference: Bool = false) {
+        loadExternalSubtitle(from: url, in: subtitleImportSlot, usesOriginalStyle: usesOriginalStyle, saveASSPreference: saveASSPreference)
     }
 
-    func loadExternalSubtitle(from url: URL, in slot: MPVSubtitleSlot, usesOriginalStyle: Bool) {
+    func loadExternalSubtitle(from url: URL, in slot: MPVSubtitleSlot, usesOriginalStyle: Bool, saveASSPreference: Bool = false) {
         subtitleManualSlots.insert(slot)
         cancelExternalSubtitleLoad(in: slot)
         let generation = (subtitleLoadGeneration[slot] ?? 0) &+ 1
         subtitleLoadGeneration[slot] = generation
         loadingIndicator.startAnimating()
         statusLabel.text = mpvLocalized("subtitle.loading")
-        subtitleRequests[slot] = player.loadExternalSubtitle(from: url, in: slot, usesOriginalStyle: usesOriginalStyle) {
+        let original = saveASSPreference ? usesOriginalStyle : (subtitleControls[slot]?.usesOriginalStyle ?? usesOriginalStyle)
+        subtitleRequests[slot] = player.loadExternalSubtitle(from: url, in: slot, usesOriginalStyle: original) {
             [weak self] success in
             guard let self, self.subtitleLoadGeneration[slot] == generation else { return }
             self.subtitleRequests[slot] = nil
@@ -208,7 +211,9 @@ extension MPVQuickPlayerViewController {
             } else { self.loadingIndicator.stopAnimating() }
             self.updateStatusLabel()
             if success {
-                self.updateSubtitleControl(in: slot) { $0.usesOriginalStyle = usesOriginalStyle }
+                if saveASSPreference, self.player.subtitleState(in: slot).supportsASSMode {
+                    self.updateSubtitleControl(in: slot) { $0.usesOriginalStyle = usesOriginalStyle }
+                }
                 self.player.setSubtitlesVisible(true, in: slot)
                 self.refreshActiveSubtitleControl()
             } else {

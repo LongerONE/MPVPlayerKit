@@ -29,7 +29,7 @@ extension MPVQuickPlayerViewController {
             }
             let current = player.subtitleState(in: slot)
             guard current.trackID != Int64(candidate.id) else { continue }
-            if player.select(track: candidate, in: slot) {
+            if player.select(track: candidate, in: slot, usesOriginalStyle: preference.usesOriginalStyle) {
                 subtitleAutomaticTrackIDs[slot] = Int64(candidate.id)
                 player.setSubtitlesVisible(true, in: slot)
             }

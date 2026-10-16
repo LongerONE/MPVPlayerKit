@@ -11,6 +11,7 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
         mpvLocalized("subtitle.position.top"), mpvLocalized("subtitle.position.bottom"),
     ])
     private let originalSwitch = UISwitch()
+    private var originalStyleRow: UIView?
     private let automaticSwitch = UISwitch()
     private let languageControl = UISegmentedControl(items: [
         mpvLocalized("subtitle.language.simplified"),
@@ -59,7 +60,10 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
         positionPresets.addTarget(self, action: #selector(positionPresetChanged), for: .valueChanged)
         contentStack.addArrangedSubview(positionRow)
         originalSwitch.addTarget(self, action: #selector(originalChanged), for: .valueChanged)
-        contentStack.addArrangedSubview(makeSwitchRow(title: mpvLocalized("subtitle.original_ass"), switchView: originalSwitch))
+        originalSwitch.accessibilityIdentifier = "MPVQuickPlayer.subtitleASSMode"
+        let originalStyleRow = makeSwitchRow(title: mpvLocalized("subtitle.original_ass"), switchView: originalSwitch)
+        self.originalStyleRow = originalStyleRow
+        contentStack.addArrangedSubview(originalStyleRow)
         automaticSwitch.addTarget(self, action: #selector(automaticChanged), for: .valueChanged)
         contentStack.addArrangedSubview(makeSwitchRow(title: mpvLocalized("subtitle.automatic"), switchView: automaticSwitch))
         languageControl.addTarget(self, action: #selector(languageChanged), for: .valueChanged)
@@ -93,6 +97,7 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
         positionPresets.isEnabled = !usesOriginalASS
         positionSlider.accessibilityHint = usesOriginalASS ? mpvLocalized("subtitle.original_ass.position_note") : nil
         originalSwitch.isOn = control.usesOriginalStyle
+        originalStyleRow?.isHidden = !state.supportsASSMode
         automaticSwitch.isOn = control.automatic
         let languages: [MPVSubtitleLanguage] = [.simplifiedChinese, .traditionalChinese, .english]
         languageControl.selectedSegmentIndex = languages.firstIndex(of: control.language) ?? 0

@@ -132,11 +132,11 @@ extension MPVQuickPlayerViewController: UIDocumentPickerDelegate {
             let options = [
                 MPVQuickPlayerActionSheetOption(title: mpvLocalized("subtitle.style.use_file")) {
                     [weak controller] in
-                    controller?.loadExternalSubtitle(from: url, usesOriginalStyle: true)
+                    controller?.loadExternalSubtitle(from: url, usesOriginalStyle: true, saveASSPreference: true)
                 },
                 MPVQuickPlayerActionSheetOption(title: mpvLocalized("subtitle.style.use_player")) {
                     [weak controller] in
-                    controller?.loadExternalSubtitle(from: url, usesOriginalStyle: false)
+                    controller?.loadExternalSubtitle(from: url, usesOriginalStyle: false, saveASSPreference: true)
                 },
             ]
             controller.presentActionSheet(

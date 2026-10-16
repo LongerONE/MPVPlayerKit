@@ -61,6 +61,110 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
 
     private enum WaitFailure: Error { case timeout }
 
+    @MainActor func testQuickPlayerASSPreferencesSurvivePlainTextAndExplicitChoices() async throws {
+        let saved = MPVSubtitleSlot.allCases.map { UserDefaults.standard.object(forKey: "MPVQuickPlayer.subtitle.\($0.rawValue)") }
+        defer {
+            cleanUp()
+            for slot in MPVSubtitleSlot.allCases { UserDefaults.standard.set(saved[slot.rawValue], forKey: "MPVQuickPlayer.subtitle.\(slot.rawValue)") }
+        }
+        for slot in MPVSubtitleSlot.allCases {
+            MPVQuickPlayerSubtitlePreferences.save(.init(position: slot == .primary ? 100 : 0, usesOriginalStyle: true), in: slot)
+        }
+        let quick = MPVQuickPlayerViewController(configuration: MPVPlayerConfiguration(
+            url: try fixture("dual-subtitles.mp4"), forceSoftwareDecode: true))
+        let host = UIWindow(frame: UIScreen.main.bounds)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene { host.windowScene = scene }
+        host.rootViewController = quick
+        host.makeKeyAndVisible()
+        window = host
+        player = quick.player
+        try await eventually("QuickPlayer 已启动") { quick.player.duration > 0 }
+        quick.player.pause()
+        for slot in MPVSubtitleSlot.allCases {
+            for name in ["original.ass", "primary.srt", "original.ssa", "secondary.vtt", "original.ass"] {
+                quick.loadExternalSubtitle(from: try fixture(name), in: slot, usesOriginalStyle: false)
+                try await eventually("QuickPlayer 加载 \(name)") { quick.subtitleRequests[slot] == nil }
+                let isASS = name.hasSuffix(".ass") || name.hasSuffix(".ssa")
+                let state = quick.player.subtitleState(in: slot)
+                XCTAssertNotNil(state.trackID)
+                XCTAssertEqual(state.supportsASSMode, isASS)
+                XCTAssertEqual(state.usesOriginalStyle, isASS)
+                XCTAssertEqual(state.assOverride, isASS ? .no : .strip)
+                XCTAssertTrue(MPVQuickPlayerSubtitlePreferences.control(in: slot).usesOriginalStyle)
+                quick.showSubtitleControl(in: slot)
+                let panel = try XCTUnwrap(quick.settingsPanelOverlay as? MPVQuickPlayerSubtitleControlView)
+                let toggle = try XCTUnwrap(descendants(panel).first { $0.accessibilityIdentifier == "MPVQuickPlayer.subtitleASSMode" } as? UISwitch)
+                XCTAssertEqual(toggle.superview?.isHidden, !isASS)
+                XCTAssertTrue(toggle.isOn)
+                if !isASS {
+                    panel.onReset?()
+                    XCTAssertTrue(MPVQuickPlayerSubtitlePreferences.control(in: slot).usesOriginalStyle)
+                }
+                attach("\(slot.rawValue)-\(name)-ASS模式入口")
+                panel.dismiss(animated: false)
+            }
+            XCTAssertTrue(quick.player.clearSubtitle(in: slot))
+        }
+        quick.loadExternalSubtitle(from: try fixture("original.ass"), in: .primary, usesOriginalStyle: false, saveASSPreference: true)
+        try await eventually("用户明确选择播放器样式") { quick.subtitleRequests[.primary] == nil }
+        XCTAssertFalse(MPVQuickPlayerSubtitlePreferences.control(in: .primary).usesOriginalStyle)
+        XCTAssertTrue(MPVQuickPlayerSubtitlePreferences.control(in: .secondary).usesOriginalStyle)
+        XCTAssertFalse(quick.player.subtitleState(in: .primary).usesOriginalStyle)
+    }
+
+    @MainActor func testEmbeddedModesAutomaticSelectionAndRebuildUseActualFormat() async throws {
+        defer { cleanUp() }
+        let value = try await start()
+        value.playbackView.configure(["url": try fixture("style-modes.mkv").absoluteString, "forceSoftwareDecode": true])
+        value.play()
+        try await eventually("内嵌轨道加载") { value.tracks(ofType: .subtitle).count == 2 }
+        value.pause()
+        let tracks = value.tracks(ofType: .subtitle)
+        let ass = try XCTUnwrap(tracks.first { MPVPlayerView.isASSSubtitleCodec($0.codec) })
+        let srt = try XCTUnwrap(tracks.first { $0.codec == "subrip" })
+        for slot in MPVSubtitleSlot.allCases {
+            for track in [ass, srt, ass] {
+                XCTAssertTrue(value.select(track: track, in: slot, usesOriginalStyle: true))
+                let state = value.subtitleState(in: slot)
+                XCTAssertEqual(state.supportsASSMode, track.id == ass.id)
+                XCTAssertEqual(state.usesOriginalStyle, track.id == ass.id)
+                value.setSubtitleDelay(1.25, in: slot)
+                value.setSubtitlePosition(55, in: slot)
+            }
+            XCTAssertTrue(value.clearSubtitle(in: slot))
+        }
+        XCTAssertTrue(value.select(track: srt, in: .primary, usesOriginalStyle: true))
+        XCTAssertTrue(value.select(track: ass, in: .secondary, usesOriginalStyle: true))
+        let snapshot = value.subtitleSessionSnapshot()
+        value.stop()
+        value.playbackView.removeFromSuperview()
+        let rebuilt = MPVPlayer(configuration: MPVPlayerConfiguration(url: try fixture("style-modes.mkv"), forceSoftwareDecode: true))
+        player = rebuilt
+        rebuilt.playbackView.frame = CGRect(x: 0, y: 0, width: 960, height: 540)
+        window?.rootViewController?.view.addSubview(rebuilt.playbackView)
+        rebuilt.restoreSubtitleSession(snapshot)
+        rebuilt.play()
+        try await eventually("重建按格式恢复") {
+            rebuilt.subtitleState(in: .primary).trackID != nil && rebuilt.subtitleState(in: .secondary).supportsASSMode
+        }
+        XCTAssertFalse(rebuilt.subtitleState(in: .primary).usesOriginalStyle)
+        XCTAssertEqual(rebuilt.subtitleState(in: .primary).shadowRadiusCapability, .supported)
+        XCTAssertTrue(rebuilt.subtitleState(in: .secondary).usesOriginalStyle)
+        rebuilt.stop()
+        let quick = MPVQuickPlayerViewController(configuration: MPVPlayerConfiguration(url: try fixture("style-modes.mkv"), forceSoftwareDecode: true))
+        window?.rootViewController = quick
+        player = quick.player
+        quick.subtitleControls[.primary] = .init(position: 100, usesOriginalStyle: true, automatic: true, language: .english)
+        quick.subtitleControls[.secondary] = .init(position: 0, usesOriginalStyle: false, automatic: true, language: .simplifiedChinese)
+        try await eventually("两路自动选轨") {
+            quick.player.subtitleState(in: .primary).trackID != nil && quick.player.subtitleState(in: .secondary).trackID != nil
+        }
+        XCTAssertFalse(quick.player.subtitleState(in: .primary).usesOriginalStyle)
+        XCTAssertFalse(quick.player.subtitleState(in: .primary).supportsASSMode)
+        XCTAssertTrue(quick.player.subtitleState(in: .secondary).supportsASSMode)
+        XCTAssertFalse(quick.player.subtitleState(in: .secondary).usesOriginalStyle)
+    }
+
     @MainActor func testQuickPlayerShadowRadiusFollowsActualRoutesWhilePaused() async throws {
         let saved = MPVQuickPlayerSubtitlePreferences.style()
         defer { cleanUp(); MPVQuickPlayerSubtitlePreferences.save(saved) }
@@ -105,14 +209,12 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         XCTAssertTrue(value.subtitleState(in: .secondary).nativeVisible)
         attach("半径-14-仅第一字幕生效")
         value.setSubtitleUsesOriginalStyle(true, in: .primary)
-        try await eventually("切换原生后禁用") { !slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .originalStyle }
+        try await eventually("SRT 不受 ASS 偏好影响") { slider.isEnabled && !value.subtitleState(in: .primary).usesOriginalStyle }
         XCTAssertEqual(MPVQuickPlayerSubtitlePreferences.style().shadowRadius, 14)
-        attach("原生字幕-禁用并解释")
-        value.setSubtitleUsesOriginalStyle(false, in: .primary)
-        try await eventually("切回自绘恢复能力") { slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .supported }
         XCTAssertEqual(label.layer.shadowRadius, 14)
         try await load("original.ass", in: .primary, on: value, original: true)
         try await eventually("原始 ASS 不支持半径") { !slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .originalStyle }
+        attach("原生字幕-禁用并解释")
         value.setSubtitleUsesOriginalStyle(false, in: .primary)
         try await eventually("ASS 公共样式仍走原生渲染") { !slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .nativeRenderer }
         try await load("primary.srt", in: .primary, on: value)

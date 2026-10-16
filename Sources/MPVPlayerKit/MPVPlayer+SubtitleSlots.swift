@@ -1,11 +1,11 @@
 import Foundation
 
 extension MPVPlayer {
-    @discardableResult public func select(track: MPVMediaTrack, in slot: MPVSubtitleSlot) -> Bool {
+    @discardableResult public func select(track: MPVMediaTrack, in slot: MPVSubtitleSlot, usesOriginalStyle: Bool? = nil) -> Bool {
         guard track.type == .subtitle else { select(track: track); return true }
         return playbackView.selectSubtitleTrack([
             "slot": slot.rawValue, "trackID": track.id,
-            "usesOriginalStyle": subtitleState(in: slot).usesOriginalStyle
+            "usesOriginalStyle": usesOriginalStyle ?? subtitleState(in: slot).usesOriginalStyle
         ])
     }
 
@@ -46,6 +46,7 @@ extension MPVPlayer {
         state.sourceID = (values["sourceID"] as? String).flatMap { $0.isEmpty ? nil : $0 }
         state.isNative = (values["isNative"] as? NSNumber)?.boolValue ?? true
         state.supportsTextStyle = (values["supportsTextStyle"] as? NSNumber)?.boolValue ?? false
+        state.supportsASSMode = (values["supportsASSMode"] as? NSNumber)?.boolValue ?? false
         state.shadowRadiusCapability = (values["shadowRadiusCapability"] as? String)
             .flatMap(MPVSubtitleShadowRadiusCapability.init(rawValue:)) ?? .inactive
         return state

@@ -358,3 +358,9 @@ This package's source code is available under the MIT License. MPVKit is an LGPL
 Read `subtitleState(in:).shadowRadiusCapability` for each slot's actual rendering capability. Shared style enables the radius when at least one active renderer supports it and explains incompatible slots. Switching routes preserves the shared value; a gap between cues does not disable support.
 
 Custom `MPVSubtitleRenderer` implementations default to unsupported. Renderers that apply `MPVSubtitleStyle.shadowRadius` can declare `supportsShadowRadius == true`; the default renderer already does. Hosts can summarize slots with `MPVSubtitleShadowRadiusAvailability` and supply their own localization for its explanation.
+
+## Format-specific ASS mode
+
+`subtitleState(in:).supportsASSMode` identifies actual ASS/SSA tracks. Hosts should hide ASS controls for other formats. Plain text such as SRT/VTT always uses player styling, even when original styling was requested; image rendering stays unchanged. State fields describe the effective mode, separately from a host's saved ASS preference.
+
+QuickPlayer preserves per-slot ASS preferences across selection, imports, automatic selection, and restoration. Plain-text imports and resets while ASS controls are hidden do not overwrite those preferences. An explicit ASS mode choice saves the new preference.

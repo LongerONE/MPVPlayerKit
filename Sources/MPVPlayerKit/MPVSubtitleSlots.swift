@@ -23,6 +23,7 @@ public enum MPVSubtitleShadowRadiusCapability: String, Sendable {
 }
 
 public struct MPVSubtitleState: Equatable, Sendable {
+    public var supportsASSMode = false
     public var shadowRadiusCapability: MPVSubtitleShadowRadiusCapability = .inactive
     public var assOverride: MPVSubtitleASSOverride = .strip
     public var trackID: Int64?
@@ -59,7 +60,7 @@ public struct MPVSubtitleState: Equatable, Sendable {
          "visible": visible, "nativeVisible": nativeVisible, "delay": delay,
          "position": position, "usesOriginalStyle": usesOriginalStyle, "assOverride": assOverride.rawValue,
          "sourceID": sourceID ?? "", "isNative": isNative,
-         "supportsTextStyle": supportsTextStyle,
+         "supportsTextStyle": supportsTextStyle, "supportsASSMode": supportsASSMode,
          "shadowRadiusCapability": shadowRadiusCapability.rawValue] as NSDictionary
     }
 }

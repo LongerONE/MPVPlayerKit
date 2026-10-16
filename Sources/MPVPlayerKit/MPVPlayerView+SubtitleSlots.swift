@@ -20,6 +20,7 @@ extension MPVPlayerView {
             state.visible = clientSubtitleController.isVisible
             state.supportsTextStyle = true
             state.usesOriginalStyle = false
+            state.supportsASSMode = false
             state.shadowRadiusCapability = state.visible ? .supported : .inactive
         }
         if state.shadowRadiusCapability == .supported, !clientSubtitleController.renderer.supportsShadowRadius {
@@ -77,6 +78,7 @@ extension MPVPlayerView {
             if let position, position.isFinite { state.position = min(150, max(0, position)) }
             if let original { state.usesOriginalStyle = original; state.assOverride = original ? .no : .strip }
             if let override { state.assOverride = override; state.usesOriginalStyle = override == .no }
+            state = self.resolvedSubtitleStyleMode(state)
             guard self.applySlotState(state, slot: slot) else {
                 _ = self.applySlotState(previous, slot: slot)
                 return
@@ -103,6 +105,7 @@ extension MPVPlayerView {
             if state.sourceID == nil, let id = state.trackID { state.sourceID = sourceIdentity(id) }
         }
         state.nativeVisible = getFlag(slot.visibilityProperty) ?? false
+        state = resolvedSubtitleStyleMode(state)
         if let id = state.trackID {
             let image = isImageTrack(id)
             state.supportsTextStyle = !image && !state.usesOriginalStyle
@@ -111,6 +114,7 @@ extension MPVPlayerView {
         if state.trackID == nil || !state.visible { state.shadowRadiusCapability = .inactive }
         if subtitleSlots.pending.values.contains(where: { $0.slot == slot }) {
             state.shadowRadiusCapability = .inactive
+            state.supportsASSMode = false
         }
         return state
     }
@@ -153,6 +157,7 @@ extension MPVPlayerView {
         target.visible = id != nil
         target.usesOriginalStyle = original
         target.assOverride = original == previous.usesOriginalStyle ? previous.assOverride : (original ? .no : .strip)
+        target = resolvedSubtitleStyleMode(target)
         if let old = previous.sourceID { subtitleSlots.delays[old] = previous.delay }
         target.delay = source.flatMap { subtitleSlots.delays[$0] } ?? 0
         guard applySlotState(target, slot: slot) else {
@@ -163,7 +168,7 @@ extension MPVPlayerView {
         published.nativeVisible = getFlag(slot.visibilityProperty) ?? false
         published.isNative = slot == .secondary || !rendersDecodedSubtitleText
         let image = id.map { isImageTrack($0) } ?? false
-        published.supportsTextStyle = id != nil && !image && !original
+        published.supportsTextStyle = id != nil && !image && !target.usesOriginalStyle
         published.updateShadowRadiusCapability(isImageSubtitle: image)
         subtitleSlots.states[slot] = target
         subtitleSlots.publish(published, slot: slot)
@@ -171,6 +176,7 @@ extension MPVPlayerView {
     }
 
     @discardableResult nonisolated func applySlotState(_ state: MPVSubtitleState, slot: MPVSubtitleSlot) -> Bool {
+        let state = resolvedSubtitleStyleMode(state)
         guard mpv != nil else {
             subtitleSlots.states[slot] = state
             if slot == .primary { subtitleDelayValue = state.delay }

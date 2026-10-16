@@ -405,3 +405,9 @@ bash Tests/run_hls_resolver_tests.sh
 通过 `subtitleState(in:).shadowRadiusCapability` 获取每路实际渲染能力，区分活动自绘、原生、原始样式、图片、自定义渲染器未支持及未活动状态。公共面板只在至少一路支持时启用半径，并解释未支持路的原因；切换路径保留公共设置。没有当前台词不代表不支持。
 
 自定义 `MPVSubtitleRenderer` 默认不声明支持；确实应用了 `MPVSubtitleStyle.shadowRadius` 的实现可提供 `supportsShadowRadius == true`。默认渲染器已支持。宿主可用 `MPVSubtitleShadowRadiusAvailability` 汇总两路能力并通过自身本地化生成提示。
+
+## ASS 模式与格式
+
+`subtitleState(in:).supportsASSMode` 只在当前实际轨道为 ASS/SSA 时为 true，宿主据此显示模式入口。SRT/VTT 等普通文本始终使用播放器样式，即使传入原始排版选项也不切换为原始渲染；图片字幕的渲染保持不变。`usesOriginalStyle` 和 `assOverride` 返回实际生效状态，不替代宿主保存的 ASS 偏好。
+
+QuickPlayer 在选轨、自动选择及恢复时沿用每路 ASS 偏好；普通文本导入和非 ASS 字幕下的控制重置不会覆盖该偏好。仅用户明确选择 ASS 模式时保存新值。Temby 使用相同能力接口，LuWu 复用 QuickPlayer。
