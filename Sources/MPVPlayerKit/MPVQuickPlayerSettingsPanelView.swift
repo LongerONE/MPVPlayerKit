@@ -15,6 +15,7 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
     let cardView = UIView()
     let effectView = UIVisualEffectView()
     let titleLabel = UILabel()
+    let titleStack = UIStackView()
     let scrollView = UIScrollView()
     let contentStack = UIStackView()
     let cancelButton = UIButton(type: .system)
@@ -168,7 +169,10 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
         titleLabel.adjustsFontForContentSizeCategory = true
         titleLabel.textAlignment = .center
         titleLabel.textColor = .label
-        effectView.contentView.addSubview(titleLabel)
+        titleStack.alignment = .center
+        titleStack.spacing = 4
+        titleStack.addArrangedSubview(titleLabel)
+        effectView.contentView.addSubview(titleStack)
 
         contentStack.axis = .vertical
         contentStack.spacing = 14
@@ -189,7 +193,7 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
         // default for programmatic views) freezes them at a zero frame and the
         // card renders as an empty blur.
         [
-            titleLabel,
+            titleStack,
             scrollView,
             contentStack,
             cancelButton,
@@ -248,10 +252,11 @@ class MPVQuickPlayerSettingsPanelView: UIView, MPVQuickPlayerPanelOverlay {
             effectView.trailingAnchor.constraint(equalTo: cardView.trailingAnchor),
             effectView.topAnchor.constraint(equalTo: cardView.topAnchor),
             effectView.bottomAnchor.constraint(equalTo: cardView.bottomAnchor),
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 18),
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 20),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -20),
-            scrollView.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 16),
+            titleStack.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 18),
+            titleStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            titleStack.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: 20),
+            titleStack.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -20),
+            scrollView.topAnchor.constraint(equalTo: titleStack.bottomAnchor, constant: 16),
             scrollView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 16),
             scrollView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -16),
             scrollView.bottomAnchor.constraint(equalTo: cancelButton.topAnchor, constant: -8),

@@ -30,6 +30,7 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
 
     var onStyleChange: ((MPVSubtitleStyle) -> Void)?
     var onFontTap: ((UIView) -> Void)?
+    var onDetailsTap: (() -> Void)?
 
     override class var cardWidth: CGFloat { 340 }
     override class var cardHeight: CGFloat { 560 }
@@ -37,13 +38,16 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     override class var accessibilityIdentifierKey: String { "MPVQuickPlayer.subtitleSettings" }
 
     override func configureContent() {
-        let note = UILabel()
-        note.text = mpvLocalized("subtitle.shared_style.note")
-        note.font = .preferredFont(forTextStyle: .footnote)
-        note.adjustsFontForContentSizeCategory = true
-        note.textColor = .secondaryLabel
-        note.numberOfLines = 0
-        contentStack.addArrangedSubview(note)
+        let detailsButton = UIButton(type: .system)
+        detailsButton.setImage(UIImage(systemName: "info.circle"), for: .normal)
+        detailsButton.accessibilityLabel = mpvLocalized("common.details")
+        detailsButton.accessibilityIdentifier = "MPVQuickPlayer.subtitleSettingsDetails"
+        detailsButton.addAction(UIAction { [weak self] _ in self?.onDetailsTap?() }, for: .touchUpInside)
+        titleStack.addArrangedSubview(detailsButton)
+        NSLayoutConstraint.activate([
+            detailsButton.widthAnchor.constraint(equalToConstant: 44),
+            detailsButton.heightAnchor.constraint(equalToConstant: 44),
+        ])
         fontButton.setTitle(mpvLocalized("subtitle.font.choose"), for: .normal)
         fontButton.addTarget(self, action: #selector(fontTapped(_:)), for: .touchUpInside)
         contentStack.addArrangedSubview(makeValueButtonRow(title: mpvLocalized("subtitle.font"), button: fontButton))

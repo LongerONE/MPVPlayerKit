@@ -141,3 +141,5 @@
 "subtitle.font.error" = "This font file could not be used. Choose a valid font.";
 
 "subtitle.original_ass.position_note" = "Original ASS keeps the file positioning and layout. Position controls are unavailable until player styling is restored; your position is retained.";
+
+"common.details" = "Details";

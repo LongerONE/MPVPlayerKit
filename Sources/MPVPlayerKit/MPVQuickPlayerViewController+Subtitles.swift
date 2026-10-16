@@ -105,6 +105,10 @@ extension MPVQuickPlayerViewController {
             || player.playbackView.decodedSubtitleText != nil
         panel.onStyleChange = { [weak self] in self?.setSubtitleStyle($0) }
         panel.onFontTap = { [weak self] view in self?.showSubtitleFontPicker(from: view) }
+        panel.onDetailsTap = { [weak self] in
+            self?.presentMessage(title: mpvLocalized("subtitle.shared_style"),
+                                 message: mpvLocalized("subtitle.shared_style.note"))
+        }
         panel.onDismiss = { [weak self, weak panel] in
             guard let self, self.settingsPanelOverlay === panel else { return }
             self.settingsPanelOverlay = nil

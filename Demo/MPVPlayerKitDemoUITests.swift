@@ -32,6 +32,17 @@ final class MPVPlayerKitDemoUITests: XCTestCase {
         app.buttons["字幕公共样式"].tap()
         XCTAssertTrue(app.otherElements["MPVQuickPlayer.subtitleSettings"].waitForExistence(timeout: 3))
         capture("QuickPlayer-字幕公共样式")
+        XCTAssertFalse(app.alerts.firstMatch.exists)
+        let details = app.buttons["MPVQuickPlayer.subtitleSettingsDetails"]
+        XCTAssertTrue(details.isHittable)
+        XCTAssertEqual(details.label, "详情")
+        details.tap()
+        let alert = app.alerts["字幕公共样式"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 3))
+        capture("QuickPlayer-字幕公共样式详情")
+        alert.buttons.firstMatch.tap()
+        XCTAssertTrue(details.waitForExistence(timeout: 3))
+        XCTAssertFalse(app.alerts.firstMatch.exists)
     }
 
     @MainActor private func capture(_ name: String) {

@@ -141,3 +141,5 @@
 "subtitle.font.error" = "无法使用此字体文件，请选择有效的字体。";
 
 "subtitle.original_ass.position_note" = "原始 ASS 优先字幕文件的定位与排版，垂直位置暂不可调；切回播放器样式后恢复已设位置。";
+
+"common.details" = "详情";
