@@ -183,6 +183,29 @@ skip backward and forward (15 second interval) and `changePlaybackPosition`.
 Hosts that drive their own Remote Command Center can opt out with
 `playerView.systemPlaybackControlsEnabled = false`.
 
+## Dual subtitles
+
+The primary and secondary subtitle slots have independent selection, visibility, delay, vertical position and ASS override policy. Font, size, weight, colors, outline and shadow use one shared style. The secondary slot starts off and must use a different source from the primary slot.
+
+```swift
+let tracks = player.tracks(ofType: .subtitle)
+if tracks.count >= 2 {
+    player.select(track: tracks[0], in: .primary)
+    player.select(track: tracks[1], in: .secondary)
+    player.setSubtitlesVisible(true, in: .secondary)
+    player.setSubtitlePosition(0, in: .secondary)
+    player.setSubtitleDelay(0.5, in: .secondary)
+}
+```
+
+Existing methods without a slot continue to control the primary subtitle. `subtitleState(in:)` exposes logical and native visibility, track, delay and style capability; `currentSubtitleText(in:)` reads subtitle text. `subtitleTextSnapshot(in:)` also returns available ASS text and start/end times, with `nil` for unavailable values; it cannot reconstruct complete ASS or bitmap subtitles. `setSubtitleASSOverride(_:in:)` supports the stock `no`, `yes`, `scale`, `force` and `strip` policies; the quick interface offers the common original-ASS/player-style choice.
+
+Native positions range from 0 to 150, with primary defaulting to 100 (bottom) and secondary to 0 (top); these are not independent pixel margins. Original ASS layout and bitmap positioning remain subject to native limitations, without automatic collision avoidance. `subtitleSessionSnapshot()` and `restoreSubtitleSession(_:)` support rebuilding within the same playback session. These snapshots may contain document and renderer objects and are for in-memory restoration only; do not persist them.
+
+The secondary slot uses the stock MPVKit 1.0.0 `secondary-sid` renderer. Existing primary text and document rendering remains available. Shared styling depends on the format and each slot's ASS policy; bitmap subtitles do not accept text font or color changes. Client-only background and shadow-radius effects apply to the primary renderer. Unsupported external resources fail without format conversion, subtitle burn-in or custom decoder libraries.
+
+QuickPlayer exposes both slots, shared appearance and separate automatic language preferences for Simplified Chinese, Traditional Chinese and English. Preferences may persist, but selected tracks, external sources, temporary visibility and delays do not. Delays are remembered per source only during the current playback session and are cleared on exit or a different video. No server delay writes are made without a confirmed contract supporting both sources.
+
 ## Client-rendered subtitles
 
 Subtitle support has two paths:
@@ -308,6 +331,7 @@ It is optional; `MPVPlayer` does not depend on it at runtime.
 
 - Setup and playback: `configure(_:)` (URL, headers, user agent, decoding, quality, deband and cache options), `play()`, `pause()`, `stop()`, `seek(_:)`, `updatePlayRate(_:)`
 - Tracks and subtitles: `mediaTracks(_:)`, `selectTrack(_:)`, `loadSubtitle(_:)`, `cancelSubtitleLoad(_:)`, `setSubtitleVisible(_:)`, `updateSubtitleStyle(_:)`, `updateSubtitleDelay(_:)`, `setSubtitleFontFromURL(_:)`, `resetSubtitleFontFromBridge()`, `currentSubtitleText()`
+- Dual subtitles: selection, load and visibility dictionaries accept `slot: 0/1`; `selectSubtitleTrack(_:)` returns the selection result. `updateSubtitleControl(_:)` accepts `slot` and `delay`, `position`, `usesOriginalStyle` or `assOverride`. Query by slot with `subtitleState(_:)`, `subtitleText(_:)` and `subtitleTextSnapshot(_:)`; pass an explicit `trackID` to `removeExternalSubtitle(_:)` or `reloadExternalSubtitle(_:)`. Load notifications add `slot` and `errorMessage` while retaining existing fields.
 - Rendering and layout: `playerContentModeRawValue`, `prepareLayoutTransition(_:)`, `refreshLayout(_:)`, `beginDisplayGeometryTransition()`, `endDisplayGeometryTransition()`
 - Picture in Picture: `isPictureInPictureSupported`, `isPictureInPictureActive`, `startPictureInPicture()`, `stopPictureInPicture()`, `togglePictureInPicture()`, `allowsAutomaticPictureInPictureFromInline`
 - System controls: `systemPlaybackControlsEnabled`

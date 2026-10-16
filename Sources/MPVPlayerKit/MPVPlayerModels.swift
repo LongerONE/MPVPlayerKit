@@ -228,6 +228,9 @@ public struct MPVMediaTrack: Identifiable, Equatable, Sendable {
     public let bitRate: Int64
     public let isSelected: Bool
     public let isImageSubtitle: Bool
+    public let isForced: Bool
+    public let isDefault: Bool
+    public let isExternal: Bool
 
     public var subtitleFontCapability: MPVSubtitleFontCapability {
         guard type == .subtitle else { return .noSubtitle }
@@ -248,5 +251,8 @@ public struct MPVMediaTrack: Identifiable, Equatable, Sendable {
         self.bitRate = (dictionary["bitRate"] as? NSNumber)?.int64Value ?? 0
         self.isSelected = (dictionary["isEnabled"] as? NSNumber)?.boolValue ?? false
         self.isImageSubtitle = (dictionary["isImageSubtitle"] as? NSNumber)?.boolValue ?? false
+        self.isForced = (dictionary["isForced"] as? NSNumber)?.boolValue ?? false
+        self.isDefault = (dictionary["isDefault"] as? NSNumber)?.boolValue ?? false
+        self.isExternal = (dictionary["isExternal"] as? NSNumber)?.boolValue ?? false
     }
 }

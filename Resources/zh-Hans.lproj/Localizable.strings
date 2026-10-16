@@ -106,3 +106,38 @@
 
 "subtitle.shadow_radius" = "阴影扩散半径";
 "subtitle.shadow_radius.unsupported" = "当前字幕渲染不支持扩散半径";
+
+"subtitle.primary" = "第一字幕";
+"subtitle.secondary" = "第二字幕";
+"subtitle.shared_style" = "字幕公共样式";
+"subtitle.shared_style.note" = "公共样式用于两路可适用字幕。原始 ASS 优先文件排版，图片字幕不应用文字样式。";
+"subtitle.source" = "来源";
+"subtitle.external" = "外部字幕";
+"subtitle.visible" = "显示字幕";
+"subtitle.position" = "垂直位置";
+"subtitle.position.value" = "垂直位置 · %d";
+"subtitle.position.top" = "顶部";
+"subtitle.position.bottom" = "底部";
+"subtitle.original_ass" = "保留原始 ASS 样式";
+"subtitle.automatic" = "自动选择";
+"subtitle.language" = "目标语言";
+"subtitle.language.simplified" = "简体";
+"subtitle.language.traditional" = "繁体";
+"subtitle.language.english" = "英语";
+"subtitle.reset_control" = "恢复本路默认控制项";
+"subtitle.primary.note" = "延迟仅在当前播放会话按来源保留。原始 ASS 和图片字幕的位置受格式限制，不自动避让。";
+"subtitle.secondary.note" = "第二字幕仅使用原生渲染。延迟仅在当前播放会话按来源保留；原始 ASS 和图片位置受格式限制，不自动避让。";
+"subtitle.occupied.track" = "%@（另一路使用中）";
+"subtitle.occupied" = "此来源已被另一路字幕使用。请先关闭另一路或选择其他来源。";
+"subtitle.error.primary" = "第一字幕加载失败，已保留原选择。请检查资源或改用当前支持的字幕格式。";
+"subtitle.error.secondary" = "第二字幕加载失败，已保留原选择。请检查资源或改用当前支持的字幕格式。";
+"subtitle.primary.bottom_offset" = "第一字幕底部距离（共享原生边距）";
+"subtitle.primary.shadow_radius" = "第一字幕自绘阴影半径";
+"subtitle.primary.shadow_radius.note" = "阴影半径仅用于第一字幕自绘，不影响第二字幕。原生底部边距为共享参数。";
+"subtitle.font" = "公共字体";
+"subtitle.font.choose" = "选择…";
+"subtitle.font.import" = "导入字体…";
+"subtitle.font.reset" = "恢复默认字体";
+"subtitle.font.error" = "无法使用此字体文件，请选择有效的字体。";
+
+"subtitle.original_ass.position_note" = "原始 ASS 优先字幕文件的定位与排版，垂直位置暂不可调；切回播放器样式后恢复已设位置。";

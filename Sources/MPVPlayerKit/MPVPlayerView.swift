@@ -59,6 +59,8 @@ public enum MPVPlayerKitNotificationKey {
     public static let decoderMode = "decoderMode"
     public static let requestID = "requestID"
     public static let success = "success"
+    public static let slot = "slot"
+    public static let errorMessage = "errorMessage"
     public static let targetTime = "targetTime"
     public static let errorCode = "errorCode"
 }
@@ -204,6 +206,7 @@ enum MPVVideoQualityPreset: Int {
 @objc(MPVPlayerView)
 public final class MPVPlayerView: UIView {
     nonisolated let configurationState = MPVPlaybackConfigurationState()
+    nonisolated let subtitleSlots = MPVSubtitleSlotRuntime()
     nonisolated(unsafe) var queueConfigurationGeneration: UInt64 = 0
     nonisolated(unsafe) var queueConfiguration = MPVPlaybackConfigurationSnapshot()
 

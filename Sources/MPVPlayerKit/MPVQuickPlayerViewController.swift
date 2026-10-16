@@ -40,13 +40,19 @@ public final class MPVQuickPlayerViewController: UIViewController {
     /// The quick player's app-local global cache preference.
     public internal(set) var cacheConfiguration: MPVCacheConfiguration
     public internal(set) var subtitleDelay: TimeInterval = 0
-    public internal(set) var subtitleStyle: MPVSubtitleStyle = {
-        var style = MPVSubtitleStyle.defaultStyle
-        if let radius = UserDefaults.standard.object(forKey: "MPVQuickPlayer.subtitleShadowRadius") as? Double {
-            style.shadowRadius = min(20, max(0, radius))
-        }
-        return style
-    }()
+    public internal(set) var subtitleStyle = MPVQuickPlayerSubtitlePreferences.style()
+    var subtitleControls: [MPVSubtitleSlot: MPVQuickPlayerSubtitlePreferences.Control] = [
+        .primary: MPVQuickPlayerSubtitlePreferences.control(in: .primary),
+        .secondary: MPVQuickPlayerSubtitlePreferences.control(in: .secondary),
+    ]
+    var subtitlePanelSlot = MPVSubtitleSlot.primary
+    var subtitleImportSlot = MPVSubtitleSlot.primary
+    var subtitleImportIsFont = false
+    var subtitleRequests: [MPVSubtitleSlot: UUID] = [:]
+    var subtitleLoadGeneration: [MPVSubtitleSlot: UInt64] = [:]
+    var subtitleManualSlots = Set<MPVSubtitleSlot>()
+    var subtitleAutomaticTrackIDs: [MPVSubtitleSlot: Int64] = [:]
+    var subtitleAutomaticStarted = Set<MPVSubtitleSlot>()
 
     public var diagnosticSessionID: UUID? { player.diagnosticSessionID }
     public func diagnosticLogFiles() async throws -> [URL] {
@@ -105,8 +111,6 @@ public final class MPVQuickPlayerViewController: UIViewController {
     var decoderMode = MPVDecoderMode.initializing
     var bufferingProgress = 0
     var isDisplayTransitionInProgress = false
-    var pendingSubtitleRequestID: UUID?
-    var isCancellingSubtitleLoad = false
     var isUsingManualLandscape: Bool
     weak var orientationSynchronizedPresentedViewController: UIViewController?
     weak var actionSheetOverlay: MPVQuickPlayerMenuView?
@@ -156,6 +160,11 @@ public final class MPVQuickPlayerViewController: UIViewController {
         modalPresentationCapturesStatusBarAppearance = true
         player.delegate = self
         player.updateSubtitleStyle(subtitleStyle)
+        applySubtitlePreferences()
+        MPVQuickPlayerSubtitlePreferences.prepareFontStorage()
+        if let fontURL = MPVQuickPlayerSubtitlePreferences.fontURL {
+            try? player.setSubtitleFont(from: fontURL)
+        }
     }
 
     public convenience init(
@@ -171,7 +180,14 @@ public final class MPVQuickPlayerViewController: UIViewController {
     }
 
     public func setSubtitleFont(from url: URL) throws {
-        try player.setSubtitleFont(from: url)
+        let savedURL = try MPVQuickPlayerSubtitlePreferences.copyFont(from: url)
+        do {
+            try player.setSubtitleFont(from: savedURL)
+            MPVQuickPlayerSubtitlePreferences.saveFont(savedURL)
+        } catch {
+            try? FileManager.default.removeItem(at: savedURL)
+            throw error
+        }
     }
 
     /// Injects host-side chrome padding (safe-area side channel) into playback controls.
@@ -185,6 +201,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
 
     public func resetSubtitleFont() {
         player.resetSubtitleFont()
+        MPVQuickPlayerSubtitlePreferences.saveFont(nil)
     }
 
     @available(*, unavailable)
@@ -273,6 +290,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         playlistSwitchTask?.cancel()
         playlistSwitchTask = nil
         isPlaylistSwitching = false
+        resetQuickPlayerSubtitleSession()
         player.stop()
         restoreIdleTimer()
     }
@@ -371,6 +389,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
             label: mpvLocalized("accessibility.subtitles"),
             action: #selector(chooseSubtitleTrack)
         )
+        subtitleButton.accessibilityIdentifier = "MPVQuickPlayer.subtitleButton"
         configureControlButton(
             pictureInPictureButton,
             symbol: .pictureInPictureEnter,

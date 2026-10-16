@@ -211,6 +211,29 @@ JSON 编码、OSLog 输出和文件写入在 utility 异步消费任务中完成
 
 自行管理 Remote Command Center 的宿主可以通过 `playerView.systemPlaybackControlsEnabled = false` 关闭。
 
+## 双字幕
+
+第一字幕与第二字幕各自选轨、显示/隐藏、校时、调整垂直位置和 ASS 覆盖策略；字体、字号、粗体、颜色、描边和阴影使用一份公共样式。第二字幕默认关闭，且只能使用与第一字幕不同的来源。
+
+```swift
+let tracks = player.tracks(ofType: .subtitle)
+if tracks.count >= 2 {
+    player.select(track: tracks[0], in: .primary)
+    player.select(track: tracks[1], in: .secondary)
+    player.setSubtitlesVisible(true, in: .secondary)
+    player.setSubtitlePosition(0, in: .secondary)
+    player.setSubtitleDelay(0.5, in: .secondary)
+}
+```
+
+无路别的旧接口继续控制第一字幕。通过 `subtitleState(in:)` 查询当前路的逻辑显隐、原生显隐、轨道、延迟及样式能力，通过 `currentSubtitleText(in:)` 读取文本。`subtitleTextSnapshot(in:)` 同时提供可用的文本、ASS 文本及起止时间；缺失值为 `nil`，不能用它重建完整 ASS 或图片字幕。`setSubtitleASSOverride(_:in:)` 支持原版的 `no`、`yes`、`scale`、`force`、`strip`；快捷界面提供原始 ASS／播放器样式两种常用选择。
+
+原生位置范围为 0～150，第一字幕默认 100（底部）、第二字幕默认 0（顶部），不是独立的像素边距。原始 ASS 排版和图片字幕受原生定位能力限制，不做自动避让。同一播放会话重建引擎时可以使用 `subtitleSessionSnapshot()`／`restoreSubtitleSession(_:)`；快照可能含文档与渲染器对象，只供内存恢复，不能写入长期存储。
+
+第二字幕通过当前 MPVKit 1.0.0 原生 `secondary-sid` 渲染；第一字幕保留现有文本和文档自绘。公共样式按格式和各路 ASS 策略生效，图片字幕不能应用文字字体与颜色，背景和阴影半径等自绘能力仅适用于第一字幕。当前依赖不能加载的外挂资源会报告失败，不转换格式、不烧录或引入定制解码库。
+
+QuickPlayer 提供两路控制、公共样式和各路简体中文／繁体中文／英语自动选择偏好。配置可长期保存；选中的轨道、外挂来源、临时显隐和延迟不长期保存。延迟只在当前播放会话按来源保留，退出或换片清空。服务端没有已确认的双路持久化契约时不写入服务端。
+
 ## 客户端渲染字幕
 
 字幕有两条能力路径：
@@ -330,6 +353,7 @@ playerViewController.gestureOptions = [.seeking, .volume]
 
 - 配置与播放：`configure(_:)`（URL、headers、userAgent、解码、画质、deband 与缓存选项）、`play()`、`pause()`、`stop()`、`seek(_:)`、`updatePlayRate(_:)`
 - 轨道与字幕：`mediaTracks(_:)`、`selectTrack(_:)`、`loadSubtitle(_:)`、`cancelSubtitleLoad(_:)`、`setSubtitleVisible(_:)`、`updateSubtitleStyle(_:)`、`updateSubtitleDelay(_:)`、`setSubtitleFontFromURL(_:)`、`resetSubtitleFontFromBridge()`、`currentSubtitleText()`
+- 双字幕：选轨、加载和显隐字典可传 `slot: 0/1`；`selectSubtitleTrack(_:)` 返回选轨结果，`updateSubtitleControl(_:)` 接收 `slot` 与 `delay`／`position`／`usesOriginalStyle`／`assOverride`；`subtitleState(_:)`、`subtitleText(_:)`、`subtitleTextSnapshot(_:)` 按路查询，`removeExternalSubtitle(_:)`／`reloadExternalSubtitle(_:)` 显式传 `trackID`。加载通知增加 `slot` 和 `errorMessage`，旧字段保留。
 - 渲染与布局：`playerContentModeRawValue`、`prepareLayoutTransition(_:)`、`refreshLayout(_:)`、`beginDisplayGeometryTransition()`、`endDisplayGeometryTransition()`
 - 画中画：`isPictureInPictureSupported`、`isPictureInPictureActive`、`startPictureInPicture()`、`stopPictureInPicture()`、`togglePictureInPicture()`、`allowsAutomaticPictureInPictureFromInline`
 - 系统媒体控制：`systemPlaybackControlsEnabled`
@@ -338,7 +362,7 @@ playerViewController.gestureOptions = [.seeking, .volume]
 
 ## Demo
 
-打开 `Demo/MPVPlayerKitDemo.xcodeproj` 并运行 `MPVPlayerKitDemo` scheme。Demo 以本地 Swift Package 方式引用本仓库，并用公开的 HLS 样例启动快捷播放器。要测试带自定义音轨或字幕轨道的媒体，替换 `Demo/MPVPlayerKitDemo/AppDelegate.swift` 中的 `sampleURL`。
+打开 `Demo/MPVPlayerKitDemo.xcodeproj` 并运行 `MPVPlayerKitDemo` scheme。Demo 以本地 Swift Package 方式引用本仓库，并用公开的 HLS 样例启动快捷播放器。要测试带自定义音轨或字幕轨道的媒体，替换 `Demo/MPVPlayerKitDemo/SceneDelegate.swift` 中的 `sampleURL`。
 
 ## 说明
 

@@ -43,6 +43,13 @@
       shouldUseLaunchSchemeArgsEnv = "YES">
       <Testables>
          <TestableReference skipped = "NO">
+            <BuildableReference BuildableIdentifier = "primary"
+               BlueprintIdentifier = "D30000000000000000000015"
+               BuildableName = "MPVPlayerKitDemoUITests.xctest"
+               BlueprintName = "MPVPlayerKitDemoUITests"
+               ReferencedContainer = "container:MPVPlayerKitDemo.xcodeproj" />
+         </TestableReference>
+         <TestableReference skipped = "NO">
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "B20000000000000000000001"

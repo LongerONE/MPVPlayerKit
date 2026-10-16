@@ -19,12 +19,14 @@ extension MPVPlayerView {
         guard document != nil else { return }
         queue.async { [weak self] in
             guard let self, self.mpv != nil else { return }
+            self.subtitleSlots.selectionRevision[.primary, default: 0] &+= 1
+            self.subtitleSlots.publishRevision(self.subtitleSlots.selectionRevision[.primary, default: 0], slot: .primary)
             _ = self.beginNewSubtitleSelection(reason: "client-selection")
             let snapshot = self.logicalSubtitleSelection()
             _ = self.performSubtitleSelectionTransaction(
                 previous: snapshot,
                 targetUsesOriginalStyle: snapshot.usesOriginalStyle,
-                targetSubtitleID: snapshot.subtitleID,
+                targetSubtitleID: nil,
                 targetVisibility: false
             )
         }

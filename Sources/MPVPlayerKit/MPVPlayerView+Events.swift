@@ -74,10 +74,13 @@ extension MPVPlayerView {
                     self.mpvDebugLog(
                         "event file-loaded profile=\(self.activeProfileDescription)"
                     )
+                    self.subtitleSlots.fileLoaded = true
+                    for slot in MPVSubtitleSlot.allCases { self.subtitleSlots.publish(self.slotState(slot), slot: slot) }
                     self.markBufferingFileLoaded()
                     self.restoreProfileRetryIfNeeded()
                     self.ensureVideoTrackSelected(reason: "file-loaded")
                     self.refreshMediaTracksCache()
+                    self.restoreSubtitleSlotsIfNeeded()
                     self.logPlaybackPipelineDiagnostics(reason: "file-loaded")
                     self.refreshPictureInPictureVideoDisplaySize()
                     self.refreshVideoDisplayAspectRatio()
@@ -151,6 +154,7 @@ extension MPVPlayerView {
     nonisolated func handleCommandReply(_ event: UnsafeMutablePointer<mpv_event>) {
         dispatchPrecondition(condition: .onQueue(queue))
         let userdata = event.pointee.reply_userdata
+        if handleSlotSubtitleReply(userdata: userdata, error: event.pointee.error) { return }
         if let canceled = canceledExternalSubtitleCommands.removeValue(forKey: userdata) {
             restoreAfterStaleExternalReplyIfNeeded(canceled)
             return
@@ -393,6 +397,10 @@ extension MPVPlayerView {
         rendersDecodedSubtitleText = usesOverlay
         currentSubtitleUsesOriginalStyle = snapshot.usesOriginalStyle
         committedSubtitleSelection = snapshot
+        if let policy = subtitleSlots.states[.primary]?.assOverride,
+           (policy == .no) == snapshot.usesOriginalStyle {
+            guard command("set", args: [MPVProperty.subtitleASSOverride, policy.rawValue], checkForErrors: false) >= 0 else { return false }
+        }
         refreshSubtitleTextCache()
         return true
     }
@@ -471,21 +479,6 @@ extension MPVPlayerView {
         }
         if restoreSubtitleSelection(committedSubtitleSelection) == false {
             enterSafeSubtitleState(reason: "stale-reply-restore-failed")
-        }
-    }
-
-    nonisolated func notifySubtitleLoad(requestID: String, success: Bool) {
-        let session = currentMPVPlaybackUpdateSourceSession() ?? queueConfigurationGeneration
-        notifyOnMain {
-            let accepted = success && self.currentBufferingSessionGeneration() == session && !self.isStopped()
-            NotificationCenter.default.post(
-                name: MPVPlayerKitNotification.didLoadSubtitle,
-                object: self,
-                userInfo: [
-                    MPVPlayerKitNotificationKey.requestID: requestID,
-                    MPVPlayerKitNotificationKey.success: accepted,
-                ]
-            )
         }
     }
 

@@ -24,6 +24,7 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
     public let view = UIView()
     private let label = MPVSubtitleLabel()
     private var bottomConstraint: NSLayoutConstraint!
+    var verticalPosition: Double = 100
 
     public init() {
         view.isUserInteractionEnabled = false
@@ -53,7 +54,14 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         let hostBounds = view.superview?.bounds ?? view.bounds
-        let widthScale = max(hostBounds.height, 180) / 720
+        let videoRect: CGRect
+        if let player = view.superview as? MPVPlayerView {
+            let mode: MPVContentModeSnapshot = player.videoDisplayMode == .fill ? .fill : .fit
+            let mapping = MPVDisplayGeometry.make(canvasSize: hostBounds.size,
+                videoAspectRatio: player.currentVideoDisplayAspectRatio(), targetBounds: hostBounds, contentMode: mode)
+            videoRect = mapping.targetVideoRect.intersection(hostBounds)
+        } else { videoRect = hostBounds }
+        let widthScale = max(videoRect.height, 180) / 720
         let fontSize = max(8, CGFloat(style.fontSize) * widthScale)
         let font = subtitleFont(named: style.fontName, size: fontSize, bold: style.bold)
         let outlineSize = max(0, CGFloat(style.outlineSize) * widthScale)
@@ -76,8 +84,12 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
         label.layer.shadowOffset = showsShadow
             ? CGSize(width: 0, height: CGFloat(style.shadowOffset))
             : .zero
-        let heightScale = max(hostBounds.height, 180) / 720
-        updateBottomOffset(Double(CGFloat(style.bottomOffset) * heightScale))
+        let heightScale = max(videoRect.height, 180) / 720
+        let margin = CGFloat(style.bottomOffset) * heightScale
+        let textHeight = label.sizeThatFits(CGSize(width: max(1, hostBounds.width - 40), height: .greatestFiniteMagnitude)).height
+        let travel = max(0, videoRect.height - margin * 2 - textHeight)
+        let positionOffset = travel * CGFloat((100 - verticalPosition) / 100)
+        updateBottomOffset(Double(hostBounds.maxY - videoRect.maxY + margin + positionOffset))
         label.isHidden = false
     }
 
@@ -137,7 +149,7 @@ private final class MPVSubtitleLabel: UILabel {
 final class MPVSubtitlePresentationController {
     private weak var hostView: UIView?
     private(set) var renderer: any MPVSubtitleRenderer
-    private var document: MPVSubtitleDocument?
+    private(set) var document: MPVSubtitleDocument?
     private var lastPresentation: MPVSubtitlePresentation?
     var isVisible = true
     var delay: TimeInterval = 0

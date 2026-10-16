@@ -74,6 +74,11 @@ extension MPVQuickPlayerViewController: MPVPlayerDelegate {
         didUpdateCurrentTime currentTime: TimeInterval,
         duration: TimeInterval
     ) {
+        automaticallySelectSubtitles()
+        subtitleDelay = player.subtitleState(in: .primary).delay
+        if let panel = settingsPanelOverlay as? MPVQuickPlayerSubtitleControlView {
+            refreshSubtitleControl(panel, in: subtitlePanelSlot)
+        }
         progressSlider.maximumValue = Float(max(duration, 1))
         if isScrubbing == false {
             progressSlider.value = Float(min(max(currentTime, 0), max(duration, 1)))
@@ -102,6 +107,14 @@ extension MPVQuickPlayerViewController: UIDocumentPickerDelegate {
         didPickDocumentsAt urls: [URL]
     ) {
         guard let url = urls.first else { return }
+        if subtitleImportIsFont {
+            subtitleImportIsFont = false
+            do { try setSubtitleFont(from: url) }
+            catch {
+                presentMessage(title: mpvLocalized("subtitle.error.title"), message: mpvLocalized("subtitle.font.error"))
+            }
+            return
+        }
         let subtitleExtension = url.pathExtension.lowercased()
         guard subtitleExtension == "ass" || subtitleExtension == "ssa" else {
             presentAfterCurrentSheet { controller in

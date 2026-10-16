@@ -1,0 +1,26 @@
+{
+  "date": "2026-10-16",
+  "dependency": "MPVKit 1.0.0 original package; no P0 patched library",
+  "fixture": "Demo/MPVPlayerKitDemo/SubtitleFixtures/dual-subtitles.mp4",
+  "fixtureDurationSeconds": 12,
+  "fixtureVideo": "H264 640x360 24fps yuv420p, no audio",
+  "actualRegressionDevice": "iPhone 17e",
+  "actualRegressionUDID": "B93E108F-9E92-4BCD-AA78-E61ABB8CD6EC",
+  "actualRegressionRuntime": "iOS 27.0",
+  "regressionLaunchArgument": "--dual-subtitle-regression",
+  "visualLaunchArgument": "--dual-subtitle-demo",
+  "visualEvidence": "demo-dual-subtitles.png shows PRIMARY_ALPHA below and SECONDARY_ONE above video at 00:02/00:12",
+  "xctestRuntime": "iPad Pro 13-inch M5, iOS27.0",
+  "xctestPassedBeforeLifecycleFix": [
+    "testClientPrimaryClearDoesNotClearNativeSecondary",
+    "testFailedLoadAndCancellationPreserveOtherSlot",
+    "testIndependentDelayVisibilityPositionAndASS",
+    "testNativeTwoTracksTextAndDuplicateRejection",
+    "testSourceDelayRestoresOnlyForPreviouslyAdjustedSource"
+  ],
+  "xctestLifecycleFailure": "Rebuild/configure state polling deadlocked before cached-state fix. Thread sample /tmp/mpv-dual-host-sample.txt. Both lifecycle scenarios passed later through actual Demo direct regression.",
+  "xctestRerunLimitation": "XCTest host/UI launch service repeatedly blocked before Test Case on existing iPad and temporary iOS27.1 Duo; bounded attempts stopped. Slot/Prefs tests compiled but not executed. UI settings panel screenshots not obtained.",
+  "temporaryDeviceCleanup": "Temporary iOS27.1 Duo C4F73643-35EE-4B73-B429-DE3B86413F5A shut down and deleted",
+  "deviceScope": "Simulator only; no physical device conclusion",
+  "finalBuildLog": "/tmp/mpv-dual-final-build.log"
+}

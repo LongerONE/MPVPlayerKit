@@ -121,6 +121,9 @@ extension MPVPlayerView {
             self.updatePictureInPictureVideoDisplaySize(.zero)
         }
         performOnMPVQueueSync {
+            for slot in MPVSubtitleSlot.allCases { cancelSlotLoads(slot) }
+            subtitleSlots.canceled.removeAll()
+            subtitleSlots.fileLoaded = false
             let pendingRequestIDs = pendingExternalSubtitleLoad?.requestIDs ?? []
             if let mpv, let pending = pendingExternalSubtitleLoad {
                 mpv_abort_async_command(mpv, pending.userdata)

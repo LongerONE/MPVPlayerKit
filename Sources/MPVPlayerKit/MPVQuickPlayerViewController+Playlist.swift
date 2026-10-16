@@ -124,7 +124,9 @@ extension MPVQuickPlayerViewController {
                 configuration.debandEnabled = self.debandEnabled
                 configuration.cacheConfiguration = self.cacheConfiguration
 
+                self.resetQuickPlayerSubtitleSession()
                 self.player.playbackView.configure(configuration.bridgeDictionary)
+                self.applySubtitlePreferences()
                 self.playlistConfiguration = configuration
                 self.currentPlaylistIndex = index
                 self.currentPlaylistTitle = resource.title

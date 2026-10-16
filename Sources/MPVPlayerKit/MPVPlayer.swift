@@ -217,6 +217,12 @@ public final class MPVPlayer: NSObject {
         usesOriginalStyle: Bool = false,
         completion: @escaping (Bool) -> Void
     ) -> UUID {
+        registerSubtitleLoad(url: url, slot: .primary, usesOriginalStyle: usesOriginalStyle, completion: completion)
+    }
+
+    func registerSubtitleLoad(
+        url: URL, slot: MPVSubtitleSlot, usesOriginalStyle: Bool, completion: @escaping (Bool) -> Void
+    ) -> UUID {
         let requestID = UUID()
         subtitleLoadGeneration &+= 1
         let generation = subtitleLoadGeneration
@@ -232,6 +238,7 @@ public final class MPVPlayer: NSObject {
         let options = [
             "requestID": requestID.uuidString,
             "url": url.absoluteString,
+            "slot": NSNumber(value: slot.rawValue),
             "usesOriginalStyle": NSNumber(value: usesOriginalStyle),
         ] as NSDictionary
         playbackView.loadSubtitle(options)
@@ -298,7 +305,12 @@ public final class MPVPlayer: NSObject {
         url: URL, headers: [String: String], requestID: UUID, generation: UInt64
     ) {
         let session = playbackView.currentBufferingSessionGeneration()
-        playbackView.beginExternalSubtitleDownload()
+        var selectionRevision: UInt64 = 0
+        if playbackView.isReadyToPlayReported() || playbackView.isPlaybackRestarted() {
+            playbackView.performOnMPVQueueSync {
+                selectionRevision = playbackView.subtitleSlots.selectionRevision[.primary, default: 0]
+            }
+        }
         let networkSession = subtitleDownloadSession
         subtitleDownloads[requestID.uuidString] = Task { @MainActor [weak self] in
             var localURL: URL?
@@ -313,11 +325,22 @@ public final class MPVPlayer: NSObject {
                 defer { try? FileManager.default.removeItem(at: download) }
                 try Task.checkCancellation()
                 guard let self, self.pendingSubtitleLoads[requestID.uuidString]?.generation == generation,
-                      self.subtitleLoadGeneration == generation,
                       self.playbackView.currentBufferingSessionGeneration() == session,
                       !self.playbackView.isStopped(),
                       let http = response as? HTTPURLResponse, (200...299).contains(http.statusCode) else {
                     self?.finishSubtitleLoad(requestID: requestID.uuidString, success: false)
+                    return
+                }
+                var stillCurrent = false
+                if self.playbackView.isReadyToPlayReported() || self.playbackView.isPlaybackRestarted() {
+                    self.playbackView.performOnMPVQueueSync {
+                        stillCurrent = self.playbackView.subtitleSlots.selectionRevision[.primary, default: 0] == selectionRevision
+                    }
+                } else {
+                    stillCurrent = selectionRevision == 0
+                }
+                guard stillCurrent else {
+                    self.finishSubtitleLoad(requestID: requestID.uuidString, success: false)
                     return
                 }
                 let destination = FileManager.default.temporaryDirectory
@@ -330,6 +353,7 @@ public final class MPVPlayer: NSObject {
                 self.playbackView.loadSubtitle([
                     "requestID": requestID.uuidString,
                     "url": destination.absoluteString,
+                    "sourceID": url.absoluteString,
                     "usesOriginalStyle": NSNumber(value: false),
                 ] as NSDictionary)
             } catch {

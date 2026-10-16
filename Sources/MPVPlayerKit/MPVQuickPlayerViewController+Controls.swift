@@ -119,6 +119,6 @@ extension MPVQuickPlayerViewController {
     }
 
     @objc func chooseSubtitleTrack() {
-        presentTrackPicker(type: .subtitle, sourceView: subtitleButton)
+        showSubtitleSettings()
     }
 }

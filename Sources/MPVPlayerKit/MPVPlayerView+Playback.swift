@@ -116,8 +116,14 @@ extension MPVPlayerView {
     }
 
     @objc public func stop() {
+        setReadyToPlayReported(false)
+        setPlaybackRestarted(false)
         _ = nextPlaybackIntentGeneration()
         _ = nextBufferingSessionGeneration()
+        for slot in MPVSubtitleSlot.allCases {
+            subtitleSlots.publish(MPVSubtitleState(slot: slot), slot: slot)
+        }
+        queue.async { [weak self] in self?.resetSubtitleSlotSession() }
         clearPendingPlaybackPositionUpdate()
         decodedSubtitleText = nil
         clientSubtitleController.clear()
@@ -296,6 +302,10 @@ extension MPVPlayerView {
             return
         }
 
+        if mediaType == "sub" {
+            _ = selectSubtitleTrack(options)
+            return
+        }
         let isImageSubtitle = boolValue(options["isImageSubtitle"])
         let usesNativeSubtitleRendering = boolValue(options["usesNativeSubtitleRendering"])
         let usesOriginalStyle = boolValue(options["usesOriginalStyle"])
@@ -326,26 +336,7 @@ extension MPVPlayerView {
     }
 
     @objc public func loadSubtitle(_ options: NSDictionary) {
-        guard let requestID = options["requestID"] as? String,
-              let urlString = options["url"] as? String, urlString.isEmpty == false else {
-            mpvDebugLog("loadSubtitle ignored missing url")
-            return
-        }
-        clearClientSubtitle()
-        let usesOriginalStyle = boolValue(options["usesOriginalStyle"])
-        let session = currentBufferingSessionGeneration()
-        queue.async { [weak self] in
-            guard let self else { return }
-            guard !self.isStopped(), self.currentBufferingSessionGeneration() == session else {
-                self.notifySubtitleLoad(requestID: requestID, success: false)
-                return
-            }
-            self.loadSubtitleOnMPVQueue(
-                requestID: requestID,
-                urlString: urlString,
-                usesOriginalStyle: usesOriginalStyle
-            )
-        }
+        loadSlotSubtitle(options)
     }
 
     nonisolated func loadSubtitleOnMPVQueue(
@@ -413,30 +404,31 @@ extension MPVPlayerView {
     }
 
     @objc public func setSubtitleVisible(_ options: NSDictionary) {
+        let slot = subtitleSlot(options)
         let visible = boolValue(options["visible"])
-        if clientSubtitleController.hasSelection {
-            applyClientSubtitleVisibility(visible)
-            return
-        }
+        if slot == .primary, clientSubtitleController.hasSelection { applyClientSubtitleVisibility(visible) }
         queue.async { [weak self] in
             guard let self else { return }
-            _ = self.beginNewSubtitleSelection(reason: visible ? "visibility-on" : "visibility-off")
-            let snapshot = self.logicalSubtitleSelection()
-            let success = self.performSubtitleSelectionTransaction(
-                previous: snapshot,
-                targetUsesOriginalStyle: snapshot.usesOriginalStyle,
-                targetSubtitleID: snapshot.subtitleID,
-                targetVisibility: visible
-            )
-            if success { self.activeExternalSubtitleActivation = nil }
-            self.mpvDebugLog("setSubtitleVisible visible=\(visible) transactionSuccess=\(success)")
+            var state = self.slotState(slot)
+            state.visible = visible
+            if self.applySlotState(state, slot: slot) {
+                self.subtitleSlots.states[slot] = state
+                self.subtitleSlots.publish(self.slotState(slot), slot: slot)
+            }
         }
     }
 
     @objc public func cancelSubtitleLoad(_ options: NSDictionary) {
         guard let requestID = options["requestID"] as? String else { return }
         queue.async { [weak self] in
-            self?.cancelExternalSubtitleRequestOnMPVQueue(requestID: requestID)
+            guard let self else { return }
+            for (userdata, load) in self.subtitleSlots.pending where load.requestID == requestID {
+                if let mpv = self.mpv { mpv_abort_async_command(mpv, userdata) }
+                self.subtitleSlots.pending.removeValue(forKey: userdata)
+                self.subtitleSlots.canceled[userdata] = load
+                self.finishSlotLoad(load, success: false, error: "字幕加载已取消")
+            }
+            self.cancelExternalSubtitleRequestOnMPVQueue(requestID: requestID)
         }
     }
 
@@ -482,19 +474,9 @@ extension MPVPlayerView {
                 self.mpvDebugLog("updateSubtitleStyle deferred values=\(values)")
                 return
             }
-            guard self.currentSubtitleUsesOriginalStyle == false else {
-                self.mpvDebugLog("updateSubtitleStyle stored but skipped for ASS/SSA original style")
-                return
-            }
-            let snapshot = self.logicalSubtitleSelection()
-            if self.performSubtitleSelectionTransaction(
-                previous: snapshot,
-                targetUsesOriginalStyle: false,
-                targetSubtitleID: snapshot.subtitleID,
-                targetVisibility: snapshot.isVisible
-            ) == false {
+            if !self.applyUserSubtitleStyleProperties() {
                 self.subtitleStyleValues = previousValues
-                self.restoreSubtitleSelection(snapshot)
+                _ = self.applyUserSubtitleStyleProperties()
             }
         }
     }
@@ -526,14 +508,7 @@ extension MPVPlayerView {
     }
 
     @objc public func updateSubtitleDelay(_ value: NSNumber) {
-        let delay = value.doubleValue
-        applyClientSubtitleDelay(delay.isFinite ? delay : 0)
-        queue.async { [weak self] in
-            guard let self else { return }
-            self.subtitleDelayValue = delay.isFinite ? delay : 0
-            guard self.mpv != nil else { return }
-            self.setDouble(MPVProperty.subtitleDelay, self.subtitleDelayValue)
-        }
+        updateSubtitleControl(["slot": 0, "delay": value])
     }
 
     @objc public func currentSubtitleText() -> NSString? {

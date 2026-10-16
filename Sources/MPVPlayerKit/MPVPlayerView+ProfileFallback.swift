@@ -38,12 +38,16 @@ extension MPVPlayerView {
         let intent = currentPlaybackIntentGeneration()
         let resumeTime = playbackHadStarted ? max(currentTime, 0) : 0
         let shouldPlay = isPlaying
+        let subtitles = MPVSubtitleSessionTransfer(values: subtitleSessionSnapshot() as? [String: Any] ?? [:])
+        setReadyToPlayReported(false)
+        setPlaybackRestarted(false)
         queue.async { [weak self] in
             guard let self, !self.isStopped(),
                   self.currentBufferingSessionGeneration() == session else { return }
             if playbackHadStarted {
                 self.pendingProfileRetry = (resumeTime, shouldPlay && self.isPlaybackIntentCurrent(intent))
             }
+            self.subtitleSlots.restoreSnapshot = subtitles.values
             let success = self.retryProfileOnMPVQueue(url: url, nextIndex: nextIndex,
                 count: profile.count, errorCode: errorCode)
             if !success {
@@ -68,9 +72,9 @@ extension MPVPlayerView {
         var index = nextIndex
         while index < count, !isStopped(), currentBufferingSessionGeneration() == queueConfigurationGeneration {
             setActiveSetupProfileIndex(index)
-            prepareProfilesForNextRenderer()
             setReadyToPlayReported(false)
             setPlaybackRestarted(false)
+            prepareProfilesForNextRenderer()
             guard let nextProfile = setupProfile(at: index) else { return false }
             if setupMPV(url: url, profile: nextProfile) {
                 recordDiagnosticEvent("解码配置回退", fields: ["原配置": oldProfile, "新配置": nextProfile.name])

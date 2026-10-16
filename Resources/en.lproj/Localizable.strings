@@ -106,3 +106,38 @@
 
 "subtitle.shadow_radius" = "Shadow Radius";
 "subtitle.shadow_radius.unsupported" = "Current subtitle rendering does not support shadow radius";
+
+"subtitle.primary" = "First Subtitle";
+"subtitle.secondary" = "Second Subtitle";
+"subtitle.shared_style" = "Shared Subtitle Style";
+"subtitle.shared_style.note" = "Shared by both compatible subtitles. Original ASS keeps its layout; image subtitles do not use text styling.";
+"subtitle.source" = "Source";
+"subtitle.external" = "External subtitle";
+"subtitle.visible" = "Show Subtitle";
+"subtitle.position" = "Vertical Position";
+"subtitle.position.value" = "Vertical Position · %d";
+"subtitle.position.top" = "Top";
+"subtitle.position.bottom" = "Bottom";
+"subtitle.original_ass" = "Keep Original ASS Style";
+"subtitle.automatic" = "Automatic Selection";
+"subtitle.language" = "Preferred Language";
+"subtitle.language.simplified" = "Simplified";
+"subtitle.language.traditional" = "Traditional";
+"subtitle.language.english" = "English";
+"subtitle.reset_control" = "Reset This Subtitle Controls";
+"subtitle.primary.note" = "Delay is kept per source for this playback session. Original ASS and image positioning is format dependent; overlap is not adjusted automatically.";
+"subtitle.secondary.note" = "The second subtitle uses native rendering. Delay is kept per source for this session. Original ASS and image positioning is format dependent; overlap is not adjusted automatically.";
+"subtitle.occupied.track" = "%@ (used by other subtitle)";
+"subtitle.occupied" = "This source is used by the other subtitle. Turn that subtitle off or choose another source.";
+"subtitle.error.primary" = "The first subtitle could not be loaded. Its previous selection was kept. Check the resource or use a supported format.";
+"subtitle.error.secondary" = "The second subtitle could not be loaded. Its previous selection was kept. Check the resource or use a supported format.";
+"subtitle.primary.bottom_offset" = "First Bottom Offset (Shared Native Margin)";
+"subtitle.primary.shadow_radius" = "First Custom Shadow Radius";
+"subtitle.primary.shadow_radius.note" = "Shadow radius only affects the first custom-rendered subtitle. Native bottom margin is shared.";
+"subtitle.font" = "Shared Font";
+"subtitle.font.choose" = "Choose…";
+"subtitle.font.import" = "Import Font…";
+"subtitle.font.reset" = "Reset Font";
+"subtitle.font.error" = "This font file could not be used. Choose a valid font.";
+
+"subtitle.original_ass.position_note" = "Original ASS keeps the file positioning and layout. Position controls are unavailable until player styling is restored; your position is retained.";

@@ -90,6 +90,7 @@ extension MPVPlayerView {
         let session = nextBufferingSessionGeneration()
         let snapshot = configurationState.snapshot()
         queue.async { [weak self] in
+            self?.resetSubtitleSlotSession()
             self?.queueConfigurationGeneration = session
             self?.queueConfiguration = snapshot
             self?.setReadyToPlayReported(false)

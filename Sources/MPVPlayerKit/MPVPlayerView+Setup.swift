@@ -355,6 +355,10 @@ extension MPVPlayerView {
         checkError(mpv_set_option_string(mpv, "subs-match-os-language", "yes"), operation: "set_option subs-match-os-language", notifyOnFailure: false)
         checkError(mpv_set_option_string(mpv, "sub-auto", "no"), operation: "set_option sub-auto", notifyOnFailure: false)
         checkError(mpv_set_option_string(mpv, "embeddedfonts", "yes"), operation: "set_option embeddedfonts", notifyOnFailure: false)
+        checkError(mpv_set_option_string(mpv, "secondary-sid", "no"), operation: "set_option secondary-sid", notifyOnFailure: false)
+        checkError(mpv_set_option_string(mpv, "secondary-sub-visibility", "yes"), operation: "set_option secondary-sub-visibility", notifyOnFailure: false)
+        checkError(mpv_set_option_string(mpv, "secondary-sub-pos", "0"), operation: "set_option secondary-sub-pos", notifyOnFailure: false)
+        checkError(mpv_set_option_string(mpv, "secondary-sub-delay", "0"), operation: "set_option secondary-sub-delay", notifyOnFailure: false)
         checkError(mpv_set_option_string(mpv, MPVProperty.subtitleVisibility, "no"), operation: "set_option sub-visibility", notifyOnFailure: false)
         checkError(
             mpv_set_option_string(mpv, MPVProperty.subtitleDelay, decimalString(subtitleDelayValue, fallback: 0)),

@@ -3,7 +3,7 @@ import UIKit
 /// Subtitle settings: delay, style presets, and common style tweaks.
 @MainActor
 final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView {
-    private let delayButton = UIButton(type: .system)
+    private let fontButton = UIButton(type: .system)
     private let styleControl = UISegmentedControl(items: [
         mpvLocalized("subtitle.style.default"),
         mpvLocalized("subtitle.style.large"),
@@ -20,7 +20,7 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     var isShadowRadiusEditable = true {
         didSet {
             radiusSlider.isEnabled = isShadowRadiusEditable
-            radiusNote.isHidden = isShadowRadiusEditable
+            radiusNote.isHidden = false
         }
     }
     private let bottomOffsetValueLabel = UILabel()
@@ -29,19 +29,24 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     private var delay: TimeInterval = 0
 
     var onStyleChange: ((MPVSubtitleStyle) -> Void)?
-    var onDelayTap: ((UIView) -> Void)?
+    var onFontTap: ((UIView) -> Void)?
 
     override class var cardWidth: CGFloat { 340 }
     override class var cardHeight: CGFloat { 560 }
-    override class var titleKey: String { "settings.subtitle" }
+    override class var titleKey: String { "subtitle.shared_style" }
     override class var accessibilityIdentifierKey: String { "MPVQuickPlayer.subtitleSettings" }
 
     override func configureContent() {
-        delayButton.accessibilityIdentifier = "MPVQuickPlayer.subtitleDelay"
-        delayButton.addTarget(self, action: #selector(delayTapped(_:)), for: .touchUpInside)
-        contentStack.addArrangedSubview(
-            makeValueButtonRow(title: mpvLocalized("subtitle.delay"), button: delayButton)
-        )
+        let note = UILabel()
+        note.text = mpvLocalized("subtitle.shared_style.note")
+        note.font = .preferredFont(forTextStyle: .footnote)
+        note.adjustsFontForContentSizeCategory = true
+        note.textColor = .secondaryLabel
+        note.numberOfLines = 0
+        contentStack.addArrangedSubview(note)
+        fontButton.setTitle(mpvLocalized("subtitle.font.choose"), for: .normal)
+        fontButton.addTarget(self, action: #selector(fontTapped(_:)), for: .touchUpInside)
+        contentStack.addArrangedSubview(makeValueButtonRow(title: mpvLocalized("subtitle.font"), button: fontButton))
 
         styleControl.addTarget(self, action: #selector(stylePresetChanged(_:)), for: .valueChanged)
         contentStack.addArrangedSubview(
@@ -79,11 +84,11 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         radiusSlider.accessibilityIdentifier = "MPVQuickPlayer.subtitleShadowRadius"
         radiusSlider.addTarget(self, action: #selector(radiusChanged(_:)), for: .valueChanged)
         contentStack.addArrangedSubview(makeShadowRow(radius: true))
-        radiusNote.text = mpvLocalized("subtitle.shadow_radius.unsupported")
+        radiusNote.text = mpvLocalized("subtitle.primary.shadow_radius.note")
         radiusNote.font = .preferredFont(forTextStyle: .footnote)
         radiusNote.textColor = .secondaryLabel
         radiusNote.numberOfLines = 0
-        radiusNote.isHidden = isShadowRadiusEditable
+        radiusNote.isHidden = false
         contentStack.addArrangedSubview(radiusNote)
 
         bottomOffsetStepper.minimumValue = 0
@@ -92,7 +97,7 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         bottomOffsetStepper.addTarget(self, action: #selector(bottomOffsetChanged(_:)), for: .valueChanged)
         contentStack.addArrangedSubview(
             makeStepperRow(
-                title: mpvLocalized("subtitle.bottom_offset"),
+                title: mpvLocalized("subtitle.primary.bottom_offset"),
                 valueLabel: bottomOffsetValueLabel,
                 stepper: bottomOffsetStepper
             )
@@ -104,9 +109,6 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     func update(style: MPVSubtitleStyle, delay: TimeInterval) {
         self.style = style
         self.delay = delay
-        let delayText = MPVQuickPlayerViewController.delayTitle(delay)
-        delayButton.setTitle(delayText, for: .normal)
-        delayButton.accessibilityValue = delayText
         styleControl.selectedSegmentIndex = Self.presetIndex(for: style)
         fontSizeStepper.value = style.fontSize
         fontSizeValueLabel.text = "\(Int(style.fontSize.rounded()))"
@@ -128,7 +130,7 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         let shadowSlider = radius ? radiusSlider : shadowSlider
         let shadowValueLabel = radius ? radiusValueLabel : shadowValueLabel
         let label = UILabel()
-        label.text = mpvLocalized(radius ? "subtitle.shadow_radius" : "subtitle.shadow_strength")
+        label.text = mpvLocalized(radius ? "subtitle.primary.shadow_radius" : "subtitle.shadow_strength")
         label.font = .preferredFont(forTextStyle: .body)
         label.adjustsFontForContentSizeCategory = true
         label.textColor = .label
@@ -167,8 +169,8 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         update(style: style, delay: delay)
     }
 
-    @objc private func delayTapped(_ sender: UIButton) {
-        onDelayTap?(sender)
+    @objc private func fontTapped(_ sender: UIButton) {
+        onFontTap?(sender)
     }
 
     @objc private func stylePresetChanged(_ sender: UISegmentedControl) {

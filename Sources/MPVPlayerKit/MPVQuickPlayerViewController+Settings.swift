@@ -148,24 +148,6 @@ extension MPVQuickPlayerViewController {
         presentSettingsPanel(settingsView)
     }
 
-    func showSubtitleSettings() {
-        let settingsView = MPVQuickPlayerSubtitleSettingsView()
-        settingsView.isShadowRadiusEditable = player.playbackView.clientSubtitleController.hasSelection
-            || player.playbackView.decodedSubtitleText != nil
-        settingsView.onStyleChange = { [weak self] style in
-            self?.setSubtitleStyle(style)
-        }
-        settingsView.onDelayTap = { [weak self, weak settingsView] sourceView in
-            self?.showSubtitleDelayPicker(from: sourceView, settingsView: settingsView)
-        }
-        settingsView.onDismiss = { [weak self, weak settingsView] in
-            guard let self, settingsPanelOverlay === settingsView else { return }
-            settingsPanelOverlay = nil
-        }
-        settingsView.update(style: subtitleStyle, delay: subtitleDelay)
-        presentSettingsPanel(settingsView)
-    }
-
     private func showCacheDurationPicker(
         from sourceView: UIView,
         settingsView: MPVQuickPlayerCacheSettingsView?
@@ -190,18 +172,6 @@ extension MPVQuickPlayerViewController {
         )
     }
 
-    public func setSubtitleDelay(_ delay: TimeInterval) {
-        guard delay.isFinite else { return }
-        subtitleDelay = min(max(delay, -60), 60)
-        player.setSubtitleDelay(subtitleDelay)
-    }
-
-    public func setSubtitleStyle(_ style: MPVSubtitleStyle) {
-        subtitleStyle = style
-        UserDefaults.standard.set(style.shadowRadius, forKey: "MPVQuickPlayer.subtitleShadowRadius")
-        player.updateSubtitleStyle(style)
-    }
-
     func showPlaybackRatePicker() {
         let options = [0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4].map { rate in
             let marker = abs(rate - playbackRate) < 0.001 ? "✓ " : ""
@@ -216,54 +186,6 @@ extension MPVQuickPlayerViewController {
             options: options,
             cancelTitle: mpvLocalized("common.cancel")
         )
-    }
-
-    func showSubtitleDelayPicker(
-        from sourceView: UIView,
-        settingsView: MPVQuickPlayerSubtitleSettingsView?
-    ) {
-        var options = [-2.0, -1, -0.5, 0, 0.5, 1, 2].map { delay in
-            let marker = abs(delay - subtitleDelay) < 0.001 ? "✓ " : ""
-            return MPVQuickPlayerActionSheetOption(
-                title: marker + Self.delayTitle(delay),
-                action: { [weak self, weak settingsView] in
-                    guard let self else { return }
-                    setSubtitleDelay(delay)
-                    settingsView?.update(style: subtitleStyle, delay: subtitleDelay)
-                }
-            )
-        }
-        options.append(.init(title: mpvLocalized("common.custom")) { [weak self, weak settingsView] in
-            self?.presentAfterCurrentSheet {
-                $0.showCustomSubtitleDelayPrompt(settingsView: settingsView)
-            }
-        })
-        presentActionSheet(
-            title: mpvLocalized("subtitle.delay"),
-            sourceView: sourceView,
-            options: options,
-            cancelTitle: mpvLocalized("common.cancel")
-        )
-    }
-
-    func showCustomSubtitleDelayPrompt(settingsView: MPVQuickPlayerSubtitleSettingsView?) {
-        let alert = UIAlertController(
-            title: mpvLocalized("subtitle.delay"),
-            message: mpvLocalized("subtitle.delay.prompt"),
-            preferredStyle: .alert
-        )
-        alert.addTextField { [subtitleDelay] field in
-            field.keyboardType = .numbersAndPunctuation
-            field.text = String(format: "%.2f", subtitleDelay)
-        }
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.apply"), style: .default) {
-            [weak self, weak alert, weak settingsView] _ in
-            guard let self, let value = alert?.textFields?.first?.text.flatMap(Double.init) else { return }
-            setSubtitleDelay(value)
-            settingsView?.update(style: subtitleStyle, delay: subtitleDelay)
-        })
-        alert.addAction(UIAlertAction(title: mpvLocalized("common.cancel"), style: .cancel))
-        presentInPlayerOrientation(alert)
     }
 
     func presentActionSheet(
@@ -353,26 +275,9 @@ extension MPVQuickPlayerViewController {
         case .subtitle: title = mpvLocalized("track.subtitle")
         }
 
-        var options: [MPVQuickPlayerActionSheetOption] = []
-        if type == .subtitle {
-            options.append(.init(title: mpvLocalized("common.off")) { [weak self] in
-                self?.player.setSubtitlesVisible(false)
-            })
-            options.append(.init(title: mpvLocalized("subtitle.load_external")) { [weak self] in
-                self?.presentAfterCurrentSheet { $0.presentExternalSubtitlePicker() }
-            })
-            if pendingSubtitleRequestID != nil {
-                options.append(.init(title: mpvLocalized("subtitle.cancel_load"), isDestructive: true) { [weak self] in
-                    self?.cancelExternalSubtitleLoad()
-                })
-            }
-        }
-        options += tracks.map { track in
+        let options = tracks.map { track in
             MPVQuickPlayerActionSheetOption(title: track.name, isSelected: track.isSelected) { [weak self] in
                 self?.player.select(track: track)
-                if type == .subtitle {
-                    self?.player.setSubtitlesVisible(true)
-                }
             }
         }
         presentActionSheet(
@@ -382,51 +287,6 @@ extension MPVQuickPlayerViewController {
             options: options,
             cancelTitle: mpvLocalized("common.cancel")
         )
-    }
-
-    func presentExternalSubtitlePicker() {
-        let picker = UIDocumentPickerViewController(
-            forOpeningContentTypes: [.text, .data],
-            asCopy: true
-        )
-        picker.delegate = self
-        picker.allowsMultipleSelection = false
-        present(picker, animated: true)
-    }
-
-    func loadExternalSubtitle(from url: URL, usesOriginalStyle: Bool) {
-        loadingIndicator.startAnimating()
-        statusLabel.text = mpvLocalized("subtitle.loading")
-        pendingSubtitleRequestID = player.loadExternalSubtitle(
-            from: url,
-            usesOriginalStyle: usesOriginalStyle
-        ) { [weak self] success in
-            guard let self else { return }
-            pendingSubtitleRequestID = nil
-            if Self.shouldShowLoading(for: playbackState) {
-                loadingIndicator.startAnimating()
-            } else {
-                loadingIndicator.stopAnimating()
-            }
-            if success {
-                player.setSubtitlesVisible(true)
-                updateStatusLabel()
-            } else if isCancellingSubtitleLoad == false {
-                presentMessage(
-                    title: mpvLocalized("subtitle.error.title"),
-                    message: mpvLocalized("subtitle.error.message")
-                )
-            }
-            isCancellingSubtitleLoad = false
-        }
-    }
-
-    func cancelExternalSubtitleLoad() {
-        guard let requestID = pendingSubtitleRequestID else { return }
-        isCancellingSubtitleLoad = true
-        player.cancelExternalSubtitleLoad(requestID)
-        pendingSubtitleRequestID = nil
-        updateStatusLabel()
     }
 
     func presentMessage(title: String, message: String) {

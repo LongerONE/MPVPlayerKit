@@ -1,0 +1,13 @@
+{
+  "checks" : {
+    "beforeSnapshot" : true,
+    "configureClearsSession" : true,
+    "documentAndSecondaryRestored" : true,
+    "restoredSecondaryText" : true,
+    "secondaryLoaded" : true,
+    "videoReady" : true
+  },
+  "dependency" : "MPVKit 1.0.0",
+  "passed" : true,
+  "runtime" : "27.0"
+}
