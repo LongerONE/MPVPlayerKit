@@ -125,6 +125,8 @@ extension MPVPlayerView {
         }
         queue.async { [weak self] in self?.resetSubtitleSlotSession() }
         clearPendingPlaybackPositionUpdate()
+        secondaryDecodedSubtitleText = nil
+        secondarySubtitleRenderer.clear()
         decodedSubtitleText = nil
         clientSubtitleController.clear()
         stopPictureInPictureForPlayerTeardown()

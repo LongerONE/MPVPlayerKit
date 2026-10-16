@@ -67,6 +67,7 @@ extension MPVPlayerView {
     }
 
     func updateClientSubtitle(at time: TimeInterval) {
+        renderSecondarySubtitleText()
         if decodedSubtitleText != nil {
             renderDecodedSubtitleText()
         } else {
@@ -85,7 +86,7 @@ extension MPVPlayerView {
 
     nonisolated static func supportsDecodedSubtitleText(codec: String?, usesOriginalStyle: Bool) -> Bool {
         guard !usesOriginalStyle, let codec = codec?.lowercased() else { return false }
-        return ["subrip", "srt", "webvtt", "vtt", "text", "mov_text"].contains(codec)
+        return ["subrip", "srt", "webvtt", "vtt", "text", "mov_text"].contains(codec) || isASSSubtitleCodec(codec)
     }
 
     nonisolated func shouldRenderDecodedSubtitleText(id: Int64?, usesOriginalStyle: Bool) -> Bool {
@@ -112,6 +113,7 @@ extension MPVPlayerView {
 
     func applyClientSubtitleStyle(_ style: MPVSubtitleStyle) {
         clientSubtitleController.style = style
+        renderSecondarySubtitleText()
         clientSubtitleController.update(at: currentTime, force: true)
         if decodedSubtitleText != nil { renderDecodedSubtitleText() }
     }

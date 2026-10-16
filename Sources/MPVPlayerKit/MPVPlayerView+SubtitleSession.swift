@@ -15,6 +15,10 @@ extension MPVPlayerView {
                         values["url"] = self.getString("track-list/\(index)/external-filename")
                     }
                 }
+                // 同来源复用轨道时，轨道文件名可能已过期；恢复使用最近成功加载的资源。
+                if let source = self.slotState(slot).sourceID, let url = self.subtitleSlots.externalSourceURLs[source] {
+                    values["url"] = url
+                }
                 return values
             }
             snapshot["delays"] = self.subtitleSlots.delays
@@ -109,6 +113,7 @@ extension MPVPlayerView {
         subtitleSlots.states = [.primary: MPVSubtitleState(slot: .primary), .secondary: MPVSubtitleState(slot: .secondary)]
         subtitleSlots.delays.removeAll()
         subtitleSlots.externalSources.removeAll()
+        subtitleSlots.externalSourceURLs.removeAll()
         subtitleSlots.completedRequests.removeAll()
         subtitleSlots.canceled.removeAll()
         for slot in MPVSubtitleSlot.allCases { subtitleSlots.publish(MPVSubtitleState(slot: slot), slot: slot) }

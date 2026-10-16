@@ -23,7 +23,7 @@ extension MPVPlayerView {
             state.supportsASSMode = false
             state.shadowRadiusCapability = state.visible ? .supported : .inactive
         }
-        if state.shadowRadiusCapability == .supported, !clientSubtitleController.renderer.supportsShadowRadius {
+        if slot == .primary, state.shadowRadiusCapability == .supported, !clientSubtitleController.renderer.supportsShadowRadius {
             state.shadowRadiusCapability = .unsupportedRenderer
         }
         return state.dictionary
@@ -110,6 +110,9 @@ extension MPVPlayerView {
             state.delay = subtitleDelayValue
             if state.sourceID == nil, let id = state.trackID { state.sourceID = sourceIdentity(id) }
         }
+        if slot == .secondary {
+            state.isNative = !shouldRenderDecodedSubtitleText(id: state.trackID, usesOriginalStyle: state.usesOriginalStyle)
+        }
         state.nativeVisible = getFlag(slot.visibilityProperty) ?? false
         state = resolvedSubtitleStyleMode(state)
         if let id = state.trackID {
@@ -172,7 +175,8 @@ extension MPVPlayerView {
         }
         var published = target
         published.nativeVisible = getFlag(slot.visibilityProperty) ?? false
-        published.isNative = slot == .secondary || !rendersDecodedSubtitleText
+        published.isNative = slot == .primary ? !rendersDecodedSubtitleText
+            : !shouldRenderDecodedSubtitleText(id: id, usesOriginalStyle: target.usesOriginalStyle)
         let image = id.map { isImageTrack($0) } ?? false
         published.supportsTextStyle = id != nil && !image && !target.usesOriginalStyle
         published.updateShadowRadiusCapability(isImageSubtitle: image)
@@ -196,9 +200,10 @@ extension MPVPlayerView {
             guard command("set", args: [slot.overrideProperty, state.assOverride.rawValue], checkForErrors: false) >= 0 else { return false }
             subtitleDelayValue = state.delay
         } else {
+            let usesOverlay = shouldRenderDecodedSubtitleText(id: state.trackID, usesOriginalStyle: state.usesOriginalStyle)
             let properties = [(slot.overrideProperty, state.assOverride.rawValue),
                               (slot.idProperty, state.trackID.map(String.init) ?? "no"),
-                              (slot.visibilityProperty, state.visible ? "yes" : "no")]
+                              (slot.visibilityProperty, state.visible && !usesOverlay ? "yes" : "no")]
             for (key, value) in properties {
                 guard command("set", args: [key, value], checkForErrors: false) >= 0 else { return false }
             }
@@ -207,6 +212,7 @@ extension MPVPlayerView {
         for (key, value) in [(slot.delayProperty, state.delay), (slot.positionProperty, state.position)] {
             guard command("set", args: [key, String(value)], checkForErrors: false) >= 0 else { return false }
         }
+        if slot == .secondary { refreshSecondarySubtitleText(state: state) }
         return true
     }
 
@@ -254,6 +260,7 @@ extension MPVPlayerView {
             if let existing = self.subtitleSlots.externalSources.first(where: { $0.value == sourceID })?.key,
                self.subtitleTrackIDs().contains(existing) {
                 let success = self.selectSlot(slot, id: existing, sourceID: sourceID, original: original)
+                if success { self.subtitleSlots.externalSourceURLs[sourceID] = url }
                 self.finishSlotLoad(load, success: success, error: success ? nil : "字幕选轨失败")
                 return
             }
@@ -297,6 +304,7 @@ extension MPVPlayerView {
         let success = id.map { selectSlot(load.slot, id: $0, sourceID: load.sourceID, original: load.original) } ?? false
         if success, let id {
             subtitleSlots.externalSources[id] = load.sourceID
+            subtitleSlots.externalSourceURLs[load.sourceID] = load.url
             if subtitleSlots.restorationRequests.remove(load.requestID) != nil {
                 var restored = load.previous
                 applyRestorationASSOverride(to: &restored, slot: load.slot)

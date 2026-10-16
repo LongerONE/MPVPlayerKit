@@ -411,3 +411,7 @@ bash Tests/run_hls_resolver_tests.sh
 `subtitleState(in:).supportsASSMode` 只在当前实际轨道为 ASS/SSA 时为 true，宿主据此显示模式入口。SRT/VTT 等普通文本始终使用播放器样式，即使传入原始排版选项也不切换为原始渲染；图片字幕的渲染保持不变。`usesOriginalStyle` 和 `assOverride` 返回实际生效状态，不替代宿主保存的 ASS 偏好。
 
 QuickPlayer 在选轨、自动选择及恢复时沿用每路 ASS 偏好；普通文本导入和非 ASS 字幕下的控制重置不会覆盖该偏好。仅用户明确选择 ASS 模式时保存新值。Temby 使用相同能力接口，LuWu 复用 QuickPlayer。
+
+## 两路字幕阴影扩散
+
+两路文本字幕在播放器样式下分别自绘，支持公共阴影扩散半径，包含 SRT/VTT 和 ASS/SSA。文本解码、台词定时及每路延迟仍由 libmpv 负责。原始样式 ASS/SSA 和图片字幕保留原生渲染，并明确提示不支持扩散半径。两路共用公共样式及字体，选择、显隐、位置和延迟保持独立；实际渲染状态不覆盖宿主保存的两路 ASS 偏好。

@@ -12,7 +12,7 @@ extension MPVPlayerView {
         state.supportsASSMode = false
         guard let id = state.trackID, let codec = subtitleTrackCodec(id) else { return state }
         state.supportsASSMode = Self.isASSSubtitleCodec(codec)
-        if Self.supportsDecodedSubtitleText(codec: codec, usesOriginalStyle: false) {
+        if !state.supportsASSMode, Self.supportsDecodedSubtitleText(codec: codec, usesOriginalStyle: false) {
             state.usesOriginalStyle = false
             state.assOverride = .strip
         }

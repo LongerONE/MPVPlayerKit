@@ -226,6 +226,11 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         XCTAssertFalse(quick.player.subtitleState(in: .primary).supportsASSMode)
         XCTAssertTrue(quick.player.subtitleState(in: .secondary).supportsASSMode)
         XCTAssertFalse(quick.player.subtitleState(in: .secondary).usesOriginalStyle)
+        quick.player.pause()
+        try await seek(2, on: quick.player)
+        let automaticLabel = try XCTUnwrap(quick.player.playbackView.secondarySubtitleRenderer.view.subviews.first as? UILabel)
+        try await eventually("自动选择 ASS 的实际自绘台词") { automaticLabel.attributedText?.string.contains("ASS_ONE") == true }
+        XCTAssertEqual(quick.player.subtitleState(in: .secondary).shadowRadiusCapability, .supported)
         XCTAssertTrue(MPVQuickPlayerSubtitlePreferences.control(in: .primary).usesOriginalStyle)
         XCTAssertFalse(MPVQuickPlayerSubtitlePreferences.control(in: .secondary).usesOriginalStyle)
     }
@@ -235,6 +240,9 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         defer { cleanUp(); MPVQuickPlayerSubtitlePreferences.save(saved) }
         let quick = MPVQuickPlayerViewController(configuration: MPVPlayerConfiguration(
             url: try fixture("dual-subtitles.mp4"), forceSoftwareDecode: true))
+        quick.subtitleControls[.primary]?.position = 100
+        quick.subtitleControls[.secondary]?.position = 0
+        quick.applySubtitlePreferences()
         let host = UIWindow(frame: UIScreen.main.bounds)
         if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene { host.windowScene = scene }
         host.rootViewController = quick
@@ -254,8 +262,8 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         try await eventually("仅自绘时允许设置") { slider.isEnabled && note.isHidden }
         XCTAssertEqual(value.subtitleState(in: .primary).shadowRadiusCapability, .supported)
         try await load("secondary.vtt", in: .secondary, on: value)
-        try await eventually("混合渲染提示") { slider.isEnabled && !note.isHidden }
-        XCTAssertEqual(value.subtitleState(in: .secondary).shadowRadiusCapability, .nativeRenderer)
+        try await eventually("两路自绘允许设置") { slider.isEnabled && note.isHidden }
+        XCTAssertEqual(value.subtitleState(in: .secondary).shadowRadiusCapability, .supported)
         try await seek(2, on: value)
         try await eventually("第一路自绘文本") { value.currentSubtitleText(in: .primary)?.contains("PRIMARY_ALPHA") == true }
         var style = saved
@@ -264,24 +272,35 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         quick.setSubtitleStyle(style)
         panel.update(style: style, delay: 0)
         let label = try XCTUnwrap(value.playbackView.clientSubtitleRenderer.view.subviews.first as? UILabel)
+        let secondaryLabel = try XCTUnwrap(value.playbackView.secondarySubtitleRenderer.view.subviews.first as? UILabel)
+        try await eventually("第二路实际自绘文本") { secondaryLabel.attributedText?.string.contains("SECONDARY_ONE") == true }
         let text = label.attributedText?.string
-        attach("半径-0-混合渲染")
+        attach("半径-0-两路自绘")
+        panel.isHidden = true
+        attach("两路字幕呈现-半径0")
+        panel.isHidden = false
         slider.value = 14
         slider.sendActions(for: .valueChanged)
         XCTAssertEqual(label.layer.shadowRadius, 14)
         XCTAssertEqual(label.attributedText?.string, text)
         XCTAssertEqual(MPVQuickPlayerSubtitlePreferences.style().shadowRadius, 14)
-        XCTAssertTrue(value.subtitleState(in: .secondary).nativeVisible)
-        attach("半径-14-仅第一字幕生效")
+        XCTAssertFalse(value.subtitleState(in: .secondary).nativeVisible)
+        XCTAssertEqual(secondaryLabel.layer.shadowRadius, 14)
+        attach("半径-14-两路同时生效")
+        panel.isHidden = true
+        attach("两路字幕呈现-半径14")
+        panel.isHidden = false
         value.setSubtitleUsesOriginalStyle(true, in: .primary)
         try await eventually("SRT 不受 ASS 偏好影响") { slider.isEnabled && !value.subtitleState(in: .primary).usesOriginalStyle }
         XCTAssertEqual(MPVQuickPlayerSubtitlePreferences.style().shadowRadius, 14)
         XCTAssertEqual(label.layer.shadowRadius, 14)
         try await load("original.ass", in: .primary, on: value, original: true)
-        try await eventually("原始 ASS 不支持半径") { !slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .originalStyle }
+        try await eventually("原始 ASS 与第二路自绘混合提示") { slider.isEnabled && !note.isHidden && value.subtitleState(in: .primary).shadowRadiusCapability == .originalStyle }
+        try await load("original.ssa", in: .secondary, on: value, original: true)
+        try await eventually("两路原始样式禁用半径") { !slider.isEnabled }
         attach("原生字幕-禁用并解释")
         value.setSubtitleUsesOriginalStyle(false, in: .primary)
-        try await eventually("ASS 公共样式仍走原生渲染") { !slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .nativeRenderer }
+        try await eventually("ASS 播放器样式支持半径") { slider.isEnabled && value.subtitleState(in: .primary).shadowRadiusCapability == .supported }
         try await load("primary.srt", in: .primary, on: value)
         try await eventually("切回 SRT 恢复半径") { slider.isEnabled }
         XCTAssertEqual(label.layer.shadowRadius, 14)
@@ -335,7 +354,7 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         add(attachment)
     }
 
-    @MainActor func testNativeTwoTracksTextAndDuplicateRejection() async throws {
+    @MainActor func testTwoDecodedTracksTextAndDuplicateRejection() async throws {
         defer { cleanUp() }
         let player = try await start()
         try await load("primary.srt", in: .primary, on: player)
@@ -350,7 +369,8 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         XCTAssertNotNil(primary.trackID)
         XCTAssertNotNil(secondary.trackID)
         XCTAssertNotEqual(primary.trackID, secondary.trackID)
-        XCTAssertTrue(secondary.nativeVisible)
+        XCTAssertFalse(secondary.nativeVisible)
+        XCTAssertFalse(secondary.isNative)
         let occupied = try XCTUnwrap(player.tracks(ofType: .subtitle).first {
             Int64($0.id) == primary.trackID
         })
@@ -379,16 +399,26 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
             player.currentSubtitleText(in: .primary)?.contains("PRIMARY_BRAVO") == true &&
             player.currentSubtitleText(in: .secondary)?.contains("SECONDARY_ONE") == true
         }
+        let secondaryLabel = try XCTUnwrap(player.playbackView.secondarySubtitleRenderer.view.subviews.first as? UILabel)
+        try await eventually("第二路自绘按独立延迟显示旧句") { secondaryLabel.attributedText?.string.contains("SECONDARY_ONE") == true }
+        player.setSubtitleDelay(-1, in: .secondary)
+        try await seek(3.5, on: player)
+        try await eventually("第二路负延迟显示下一句") { secondaryLabel.attributedText?.string.contains("SECONDARY_TWO") == true }
         try await load("original.ass", in: .secondary, on: player, original: true)
+        try await eventually("原始 ASS 清空自绘层") { secondaryLabel.attributedText == nil }
         XCTAssertTrue(player.subtitleState(in: .secondary).usesOriginalStyle)
         player.setSubtitleUsesOriginalStyle(false, in: .secondary)
         try await eventually("退出原始 ASS 模式") {
-            !player.subtitleState(in: .secondary).usesOriginalStyle
+            !player.subtitleState(in: .secondary).usesOriginalStyle &&
+                player.subtitleState(in: .secondary).shadowRadiusCapability == .supported
         }
+        XCTAssertFalse(player.subtitleState(in: .secondary).nativeVisible)
+        try await seek(2, on: player)
+        try await eventually("ASS 播放器样式实际自绘") { secondaryLabel.attributedText?.string.contains("ASS_ONE") == true }
         attach("V02-第二路位置35")
     }
 
-    @MainActor func testClientPrimaryClearDoesNotClearNativeSecondary() async throws {
+    @MainActor func testClientPrimaryClearDoesNotClearSecondary() async throws {
         defer { cleanUp() }
         let player = try await start()
         try await load("secondary.vtt", in: .secondary, on: player)
@@ -405,11 +435,11 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         XCTAssertTrue(player.subtitleState(in: .secondary).visible)
         player.clearClientSubtitle()
         XCTAssertEqual(player.subtitleState(in: .secondary).trackID, secondaryID)
-        XCTAssertTrue(player.subtitleState(in: .secondary).nativeVisible)
+        XCTAssertFalse(player.subtitleState(in: .secondary).nativeVisible)
         attach("V04-第一路清理后第二路保留")
     }
 
-    @MainActor func testDocumentAndNativeSecondaryRestoreAcrossPlayerRebuild() async throws {
+    @MainActor func testDocumentAndSecondaryRestoreAcrossPlayerRebuild() async throws {
         defer { cleanUp() }
         let original = try await start()
         try await load("secondary.vtt", in: .secondary, on: original)
@@ -442,6 +472,12 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         try await seek(2, on: rebuilt)
         rebuilt.pause()
         XCTAssertFalse(rebuilt.subtitleState(in: .secondary).nativeVisible)
+        let label = try XCTUnwrap(rebuilt.playbackView.secondarySubtitleRenderer.view.subviews.first as? UILabel)
+        XCTAssertNil(label.attributedText)
+        rebuilt.setSubtitlesVisible(true, in: .secondary)
+        try await seek(5, on: rebuilt)
+        try await eventually("重建后自绘继续按第二路延迟显示") { label.attributedText?.string.contains("SECONDARY_ONE") == true }
+        XCTAssertEqual(rebuilt.subtitleState(in: .secondary).shadowRadiusCapability, .supported)
         attach("V11-文档与第二路重建恢复")
     }
 
@@ -513,7 +549,7 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         try await Task.sleep(nanoseconds: 800_000_000)
         XCTAssertEqual(cancelledCount, 1)
         XCTAssertEqual(player.subtitleState(in: .secondary).trackID, before.trackID)
-        XCTAssertTrue(player.subtitleState(in: .secondary).nativeVisible)
+        XCTAssertFalse(player.subtitleState(in: .secondary).nativeVisible)
         XCTAssertTrue(player.currentSubtitleText(in: .secondary)?.contains("SECONDARY_ONE") == true)
         XCTAssertNotNil(player.subtitleState(in: .primary).trackID)
     }

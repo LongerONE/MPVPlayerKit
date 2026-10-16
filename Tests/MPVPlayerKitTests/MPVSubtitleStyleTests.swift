@@ -215,11 +215,11 @@ final class MPVSubtitleStyleTests: XCTestCase {
     }
 
     func testDecodedTextRoutingKeepsOriginalASSAndImagesNative() {
-        for codec in ["subrip", "srt", "webvtt", "text", "mov_text"] {
+        for codec in ["subrip", "srt", "webvtt", "text", "mov_text", "ass", "ssa", "substation_alpha"] {
             XCTAssertTrue(MPVPlayerView.supportsDecodedSubtitleText(codec: codec, usesOriginalStyle: false))
             XCTAssertFalse(MPVPlayerView.supportsDecodedSubtitleText(codec: codec, usesOriginalStyle: true))
         }
-        for codec in ["ass", "ssa", "hdmv_pgs_subtitle", "dvd_subtitle", "unknown"] {
+        for codec in ["hdmv_pgs_subtitle", "dvd_subtitle", "unknown"] {
             XCTAssertFalse(MPVPlayerView.supportsDecodedSubtitleText(codec: codec, usesOriginalStyle: false))
         }
         XCTAssertFalse(MPVPlayerView.supportsDecodedSubtitleText(codec: nil, usesOriginalStyle: false))

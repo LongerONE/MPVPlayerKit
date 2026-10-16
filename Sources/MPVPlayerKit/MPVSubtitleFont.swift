@@ -134,6 +134,7 @@ extension MPVPlayerView {
         var style = clientSubtitleController.style
         style.fontName = customSubtitleFontName
         clientSubtitleController.style = style
+        renderSecondarySubtitleText()
         clientSubtitleController.update(at: currentTime, force: true)
         if decodedSubtitleText != nil { renderDecodedSubtitleText() }
 

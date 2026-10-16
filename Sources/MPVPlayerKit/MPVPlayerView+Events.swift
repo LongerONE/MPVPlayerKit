@@ -549,7 +549,7 @@ extension MPVPlayerView {
         let property = data.assumingMemoryBound(to: mpv_event_property.self).pointee
         let propertyName = String(cString: property.name)
         switch propertyName {
-        case MPVProperty.subtitleText:
+        case MPVProperty.subtitleText, "secondary-sub-text":
             refreshSubtitleTextCache()
         case MPVProperty.videoOutputDisplayWidth, MPVProperty.videoOutputDisplayHeight,
              MPVProperty.videoDisplayWidth, MPVProperty.videoDisplayHeight:

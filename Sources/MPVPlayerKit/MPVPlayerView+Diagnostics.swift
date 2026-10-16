@@ -232,6 +232,7 @@ extension MPVPlayerView {
 
     nonisolated func refreshSubtitleTextCache() {
         dispatchPrecondition(condition: .onQueue(queue))
+        refreshSecondarySubtitleText(state: slotState(.secondary))
         let raw = getString(MPVProperty.subtitleText)
         let cleaned = raw?.trimmingCharacters(in: .whitespacesAndNewlines)
         let value = (cleaned?.isEmpty == false) ? raw : nil

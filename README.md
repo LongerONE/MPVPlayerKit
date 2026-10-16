@@ -364,3 +364,7 @@ Custom `MPVSubtitleRenderer` implementations default to unsupported. Renderers t
 `subtitleState(in:).supportsASSMode` identifies actual ASS/SSA tracks. Hosts should hide ASS controls for other formats. Plain text such as SRT/VTT always uses player styling, even when original styling was requested; image rendering stays unchanged. State fields describe the effective mode, separately from a host's saved ASS preference.
 
 QuickPlayer preserves per-slot ASS preferences across selection, imports, automatic selection, and restoration. Plain-text imports and resets while ASS controls are hidden do not overwrite those preferences. An explicit ASS mode choice saves the new preference.
+
+## Shadow radius on both subtitle slots
+
+Both slots draw decoded text with an independent overlay when using player styling, including SRT/VTT and ASS/SSA. libmpv still owns decoding and per-slot timing. Original-style ASS/SSA and image subtitles retain native rendering and report radius as unsupported. Shared style and custom fonts apply to both text overlays; selection, visibility, position and delay stay independent. Effective rendering never overwrites the host's saved per-slot ASS preference.
