@@ -11,7 +11,13 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     ])
     private let fontSizeValueLabel = UILabel()
     private let fontSizeStepper = UIStepper()
-    private let boldSwitch = UISwitch()
+    private let weightControl = UISegmentedControl(items: [
+        mpvLocalized("subtitle.weight.regular"),
+        mpvLocalized("subtitle.weight.medium"),
+        mpvLocalized("subtitle.weight.semibold"),
+        mpvLocalized("subtitle.weight.bold"),
+        mpvLocalized("subtitle.weight.black"),
+    ])
     private let shadowSlider = UISlider()
     private let shadowValueLabel = UILabel()
     private let radiusSlider = UISlider()
@@ -32,7 +38,7 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
     var onDetailsTap: (() -> Void)?
 
     override class var cardWidth: CGFloat { 340 }
-    override class var cardHeight: CGFloat { 560 }
+    override class var cardHeight: CGFloat { 576 }
     override class var titleKey: String { "subtitle.shared_style" }
     override class var accessibilityIdentifierKey: String { "MPVQuickPlayer.subtitleSettings" }
 
@@ -68,9 +74,10 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
             )
         )
 
-        boldSwitch.addTarget(self, action: #selector(boldChanged(_:)), for: .valueChanged)
+        weightControl.accessibilityIdentifier = "MPVQuickPlayer.subtitleWeight"
+        weightControl.addTarget(self, action: #selector(weightChanged(_:)), for: .valueChanged)
         contentStack.addArrangedSubview(
-            makeSwitchRow(title: mpvLocalized("subtitle.bold"), switchView: boldSwitch)
+            makeSegmentRow(title: mpvLocalized("subtitle.weight"), segmentedControl: weightControl)
         )
 
         shadowSlider.minimumValue = 0
@@ -126,7 +133,7 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         styleControl.selectedSegmentIndex = Self.presetIndex(for: style)
         fontSizeStepper.value = style.fontSize
         fontSizeValueLabel.text = "\(Int(style.fontSize.rounded()))"
-        boldSwitch.isOn = style.bold
+        weightControl.selectedSegmentIndex = Self.weightIndex(for: style.fontWeight)
         let strength = style.shadowOffset / 4
         shadowSlider.value = Float(min(max(strength, 0), 1) * 100)
         let shadowText = mpvLocalized("subtitle.shadow_strength.value", Int(shadowSlider.value.rounded()))
@@ -196,10 +203,25 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         applyStyle(updated)
     }
 
-    @objc private func boldChanged(_ sender: UISwitch) {
+    // 内部可见以便测试直接驱动；本环境 UISegmentedControl 的 sendActions 不派发事件。
+    @objc func weightChanged(_ sender: UISegmentedControl) {
+        guard let weight = Self.weight(at: sender.selectedSegmentIndex) else { return }
         var updated = style
-        updated.bold = sender.isOn
+        updated.fontWeight = weight
         applyStyle(updated)
+    }
+
+    /// 面板只提供常用档位；宿主写入的其它数值字重就近归到最近档位。
+    nonisolated static let weightSegments: [Double] = [400, 500, 600, 700, 900]
+
+    nonisolated static func weight(at index: Int) -> Double? {
+        weightSegments.indices.contains(index) ? weightSegments[index] : nil
+    }
+
+    nonisolated static func weightIndex(for weight: Double) -> Int {
+        weightSegments.enumerated().min {
+            abs($0.element - weight) < abs($1.element - weight)
+        }?.offset ?? UISegmentedControl.noSegment
     }
 
     @objc private func shadowChanged(_ sender: UISlider) {

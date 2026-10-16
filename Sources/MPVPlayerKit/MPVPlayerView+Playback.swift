@@ -435,12 +435,14 @@ extension MPVPlayerView {
     @objc public func updateSubtitleStyle(_ options: NSDictionary) {
         let shadowOffset = (options["shadowOffset"] as? NSNumber)?.doubleValue ?? 0
         let shadowColor = Self.subtitleShadowColor(from: options, shadowOffset: shadowOffset)
-        let isBold = boolValue(options["bold"])
+        // 数值字重优先；缺省时由兼容参数 `bold` 派生。
+        let legacyBold = boolValue(options["bold"])
+        let fontWeight = Self.resolvedSubtitleFontWeight(from: options) ?? (legacyBold ? 700 : 400)
+        let isBold = MPVSubtitleStyle.isBoldWeight(fontWeight)
         let fontName = options["fontName"] as? String ?? subtitleFontName(isBold: isBold)
         applyClientSubtitleStyle(MPVSubtitleStyle(
             fontSize: (options["fontSize"] as? NSNumber)?.doubleValue ?? 38,
             fontName: fontName,
-            bold: isBold,
             textColor: options["textColor"] as? String ?? "#FFFFFFFF",
             outlineSize: (options["outlineSize"] as? NSNumber)?.doubleValue ?? 0,
             outlineColor: options["outlineColor"] as? String ?? "#FF000000",
@@ -448,11 +450,13 @@ extension MPVPlayerView {
             backgroundColor: options["backgroundColor"] as? String ?? "#00000000",
             bottomOffset: (options["bottomOffset"] as? NSNumber)?.doubleValue ?? 34,
             shadowColor: shadowColor,
-            shadowRadius: (options["shadowRadius"] as? NSNumber)?.doubleValue ?? 0
+            shadowRadius: (options["shadowRadius"] as? NSNumber)?.doubleValue ?? 0,
+            fontWeight: fontWeight
         ))
         let values = [
             MPVProperty.subtitleFont: fontName,
             MPVProperty.subtitleFontSize: decimalString(options["fontSize"], fallback: 38),
+            // ASS 原生渲染只有两档，按数值字重就近降级。
             MPVProperty.subtitleBold: isBold ? "yes" : "no",
             MPVProperty.subtitleColor: options["textColor"] as? String ?? "#FFFFFFFF",
             MPVProperty.subtitleOutlineSize: decimalString(options["outlineSize"], fallback: 0),
@@ -479,6 +483,13 @@ extension MPVPlayerView {
                 _ = self.applyUserSubtitleStyleProperties()
             }
         }
+    }
+
+    /// 数值字重优先；`fontWeight` 缺省时按兼容参数 `bold` 派生 400/700。
+    nonisolated static func resolvedSubtitleFontWeight(from options: NSDictionary) -> Double? {
+        guard let value = options["fontWeight"] as? NSNumber else { return nil }
+        let weight = value.doubleValue
+        return weight.isFinite ? weight : nil
     }
 
     nonisolated static func subtitleShadowColor(

@@ -82,9 +82,10 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
         } else { videoRect = hostBounds }
         let widthScale = max(videoRect.height, 180) / 720
         let fontSize = max(8, CGFloat(style.fontSize) * widthScale)
-        let font = subtitleFont(named: style.fontName, size: fontSize, bold: style.bold)
+        let font = subtitleFont(named: style.fontName, size: fontSize, weight: style.uiFontWeight)
         let outlineSize = max(0, CGFloat(style.outlineSize) * widthScale)
         let fillColor = UIColor(mpvHex: style.textColor, fallback: .white)
+        // 字面无粗体变体时合成加粗，强度随目标字重超过常规的程度放大。
         let syntheticBold = style.bold && !font.fontDescriptor.symbolicTraits.contains(.traitBold)
         label.outlineWidth = outlineSize
         label.outlineColor = UIColor(mpvHex: style.outlineColor, fallback: .black)
@@ -92,7 +93,7 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
             .font: font,
             .foregroundColor: fillColor,
             .strokeColor: fillColor,
-            .strokeWidth: syntheticBold ? -3 : 0,
+            .strokeWidth: syntheticBold ? Self.syntheticBoldStroke(weight: style.fontWeight) : 0,
             .backgroundColor: UIColor(mpvHex: style.backgroundColor, fallback: .clear),
             .paragraphStyle: paragraph,
         ])
@@ -129,17 +130,34 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
         if bottomConstraint.constant != value { bottomConstraint.constant = value }
     }
 
-    private func subtitleFont(named name: String?, size: CGFloat, bold: Bool) -> UIFont {
+    /// 负值表示描边填充自身，绝对值越大越粗。以常规字重为 0 基准，
+    /// 每提高 100 字重增加 1，使 700 档与旧的固定 -3 量级接近。
+    static func syntheticBoldStroke(weight: Double) -> CGFloat {
+        let steps = max(0, (weight - 400) / 100)
+        return -CGFloat(1.5 + steps * 0.5)
+    }
+
+    private func subtitleFont(named name: String?, size: CGFloat, weight: UIFont.Weight) -> UIFont {
         guard let name, let baseFont = UIFont(name: name, size: size) else {
-            return bold
-                ? UIFont.systemFont(ofSize: size, weight: .heavy)
-                : UIFont.systemFont(ofSize: size)
+            // 系统字体覆盖完整字重区间，可直接按数值字重取字面。
+            return UIFont.systemFont(ofSize: size, weight: weight)
         }
-        guard bold,
-              let descriptor = baseFont.fontDescriptor.withSymbolicTraits(.traitBold) else {
-            return baseFont
+        // 命名字体先尝试 weight trait；无该字面时退回 symbolic bold。
+        let descriptor = baseFont.fontDescriptor.addingAttributes([
+            .traits: [UIFontDescriptor.TraitKey.weight: weight],
+        ])
+        let weighted = UIFont(descriptor: descriptor, size: size)
+        if Self.resolvedWeight(of: weighted) != Self.resolvedWeight(of: baseFont) { return weighted }
+        guard weight.rawValue > UIFont.Weight.regular.rawValue,
+              let boldDescriptor = baseFont.fontDescriptor.withSymbolicTraits(.traitBold) else {
+            return weighted
         }
-        return UIFont(descriptor: descriptor, size: size)
+        return UIFont(descriptor: boldDescriptor, size: size)
+    }
+
+    private static func resolvedWeight(of font: UIFont) -> CGFloat {
+        let traits = font.fontDescriptor.object(forKey: .traits) as? [UIFontDescriptor.TraitKey: Any]
+        return (traits?[.weight] as? CGFloat) ?? UIFont.Weight.regular.rawValue
     }
 }
 

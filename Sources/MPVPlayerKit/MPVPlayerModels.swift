@@ -92,7 +92,9 @@ public struct MPVCacheConfiguration: Equatable, Sendable {
 public struct MPVSubtitleStyle: Equatable, Sendable {
     public var fontSize: Double
     public var fontName: String?
-    public var bold: Bool
+    /// 数值字重 100-900。文本字幕由 UIKit 自绘按该值取真实字面；
+    /// ASS 原生渲染只有 `sub-bold` 两档，按最近可表示字重降级。
+    public var fontWeight: Double
     public var textColor: String
     public var outlineSize: Double
     public var outlineColor: String
@@ -101,6 +103,24 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
     public var bottomOffset: Double
     public var shadowColor: String
     public var shadowRadius: Double
+
+    /// ASS 降级阈值：libass 只能表达常规/粗体两档，就近取整。
+    private static let boldThreshold: Double = 550
+
+    /// 兼容旧接口：由字重派生，写入时映射回 400/700。
+    public var bold: Bool {
+        get { Self.isBoldWeight(fontWeight) }
+        set { fontWeight = newValue ? 700 : 400 }
+    }
+
+    /// ASS 原生渲染两档降级判定，供桥接层共用同一阈值。
+    static func isBoldWeight(_ weight: Double) -> Bool {
+        weight >= boldThreshold
+    }
+
+    static func clampedFontWeight(_ value: Double) -> Double {
+        value.isFinite ? min(max(value, 100), 900) : 400
+    }
 
     public init(
         fontSize: Double = 38,
@@ -113,11 +133,13 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
         backgroundColor: String = "#00000000",
         bottomOffset: Double = 34,
         shadowColor: String = "#FF000000",
-        shadowRadius: Double = 0
+        shadowRadius: Double = 0,
+        fontWeight: Double? = nil
     ) {
         self.fontSize = fontSize.isFinite ? min(max(fontSize, 8), 120) : 38
         self.fontName = fontName
-        self.bold = bold
+        // 显式字重优先；缺省时由兼容参数 `bold` 派生。
+        self.fontWeight = Self.clampedFontWeight(fontWeight ?? (bold ? 700 : 400))
         self.textColor = textColor
         self.outlineSize = outlineSize.isFinite ? min(max(outlineSize, 0), 10) : 0
         self.outlineColor = outlineColor
@@ -143,6 +165,7 @@ public struct MPVSubtitleStyle: Equatable, Sendable {
         var values: [String: Any] = [
             "fontSize": NSNumber(value: fontSize),
             "bold": NSNumber(value: bold),
+            "fontWeight": NSNumber(value: fontWeight),
             "textColor": textColor,
             "outlineSize": NSNumber(value: outlineSize),
             "outlineColor": outlineColor,

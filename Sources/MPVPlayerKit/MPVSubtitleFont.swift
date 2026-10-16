@@ -162,3 +162,33 @@ extension MPVPlayerView {
         }
     }
 }
+
+extension MPVSubtitleStyle {
+    /// 数值字重到 `UIFont.Weight` 的映射锚点，与 CSS 字重约定一致。
+    fileprivate static let weightAnchors: [(weight: Double, ui: UIFont.Weight)] = [
+        (100, .ultraLight),
+        (200, .thin),
+        (300, .light),
+        (400, .regular),
+        (500, .medium),
+        (600, .semibold),
+        (700, .bold),
+        (800, .heavy),
+        (900, .black),
+    ]
+
+    /// 供 UIKit 自绘路径取真实字面；锚点之间线性插值，使中间值同样可分辨。
+    var uiFontWeight: UIFont.Weight {
+        let anchors = Self.weightAnchors
+        guard let first = anchors.first, let last = anchors.last else { return .regular }
+        if fontWeight <= first.weight { return first.ui }
+        if fontWeight >= last.weight { return last.ui }
+        for (lower, upper) in zip(anchors, anchors.dropFirst()) where fontWeight < upper.weight {
+            let span = upper.weight - lower.weight
+            guard span > 0 else { continue }
+            let ratio = CGFloat((fontWeight - lower.weight) / span)
+            return UIFont.Weight(lower.ui.rawValue + (upper.ui.rawValue - lower.ui.rawValue) * ratio)
+        }
+        return last.ui
+    }
+}

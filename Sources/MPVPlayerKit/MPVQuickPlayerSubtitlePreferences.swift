@@ -94,7 +94,6 @@ struct MPVQuickPlayerSubtitlePreferences {
         return MPVSubtitleStyle(
             fontSize: values["fontSize"] as? Double ?? 38,
             fontName: values["fontName"] as? String,
-            bold: values["bold"] as? Bool ?? false,
             textColor: values["textColor"] as? String ?? "#FFFFFFFF",
             outlineSize: values["outlineSize"] as? Double ?? 0,
             outlineColor: values["outlineColor"] as? String ?? "#FF000000",
@@ -102,7 +101,9 @@ struct MPVQuickPlayerSubtitlePreferences {
             backgroundColor: values["backgroundColor"] as? String ?? "#00000000",
             bottomOffset: values["bottomOffset"] as? Double ?? 34,
             shadowColor: values["shadowColor"] as? String ?? "#FF000000",
-            shadowRadius: values["shadowRadius"] as? Double ?? 0
+            shadowRadius: values["shadowRadius"] as? Double ?? 0,
+            // 历史数据只有 `bold`；迁移时由它派生 400/700。
+            fontWeight: values["fontWeight"] as? Double ?? ((values["bold"] as? Bool ?? false) ? 700 : 400)
         )
     }
 

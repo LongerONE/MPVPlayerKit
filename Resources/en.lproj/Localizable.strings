@@ -71,6 +71,12 @@
 "subtitle.style.high_contrast" = "High Contrast";
 "subtitle.font_size" = "Font Size";
 "subtitle.bold" = "Bold";
+"subtitle.weight" = "Font Weight";
+"subtitle.weight.regular" = "Regular";
+"subtitle.weight.medium" = "Medium";
+"subtitle.weight.semibold" = "Semibold";
+"subtitle.weight.bold" = "Bold";
+"subtitle.weight.black" = "Black";
 "subtitle.shadow_strength" = "Shadow Strength";
 "subtitle.shadow_strength.value" = "%d%%";
 "subtitle.bottom_offset" = "Bottom Offset";

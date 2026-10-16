@@ -71,6 +71,12 @@
 "subtitle.style.high_contrast" = "高对比度";
 "subtitle.font_size" = "字号";
 "subtitle.bold" = "加粗";
+"subtitle.weight" = "字重";
+"subtitle.weight.regular" = "常规";
+"subtitle.weight.medium" = "中等";
+"subtitle.weight.semibold" = "半粗";
+"subtitle.weight.bold" = "粗体";
+"subtitle.weight.black" = "特粗";
 "subtitle.shadow_strength" = "阴影强度";
 "subtitle.shadow_strength.value" = "%d%%";
 "subtitle.bottom_offset" = "底部偏移";

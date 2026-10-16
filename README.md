@@ -370,3 +370,17 @@ QuickPlayer preserves per-slot ASS preferences across selection, imports, automa
 ## Shadow radius on both subtitle slots
 
 Both slots draw decoded text with an independent overlay when using player styling, including SRT/VTT and ASS/SSA. libmpv still owns decoding and per-slot timing. Original-style ASS/SSA and image subtitles retain native rendering and report radius as unsupported. Shared style and custom fonts apply to both text overlays; selection, visibility, position and delay stay independent. Effective rendering never overwrites the host's saved per-slot ASS preference.
+
+## Subtitle font weight
+
+The shared subtitle style carries a continuous font weight from 100 to 900. Text subtitles such as SRT/VTT are drawn with UIKit and resolve a real font face for that weight:
+
+```swift
+player.updateSubtitleStyle(MPVSubtitleStyle(fontSize: 44, fontWeight: 600))
+```
+
+QuickPlayer offers five steps: regular 400, medium 500, semibold 600, bold 700 and black 900. A host-supplied weight between steps is shown as the nearest one while the original value is preserved. Custom renderers can read `MPVSubtitleStyle.fontWeight` from their presentation and use `uiFontWeight` for the matching `UIFont.Weight`.
+
+`bold` remains as a compatibility property derived from the weight (threshold 550); assigning `true`/`false` is equivalent to setting 700/400. The bridge dictionary provides both `bold` and `fontWeight`, so hosts that still pass only `bold` need no change. Stored preferences that carry only `bold` migrate to the corresponding weight on read.
+
+ASS/SSA kept in original style is still rendered by libass. mpv exposes only the boolean `sub-bold`, so that path degrades to the nearest representable weight (400 or 700) and intermediate steps have no effect. This is a mpv and libass capability boundary rather than a configuration limit of this package.
