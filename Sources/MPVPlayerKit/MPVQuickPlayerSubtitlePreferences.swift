@@ -9,6 +9,11 @@ struct MPVQuickPlayerSubtitlePreferences {
         var language: MPVSubtitleLanguage = .simplifiedChinese
     }
 
+    static var layoutMode: MPVSubtitleLayoutMode {
+        get { MPVSubtitleLayoutMode(rawValue: UserDefaults.standard.integer(forKey: "MPVQuickPlayer.subtitleLayoutMode")) ?? .independent }
+        set { UserDefaults.standard.set(newValue.rawValue, forKey: "MPVQuickPlayer.subtitleLayoutMode") }
+    }
+
     private static let styleKey = "MPVQuickPlayer.subtitleSharedStyle"
     private static let fontKey = "MPVQuickPlayer.subtitleSharedFont"
 

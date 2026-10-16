@@ -151,3 +151,13 @@
 "subtitle.shadow_radius.originalStyle" = "%@: Original subtitle styling does not support a separate shadow radius.";
 "subtitle.shadow_radius.imageSubtitle" = "%@: Image subtitles do not support text shadow styling.";
 "subtitle.shadow_radius.unsupportedRenderer" = "%@: The current custom renderer does not support shadow radius.";
+
+"subtitle.layout.title" = "Display mode";
+"subtitle.layout.independent" = "Independent position";
+"subtitle.layout.stacked" = "Below first subtitle";
+"subtitle.layout.group_position" = "Subtitle group position";
+"subtitle.layout.position_note" = "The first subtitle positions the group; the second follows below.";
+"subtitle.layout.fallback.originalStyle" = "Original ASS styling is active. Using independent positions temporarily.";
+"subtitle.layout.fallback.imageSubtitle" = "Image subtitles cannot be grouped. Using independent positions temporarily.";
+"subtitle.layout.fallback.unsupportedRenderer" = "This subtitle renderer cannot be grouped. Using independent positions temporarily.";
+"subtitle.layout.fallback.insufficientSpace" = "The subtitle group is too tall for the screen. Using independent positions temporarily.";

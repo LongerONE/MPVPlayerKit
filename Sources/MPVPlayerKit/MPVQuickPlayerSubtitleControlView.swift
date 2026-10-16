@@ -5,6 +5,15 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
     let sourceButton = UIButton(type: .system)
     private let delayStepper = UIStepper()
     private let delayLabel = UILabel()
+    private let layoutControl = UISegmentedControl(items: [mpvLocalized("subtitle.layout.independent"), mpvLocalized("subtitle.layout.stacked")])
+    private var layoutRow: UIView?
+    var refreshProvider: (() -> Void)?
+    var layoutStatusProvider: (() -> MPVSubtitleLayoutStatus?)?
+    var onLayoutMode: ((MPVSubtitleLayoutMode) -> Void)?
+    private var layoutTask: Task<Void, Never>?
+    private var currentSlot = MPVSubtitleSlot.primary
+    private var currentPosition: Double = 100
+    private var currentOriginalASS = false
     private let positionSlider = UISlider()
     private let positionLabel = UILabel()
     private let positionPresets = UISegmentedControl(items: [
@@ -37,6 +46,11 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
         sourceButton.accessibilityIdentifier = "MPVQuickPlayer.subtitleSource"
         sourceButton.titleLabel?.lineBreakMode = .byTruncatingMiddle
         contentStack.addArrangedSubview(makeValueButtonRow(title: mpvLocalized("subtitle.source"), button: sourceButton))
+        layoutControl.accessibilityIdentifier = "MPVQuickPlayer.subtitleLayoutMode"
+        layoutControl.addTarget(self, action: #selector(layoutChanged), for: .valueChanged)
+        let layoutRow = makeSegmentRow(title: mpvLocalized("subtitle.layout.title"), segmentedControl: layoutControl)
+        self.layoutRow = layoutRow
+        contentStack.addArrangedSubview(layoutRow)
         let delayRow = makeStepperRow(title: mpvLocalized("subtitle.delay"), valueLabel: delayLabel, stepper: delayStepper)
         delayStepper.minimumValue = -60
         delayStepper.maximumValue = 60
@@ -54,6 +68,7 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
         positionLabel.font = .preferredFont(forTextStyle: .body)
         positionLabel.adjustsFontForContentSizeCategory = true
         positionLabel.textColor = .label
+        positionLabel.numberOfLines = 0
         let positionRow = UIStackView(arrangedSubviews: [positionLabel, positionSlider, positionPresets])
         positionRow.axis = .vertical
         positionRow.spacing = 6
@@ -82,6 +97,9 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
 
     func update(slot: MPVSubtitleSlot, state: MPVSubtitleState,
                 control: MPVQuickPlayerSubtitlePreferences.Control, source: String, usesOriginalASS: Bool) {
+        currentSlot = slot
+        currentPosition = control.position
+        currentOriginalASS = usesOriginalASS
         titleLabel.text = mpvLocalized(slot == .primary ? "subtitle.primary" : "subtitle.secondary")
         sourceButton.setTitle(source, for: .normal)
         sourceButton.accessibilityLabel = mpvLocalized("subtitle.source")
@@ -101,9 +119,51 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
         automaticSwitch.isOn = control.automatic
         let languages: [MPVSubtitleLanguage] = [.simplifiedChinese, .traditionalChinese, .english]
         languageControl.selectedSegmentIndex = languages.firstIndex(of: control.language) ?? 0
-        let baseNote = mpvLocalized(slot == .secondary ? "subtitle.secondary.note" : "subtitle.primary.note")
-        note.text = usesOriginalASS
-            ? mpvLocalized("subtitle.original_ass.position_note") + "\n" + baseNote : baseNote
+        refreshLayoutControls()
+    }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        layoutTask?.cancel()
+        layoutTask = nil
+        guard window != nil, layoutStatusProvider != nil else { return }
+        refreshLayoutControls()
+        layoutTask = Task { @MainActor [weak self] in
+            while !Task.isCancelled {
+                do { try await Task.sleep(nanoseconds: 250_000_000) } catch { return }
+                guard let self, self.window != nil else { return }
+                if let refresh = self.refreshProvider { refresh() }
+                else { self.refreshLayoutControls() }
+            }
+        }
+    }
+
+    private func refreshLayoutControls() {
+        let status = layoutStatusProvider?() ?? .init(requestedMode: .independent)
+        layoutRow?.isHidden = currentSlot != .secondary
+        layoutControl.selectedSegmentIndex = status.requestedMode.rawValue
+        let follows = status.effectiveMode == .stacked
+        let blocked = currentOriginalASS || (currentSlot == .secondary && follows)
+        positionSlider.isEnabled = !blocked
+        positionPresets.isEnabled = !blocked
+        let hint = follows ? mpvLocalized("subtitle.layout.position_note")
+            : currentOriginalASS ? mpvLocalized("subtitle.original_ass.position_note") : nil
+        positionSlider.accessibilityHint = hint
+        positionLabel.text = follows && currentSlot == .secondary ? mpvLocalized("subtitle.layout.position_note")
+            : follows ? mpvLocalized("subtitle.layout.group_position") + "：\(Int(currentPosition.rounded()))"
+            : mpvLocalized("subtitle.position.value", Int(currentPosition.rounded()))
+        var notes = [mpvLocalized(currentSlot == .secondary ? "subtitle.secondary.note" : "subtitle.primary.note")]
+        if currentOriginalASS { notes.insert(mpvLocalized("subtitle.original_ass.position_note"), at: 0) }
+        if let reason = status.fallbackReason { notes.insert(mpvLocalized(reason.localizationKey), at: 0) }
+        else if follows { notes.insert(mpvLocalized("subtitle.layout.position_note"), at: 0) }
+        note.text = notes.joined(separator: "\n")
+        note.accessibilityIdentifier = "MPVQuickPlayer.subtitleLayoutNote"
+    }
+
+    @objc private func layoutChanged() {
+        guard let mode = MPVSubtitleLayoutMode(rawValue: layoutControl.selectedSegmentIndex) else { return }
+        onLayoutMode?(mode)
+        refreshLayoutControls()
     }
 
     @objc private func sourceTapped() { onSource?(sourceButton) }

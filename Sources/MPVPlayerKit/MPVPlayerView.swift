@@ -291,6 +291,7 @@ public final class MPVPlayerView: UIView {
     var decodedSubtitleText: String?
     var secondaryDecodedSubtitleText: String?
     let secondarySubtitleRenderer = MPVDefaultSubtitleRenderer()
+    var subtitleLayoutModeValue = MPVSubtitleLayoutMode.independent
     nonisolated(unsafe) var mpv: OpaquePointer?
     // mpv 句柄与 wakeup 上下文的取出/置空需互斥，避免 stop 与 deinit 并发销毁。
     let mpvHandleLock = NSLock()
@@ -420,6 +421,7 @@ public final class MPVPlayerView: UIView {
         observeHardwareDecodeLifecycle()
         clientSubtitleController.install(in: self)
         installSecondarySubtitleRenderer()
+        installSubtitleLayoutCallbacks()
     }
 
     private static func resolveSystemSubtitleFontDirectory() -> String? {

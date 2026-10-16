@@ -6,7 +6,9 @@ extension MPVPlayerView {
     }
 
     public func useClientSubtitleRenderer(_ renderer: any MPVSubtitleRenderer) {
+        (clientSubtitleController.renderer as? MPVDefaultSubtitleRenderer)?.onPresentationChanged = nil
         clientSubtitleController.useRenderer(renderer)
+        installSubtitleLayoutCallbacks()
         if decodedSubtitleText != nil { renderDecodedSubtitleText() }
     }
 
@@ -16,6 +18,7 @@ extension MPVPlayerView {
         if document != nil { decodedSubtitleText = nil }
         clientSubtitleController.select(document)
         clientSubtitleController.update(at: currentTime, force: true)
+        updateSubtitleLayoutPlacement()
         currentSubtitleFontCapability = document == nil ? .noSubtitle : .supported
         guard document != nil else { return }
         queue.async { [weak self] in
@@ -36,6 +39,7 @@ extension MPVPlayerView {
     public func clearClientSubtitle() {
         decodedSubtitleText = nil
         clientSubtitleController.clear()
+        updateSubtitleLayoutPlacement()
     }
 
     /// 兼容入口：加载外挂字幕并由 **libmpv** 渲染（与 `loadSubtitle` 相同路径）。

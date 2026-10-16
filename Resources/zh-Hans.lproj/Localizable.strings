@@ -151,3 +151,13 @@
 "subtitle.shadow_radius.originalStyle" = "%@：保留字幕原始样式，不支持单独调整阴影扩散半径。";
 "subtitle.shadow_radius.imageSubtitle" = "%@：图片字幕不支持文字阴影样式。";
 "subtitle.shadow_radius.unsupportedRenderer" = "%@：当前自定义渲染器不支持阴影扩散半径。";
+
+"subtitle.layout.title" = "显示方式";
+"subtitle.layout.independent" = "独立位置";
+"subtitle.layout.stacked" = "跟随第一字幕";
+"subtitle.layout.group_position" = "字幕组位置";
+"subtitle.layout.position_note" = "位置由第一字幕决定，第二字幕在其下方显示。";
+"subtitle.layout.fallback.originalStyle" = "当前使用 ASS 原始样式，暂按独立位置显示。";
+"subtitle.layout.fallback.imageSubtitle" = "图片字幕无法组合，暂按独立位置显示。";
+"subtitle.layout.fallback.unsupportedRenderer" = "当前字幕渲染方式无法组合，暂按独立位置显示。";
+"subtitle.layout.fallback.insufficientSpace" = "字幕组超出屏幕高度，暂按独立位置显示。";

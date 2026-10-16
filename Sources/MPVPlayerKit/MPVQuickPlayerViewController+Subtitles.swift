@@ -19,6 +19,7 @@ extension MPVQuickPlayerViewController {
     }
 
     func applySubtitlePreferences() {
+        player.subtitleLayoutMode = MPVQuickPlayerSubtitlePreferences.layoutMode
         for slot in [MPVSubtitleSlot.primary, .secondary] {
             guard let control = subtitleControls[slot] else { continue }
             player.setSubtitlePosition(control.position, in: slot)
@@ -32,6 +33,14 @@ extension MPVQuickPlayerViewController {
         let refresh = { [weak self, weak panel] in
             guard let self, let panel else { return }
             self.refreshSubtitleControl(panel, in: slot)
+        }
+        panel.refreshProvider = refresh
+        panel.layoutStatusProvider = { [weak self] in self?.player.subtitleLayoutStatus }
+        panel.onLayoutMode = { [weak self] mode in
+            guard let self else { return }
+            MPVQuickPlayerSubtitlePreferences.layoutMode = mode
+            self.player.subtitleLayoutMode = mode
+            refresh()
         }
         panel.onSource = { [weak self] view in self?.showSubtitleSource(in: slot, from: view) }
         panel.onDelay = { [weak self] delay in

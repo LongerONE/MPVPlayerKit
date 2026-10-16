@@ -31,6 +31,18 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
     private let label = MPVSubtitleLabel()
     private var bottomConstraint: NSLayoutConstraint!
     var verticalPosition: Double = 100
+    var onPresentationChanged: (() -> Void)?
+    private var independentBottomOffset: CGFloat = 34
+    private var groupBottomOffset: CGFloat?
+
+    func textHeight(for width: CGFloat) -> CGFloat {
+        label.isHidden ? 0 : label.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude)).height
+    }
+
+    func applyGroupBottomOffset(_ offset: CGFloat?) {
+        groupBottomOffset = offset
+        updatePositionConstraint()
+    }
 
     public init() {
         view.isUserInteractionEnabled = false
@@ -97,15 +109,23 @@ public final class MPVDefaultSubtitleRenderer: MPVSubtitleRenderer {
         let positionOffset = travel * CGFloat((100 - verticalPosition) / 100)
         updateBottomOffset(Double(hostBounds.maxY - videoRect.maxY + margin + positionOffset))
         label.isHidden = false
+        onPresentationChanged?()
     }
 
     public func clear() {
         label.attributedText = nil
         label.isHidden = true
+        onPresentationChanged?()
     }
 
     private func updateBottomOffset(_ offset: Double) {
-        bottomConstraint.constant = -CGFloat(offset)
+        independentBottomOffset = CGFloat(offset)
+        updatePositionConstraint()
+    }
+
+    private func updatePositionConstraint() {
+        let value = -(groupBottomOffset ?? independentBottomOffset)
+        if bottomConstraint.constant != value { bottomConstraint.constant = value }
     }
 
     private func subtitleFont(named name: String?, size: CGFloat, bold: Bool) -> UIFont {

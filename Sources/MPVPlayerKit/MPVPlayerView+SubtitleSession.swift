@@ -23,6 +23,7 @@ extension MPVPlayerView {
             }
             snapshot["delays"] = self.subtitleSlots.delays
         }
+        snapshot["layoutMode"] = subtitleLayoutMode.rawValue
         if let document = clientSubtitleController.document {
             if var slots = snapshot["slots"] as? [[String: Any]], !slots.isEmpty {
                 slots[0]["trackID"] = NSNull()
@@ -41,6 +42,7 @@ extension MPVPlayerView {
 
     @objc public func restoreSubtitleSession(_ snapshot: NSDictionary) {
         let values = snapshot as? [String: Any] ?? [:]
+        if let raw = values["layoutMode"] as? Int, let mode = MPVSubtitleLayoutMode(rawValue: raw) { subtitleLayoutMode = mode }
         if let box = values["clientDocument"] as? MPVSubtitleDocumentSnapshot {
             if let renderer = values["clientRenderer"] as? any MPVSubtitleRenderer { useClientSubtitleRenderer(renderer) }
             selectClientSubtitle(box.document)
