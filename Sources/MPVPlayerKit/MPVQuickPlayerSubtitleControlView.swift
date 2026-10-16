@@ -5,7 +5,6 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
     let sourceButton = UIButton(type: .system)
     private let delayStepper = UIStepper()
     private let delayLabel = UILabel()
-    private let visibleSwitch = UISwitch()
     private let positionSlider = UISlider()
     private let positionLabel = UILabel()
     private let positionPresets = UISegmentedControl(items: [
@@ -22,7 +21,6 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
     private let note = UILabel()
     var onSource: ((UIView) -> Void)?
     var onDelay: ((TimeInterval) -> Void)?
-    var onVisibility: ((Bool) -> Void)?
     var onPosition: ((Double) -> Void)?
     var onOriginalStyle: ((Bool) -> Void)?
     var onAutomatic: ((Bool) -> Void)?
@@ -38,8 +36,6 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
         sourceButton.accessibilityIdentifier = "MPVQuickPlayer.subtitleSource"
         sourceButton.titleLabel?.lineBreakMode = .byTruncatingMiddle
         contentStack.addArrangedSubview(makeValueButtonRow(title: mpvLocalized("subtitle.source"), button: sourceButton))
-        visibleSwitch.addTarget(self, action: #selector(visibilityChanged), for: .valueChanged)
-        contentStack.addArrangedSubview(makeSwitchRow(title: mpvLocalized("subtitle.visible"), switchView: visibleSwitch))
         let delayRow = makeStepperRow(title: mpvLocalized("subtitle.delay"), valueLabel: delayLabel, stepper: delayStepper)
         delayStepper.minimumValue = -60
         delayStepper.maximumValue = 60
@@ -89,7 +85,6 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
         delayStepper.value = state.delay
         delayLabel.text = MPVQuickPlayerViewController.delayTitle(state.delay)
         delayStepper.accessibilityValue = delayLabel.text
-        visibleSwitch.isOn = state.visible
         positionSlider.value = Float(control.position)
         positionSlider.accessibilityValue = String(Int(control.position.rounded()))
         positionLabel.text = mpvLocalized("subtitle.position.value", Int(control.position.rounded()))
@@ -113,7 +108,6 @@ final class MPVQuickPlayerSubtitleControlView: MPVQuickPlayerSettingsPanelView {
         delayStepper.accessibilityValue = delayLabel.text
         onDelay?(delay)
     }
-    @objc private func visibilityChanged() { onVisibility?(visibleSwitch.isOn) }
     @objc private func originalChanged() { onOriginalStyle?(originalSwitch.isOn) }
     @objc private func automaticChanged() { onAutomatic?(automaticSwitch.isOn) }
     @objc private func positionChanged() { onPosition?(Double(positionSlider.value.rounded())) }

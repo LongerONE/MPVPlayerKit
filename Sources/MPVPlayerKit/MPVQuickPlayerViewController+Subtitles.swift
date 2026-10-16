@@ -37,10 +37,6 @@ extension MPVQuickPlayerViewController {
         panel.onDelay = { [weak self] delay in
             self?.setSubtitleDelay(delay, in: slot)
         }
-        panel.onVisibility = { [weak self] visible in
-            self?.player.setSubtitlesVisible(visible, in: slot)
-            refresh()
-        }
         panel.onPosition = { [weak self] position in
             self?.updateSubtitleControl(in: slot) { $0.position = position }
             refresh()
@@ -157,11 +153,6 @@ extension MPVQuickPlayerViewController {
                 self?.presentAfterCurrentSheet { $0.presentExternalSubtitlePicker(in: slot) }
             },
         ]
-        if subtitleRequests[slot] != nil {
-            options.append(.init(title: mpvLocalized("subtitle.cancel_load"), isDestructive: true) { [weak self] in
-                self?.cancelExternalSubtitleLoad(in: slot)
-            })
-        }
         options += player.tracks(ofType: .subtitle).map { track in
             let occupied = Int64(track.id) == other.trackID
             return .init(title: occupied ? mpvLocalized("subtitle.occupied.track", track.name) : track.name,

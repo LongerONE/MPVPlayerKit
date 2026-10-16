@@ -32,10 +32,20 @@ final class MPVPlayerKitDemoUITests: XCTestCase {
             let position = app.sliders["MPVQuickPlayer.subtitlePosition"]
             XCTAssertTrue(position.isEnabled)
             let initialPosition = position.value as? String
-            position.adjust(toNormalizedSliderPosition: 0.35)
+            let targetPosition: CGFloat = (Double(initialPosition ?? "0") ?? 0) < 75 ? 0.8 : 0.2
+            position.adjust(toNormalizedSliderPosition: targetPosition)
             XCTAssertNotEqual(position.value as? String, initialPosition)
             XCTAssertTrue(panel.exists)
             capture("QuickPlayer-\(name)控制")
+            XCTAssertFalse(app.staticTexts["显示字幕"].exists)
+            XCTAssertFalse(app.staticTexts["隐藏字幕"].exists)
+            app.buttons["MPVQuickPlayer.subtitleSource"].tap()
+            XCTAssertFalse(app.staticTexts["取消加载字幕"].exists)
+            let off = app.cells.containing(.staticText, identifier: "关闭").firstMatch
+            XCTAssertTrue(off.waitForExistence(timeout: 3))
+            off.tap()
+            XCTAssertTrue(panel.waitForExistence(timeout: 3))
+            XCTAssertEqual(app.buttons["MPVQuickPlayer.subtitleSource"].value as? String, "关闭")
             let cancel = app.buttons["取消"].firstMatch
             XCTAssertTrue(cancel.exists)
             cancel.tap()
