@@ -54,6 +54,18 @@ final class MPVPlayerKitDemoUITests: XCTestCase {
         subtitleButton.tap()
         app.cells.containing(.staticText, identifier: "字幕公共样式").firstMatch.tap()
         XCTAssertTrue(app.otherElements["MPVQuickPlayer.subtitleSettings"].waitForExistence(timeout: 3))
+        let radius = app.sliders["MPVQuickPlayer.subtitleShadowRadius"]
+        XCTAssertTrue(radius.isEnabled, "关闭字幕后仍应允许预设第一字幕自绘半径")
+        let initialRadius = radius.value as? String
+        radius.adjust(toNormalizedSliderPosition: initialRadius == "16.0 pt" ? 0.2 : 0.8)
+        let changedRadius = radius.value as? String
+        XCTAssertNotEqual(changedRadius, initialRadius)
+        app.buttons["取消"].firstMatch.tap()
+        if !subtitleButton.isHittable { app.tap() }
+        subtitleButton.tap()
+        app.cells.containing(.staticText, identifier: "字幕公共样式").firstMatch.tap()
+        XCTAssertTrue(radius.waitForExistence(timeout: 3))
+        XCTAssertEqual(radius.value as? String, changedRadius)
         capture("QuickPlayer-字幕公共样式")
         XCTAssertFalse(app.alerts.firstMatch.exists)
         let details = app.buttons["MPVQuickPlayer.subtitleSettingsDetails"]

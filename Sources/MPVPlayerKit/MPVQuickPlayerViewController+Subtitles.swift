@@ -99,8 +99,7 @@ extension MPVQuickPlayerViewController {
 
     func showSharedSubtitleStyle() {
         let panel = MPVQuickPlayerSubtitleSettingsView()
-        panel.isShadowRadiusEditable = player.playbackView.clientSubtitleController.hasSelection
-            || player.playbackView.decodedSubtitleText != nil
+        // Allow configuring the first custom-rendered subtitle even before an active cue exists.
         panel.onStyleChange = { [weak self] in self?.setSubtitleStyle($0) }
         panel.onFontTap = { [weak self] view in self?.showSubtitleFontPicker(from: view) }
         panel.onDetailsTap = { [weak self] in
