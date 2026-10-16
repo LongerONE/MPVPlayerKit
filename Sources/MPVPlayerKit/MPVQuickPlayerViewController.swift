@@ -159,7 +159,7 @@ public final class MPVQuickPlayerViewController: UIViewController {
         super.init(nibName: nil, bundle: nil)
         modalPresentationCapturesStatusBarAppearance = true
         player.delegate = self
-        player.updateSubtitleStyle(subtitleStyle)
+        applySubtitleStyle()
         applySubtitlePreferences()
         MPVQuickPlayerSubtitlePreferences.prepareFontStorage()
         if let fontURL = MPVQuickPlayerSubtitlePreferences.fontURL {

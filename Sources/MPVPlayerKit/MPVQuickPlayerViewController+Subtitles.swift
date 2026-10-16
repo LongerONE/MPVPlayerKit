@@ -120,6 +120,13 @@ extension MPVQuickPlayerViewController {
     public func setSubtitleStyle(_ style: MPVSubtitleStyle) {
         subtitleStyle = style
         MPVQuickPlayerSubtitlePreferences.save(style)
+        applySubtitleStyle()
+    }
+
+    func applySubtitleStyle() {
+        var style = subtitleStyle
+        // Per-slot positions own placement; retain the legacy margin in saved preferences.
+        style.bottomOffset = 0
         player.updateSubtitleStyle(style)
     }
 

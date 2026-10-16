@@ -23,8 +23,6 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
             radiusNote.isHidden = false
         }
     }
-    private let bottomOffsetValueLabel = UILabel()
-    private let bottomOffsetStepper = UIStepper()
     private var style = MPVSubtitleStyle.defaultStyle
     private var delay: TimeInterval = 0
 
@@ -95,18 +93,6 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         radiusNote.isHidden = false
         contentStack.addArrangedSubview(radiusNote)
 
-        bottomOffsetStepper.minimumValue = 0
-        bottomOffsetStepper.maximumValue = 300
-        bottomOffsetStepper.stepValue = 2
-        bottomOffsetStepper.addTarget(self, action: #selector(bottomOffsetChanged(_:)), for: .valueChanged)
-        contentStack.addArrangedSubview(
-            makeStepperRow(
-                title: mpvLocalized("subtitle.primary.bottom_offset"),
-                valueLabel: bottomOffsetValueLabel,
-                stepper: bottomOffsetStepper
-            )
-        )
-
         update(style: style, delay: 0)
     }
 
@@ -126,8 +112,6 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         let radiusText = String(format: "%.1f pt", style.shadowRadius)
         radiusValueLabel.text = radiusText
         radiusSlider.accessibilityValue = radiusText
-        bottomOffsetStepper.value = style.bottomOffset
-        bottomOffsetValueLabel.text = "\(Int(style.bottomOffset.rounded()))"
     }
 
     private func makeShadowRow(radius: Bool = false) -> UIView {
@@ -210,9 +194,4 @@ final class MPVQuickPlayerSubtitleSettingsView: MPVQuickPlayerSettingsPanelView 
         applyStyle(updated)
     }
 
-    @objc private func bottomOffsetChanged(_ sender: UIStepper) {
-        var updated = style
-        updated.bottomOffset = sender.value
-        applyStyle(updated)
-    }
 }
