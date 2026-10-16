@@ -61,6 +61,65 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
 
     private enum WaitFailure: Error { case timeout }
 
+    @MainActor func testDeferredASSImportKeepsOriginalSlotAndPreference() async throws {
+        let saved = MPVSubtitleSlot.allCases.map { UserDefaults.standard.object(forKey: "MPVQuickPlayer.subtitle.\($0.rawValue)") }
+        defer {
+            cleanUp()
+            for slot in MPVSubtitleSlot.allCases { UserDefaults.standard.set(saved[slot.rawValue], forKey: "MPVQuickPlayer.subtitle.\(slot.rawValue)") }
+        }
+        for slot in MPVSubtitleSlot.allCases {
+            MPVQuickPlayerSubtitlePreferences.save(.init(position: 50, usesOriginalStyle: false), in: slot)
+        }
+        let quick = MPVQuickPlayerViewController(configuration: MPVPlayerConfiguration(
+            url: try fixture("dual-subtitles.mp4"), forceSoftwareDecode: true))
+        let host = UIWindow(frame: UIScreen.main.bounds)
+        if let scene = UIApplication.shared.connectedScenes.first as? UIWindowScene { host.windowScene = scene }
+        host.rootViewController = quick
+        host.makeKeyAndVisible()
+        window = host
+        player = quick.player
+        try await eventually("QuickPlayer 已启动") { quick.player.duration > 0 }
+        quick.player.pause()
+        quick.subtitleImportSlot = .primary
+        quick.documentPicker(UIDocumentPickerViewController(forOpeningContentTypes: [.data]),
+                             didPickDocumentsAt: [try fixture("original.ass")])
+        let menu = try XCTUnwrap(quick.actionSheetOverlay)
+        let table = try XCTUnwrap(descendants(menu).first { $0 is UITableView } as? UITableView)
+        table.delegate?.tableView?(table, didSelectRowAt: IndexPath(row: 0, section: 0))
+        quick.subtitleImportSlot = .secondary
+        try await eventually("延迟菜单操作完成") {
+            MPVSubtitleSlot.allCases.contains { quick.player.subtitleState(in: $0).supportsASSMode }
+        }
+        XCTAssertTrue(quick.player.subtitleState(in: .primary).supportsASSMode)
+        XCTAssertNil(quick.player.subtitleState(in: .secondary).trackID)
+        XCTAssertTrue(MPVQuickPlayerSubtitlePreferences.control(in: .primary).usesOriginalStyle)
+        XCTAssertFalse(MPVQuickPlayerSubtitlePreferences.control(in: .secondary).usesOriginalStyle)
+    }
+
+    @MainActor func testRebuildKeepsLatestASSChoiceWhileRestorationWaits() async throws {
+        defer { cleanUp() }
+        let value = try await start()
+        try await load("original.ass", in: .primary, on: value, original: true)
+        try await load("original.ssa", in: .secondary, on: value, original: false)
+        let snapshot = value.subtitleSessionSnapshot()
+        value.stop()
+        value.playbackView.removeFromSuperview()
+        let rebuilt = MPVPlayer(configuration: MPVPlayerConfiguration(
+            url: try fixture("dual-subtitles.mp4"), forceSoftwareDecode: true))
+        player = rebuilt
+        rebuilt.playbackView.frame = CGRect(x: 0, y: 0, width: 960, height: 540)
+        window?.rootViewController?.view.addSubview(rebuilt.playbackView)
+        rebuilt.restoreSubtitleSession(snapshot)
+        rebuilt.setSubtitleUsesOriginalStyle(false, in: .primary)
+        rebuilt.setSubtitleUsesOriginalStyle(true, in: .secondary)
+        rebuilt.play()
+        try await eventually("重建恢复两路 ASS") {
+            rebuilt.subtitleState(in: .primary).supportsASSMode && rebuilt.subtitleState(in: .secondary).supportsASSMode
+        }
+        XCTAssertFalse(rebuilt.subtitleState(in: .primary).usesOriginalStyle)
+        XCTAssertTrue(rebuilt.subtitleState(in: .secondary).usesOriginalStyle)
+    }
+
     @MainActor func testQuickPlayerASSPreferencesSurvivePlainTextAndExplicitChoices() async throws {
         let saved = MPVSubtitleSlot.allCases.map { UserDefaults.standard.object(forKey: "MPVQuickPlayer.subtitle.\($0.rawValue)") }
         defer {
@@ -113,7 +172,11 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
     }
 
     @MainActor func testEmbeddedModesAutomaticSelectionAndRebuildUseActualFormat() async throws {
-        defer { cleanUp() }
+        let saved = MPVSubtitleSlot.allCases.map { UserDefaults.standard.object(forKey: "MPVQuickPlayer.subtitle.\($0.rawValue)") }
+        defer {
+            cleanUp()
+            for slot in MPVSubtitleSlot.allCases { UserDefaults.standard.set(saved[slot.rawValue], forKey: "MPVQuickPlayer.subtitle.\(slot.rawValue)") }
+        }
         let value = try await start()
         value.playbackView.configure(["url": try fixture("style-modes.mkv").absoluteString, "forceSoftwareDecode": true])
         value.play()
@@ -151,11 +214,11 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         XCTAssertEqual(rebuilt.subtitleState(in: .primary).shadowRadiusCapability, .supported)
         XCTAssertTrue(rebuilt.subtitleState(in: .secondary).usesOriginalStyle)
         rebuilt.stop()
+        MPVQuickPlayerSubtitlePreferences.save(.init(position: 100, usesOriginalStyle: true, automatic: true, language: .english), in: .primary)
+        MPVQuickPlayerSubtitlePreferences.save(.init(position: 0, usesOriginalStyle: false, automatic: true, language: .simplifiedChinese), in: .secondary)
         let quick = MPVQuickPlayerViewController(configuration: MPVPlayerConfiguration(url: try fixture("style-modes.mkv"), forceSoftwareDecode: true))
         window?.rootViewController = quick
         player = quick.player
-        quick.subtitleControls[.primary] = .init(position: 100, usesOriginalStyle: true, automatic: true, language: .english)
-        quick.subtitleControls[.secondary] = .init(position: 0, usesOriginalStyle: false, automatic: true, language: .simplifiedChinese)
         try await eventually("两路自动选轨") {
             quick.player.subtitleState(in: .primary).trackID != nil && quick.player.subtitleState(in: .secondary).trackID != nil
         }
@@ -163,6 +226,8 @@ final class MPVDualSubtitleIntegrationTests: XCTestCase {
         XCTAssertFalse(quick.player.subtitleState(in: .primary).supportsASSMode)
         XCTAssertTrue(quick.player.subtitleState(in: .secondary).supportsASSMode)
         XCTAssertFalse(quick.player.subtitleState(in: .secondary).usesOriginalStyle)
+        XCTAssertTrue(MPVQuickPlayerSubtitlePreferences.control(in: .primary).usesOriginalStyle)
+        XCTAssertFalse(MPVQuickPlayerSubtitlePreferences.control(in: .secondary).usesOriginalStyle)
     }
 
     @MainActor func testQuickPlayerShadowRadiusFollowsActualRoutesWhilePaused() async throws {

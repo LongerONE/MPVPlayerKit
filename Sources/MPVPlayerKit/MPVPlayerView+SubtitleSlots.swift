@@ -72,6 +72,12 @@ extension MPVPlayerView {
         }
         queue.async { [weak self] in
             guard let self else { return }
+            if let mode = override ?? original.map({ $0 ? MPVSubtitleASSOverride.no : .strip }),
+               self.subtitleSlots.restoreSnapshot != nil || self.subtitleSlots.pending.values.contains(where: {
+                   $0.slot == slot && self.subtitleSlots.restorationRequests.contains($0.requestID)
+               }) {
+                self.subtitleSlots.restorationASSOverrides[slot] = mode
+            }
             var state = self.slotState(slot)
             let previous = state
             if let delay, delay.isFinite { state.delay = delay }
@@ -293,6 +299,7 @@ extension MPVPlayerView {
             subtitleSlots.externalSources[id] = load.sourceID
             if subtitleSlots.restorationRequests.remove(load.requestID) != nil {
                 var restored = load.previous
+                applyRestorationASSOverride(to: &restored, slot: load.slot)
                 restored.trackID = id
                 if applySlotState(restored, slot: load.slot) { subtitleSlots.states[load.slot] = restored; subtitleSlots.publish(slotState(load.slot), slot: load.slot) }
             }

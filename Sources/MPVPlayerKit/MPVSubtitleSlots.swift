@@ -147,6 +147,7 @@ final class MPVSubtitleSlotRuntime: @unchecked Sendable {
     var externalSources: [Int64: String] = [:]
     var restoreSnapshot: [String: Any]?
     var restorationRequests: Set<String> = []
+    var restorationASSOverrides: [MPVSubtitleSlot: MPVSubtitleASSOverride] = [:]
     var fileLoaded = false
     var selectionRevision: [MPVSubtitleSlot: UInt64] = [.primary: 0, .secondary: 0]
 

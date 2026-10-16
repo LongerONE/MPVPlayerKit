@@ -120,10 +120,11 @@ extension MPVQuickPlayerViewController: UIDocumentPickerDelegate {
             }
             return
         }
+        let slot = subtitleImportSlot
         let subtitleExtension = url.pathExtension.lowercased()
         guard subtitleExtension == "ass" || subtitleExtension == "ssa" else {
             presentAfterCurrentSheet { controller in
-                controller.loadExternalSubtitle(from: url, usesOriginalStyle: false)
+                controller.loadExternalSubtitle(from: url, in: slot, usesOriginalStyle: false)
             }
             return
         }
@@ -132,11 +133,11 @@ extension MPVQuickPlayerViewController: UIDocumentPickerDelegate {
             let options = [
                 MPVQuickPlayerActionSheetOption(title: mpvLocalized("subtitle.style.use_file")) {
                     [weak controller] in
-                    controller?.loadExternalSubtitle(from: url, usesOriginalStyle: true, saveASSPreference: true)
+                    controller?.loadExternalSubtitle(from: url, in: slot, usesOriginalStyle: true, saveASSPreference: true)
                 },
                 MPVQuickPlayerActionSheetOption(title: mpvLocalized("subtitle.style.use_player")) {
                     [weak controller] in
-                    controller?.loadExternalSubtitle(from: url, usesOriginalStyle: false, saveASSPreference: true)
+                    controller?.loadExternalSubtitle(from: url, in: slot, usesOriginalStyle: false, saveASSPreference: true)
                 },
             ]
             controller.presentActionSheet(

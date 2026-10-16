@@ -45,6 +45,7 @@ extension MPVPlayerView {
         }
         let transfer = MPVSubtitleSessionTransfer(values: values)
         queue.async { [weak self] in
+            self?.subtitleSlots.restorationASSOverrides.removeAll()
             self?.subtitleSlots.restoreSnapshot = transfer.values
             self?.restoreSubtitleSlotsIfNeeded()
         }
@@ -63,6 +64,7 @@ extension MPVPlayerView {
             state.visible = values["visible"] as? Bool ?? false
             state.usesOriginalStyle = values["usesOriginalStyle"] as? Bool ?? false
             state.assOverride = (values["assOverride"] as? String).flatMap(MPVSubtitleASSOverride.init(rawValue:)) ?? (state.usesOriginalStyle ? .no : .strip)
+            applyRestorationASSOverride(to: &state, slot: slot)
             state.sourceID = (values["sourceID"] as? String).flatMap { $0.isEmpty ? nil : $0 }
             if let source = state.sourceID {
                 state.trackID = subtitleTrackIDs().first { sourceIdentity($0) == source }
@@ -88,9 +90,17 @@ extension MPVPlayerView {
         }
     }
 
+    /// 恢复等待期间的明确设置优先于旧会话快照，不写入长期偏好。
+    nonisolated func applyRestorationASSOverride(to state: inout MPVSubtitleState, slot: MPVSubtitleSlot) {
+        guard let mode = subtitleSlots.restorationASSOverrides[slot] else { return }
+        state.assOverride = mode
+        state.usesOriginalStyle = mode == .no
+    }
+
     nonisolated func resetSubtitleSlotSession() {
         subtitleSlots.generation &+= 1
         subtitleSlots.restoreSnapshot = nil
+        subtitleSlots.restorationASSOverrides.removeAll()
         subtitleSlots.fileLoaded = false
         subtitleSlots.restorationRequests.removeAll()
         let pending = Array(subtitleSlots.pending.values)
