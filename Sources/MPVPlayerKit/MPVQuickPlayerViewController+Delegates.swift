@@ -31,7 +31,7 @@ extension MPVQuickPlayerViewController: UIGestureRecognizerDelegate {
            touchedView.isDescendant(of: actionSheetOverlay) {
             return false
         }
-        if let panel = settingsPanelOverlay as? UIView,
+        if let panel = settingsPanelOverlay,
            let touchedView = touch.view,
            touchedView.isDescendant(of: panel) {
             return false
