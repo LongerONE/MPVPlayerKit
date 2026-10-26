@@ -4,6 +4,91 @@ import UIKit
 
 final class MPVQuickPlayerTests: XCTestCase {
     @MainActor
+    func testDualPaneModesKeepHostsAndConstraintsStableAcrossRepeatedLayouts() throws {
+        let parent = UIViewController()
+        let primary = UIViewController()
+        let secondary = UIViewController()
+        let container = MPVPlayerDualPaneContainer(primary: primary, secondary: secondary)
+        parent.addChild(container)
+        parent.view.addSubview(container.view)
+        container.didMove(toParent: parent)
+        parent.setOverrideTraitCollection(UITraitCollection(horizontalSizeClass: .regular), forChild: container)
+        let primaryHost = try XCTUnwrap(primary.view.superview)
+        let secondaryHost = try XCTUnwrap(secondary.view.superview)
+
+        func layoutAndAssertStable() {
+            container.viewWillLayoutSubviews()
+            container.view.layoutIfNeeded()
+            let constraints = Set(container.view.constraints.filter(\.isActive).map(ObjectIdentifier.init))
+            for _ in 0..<5 {
+                container.viewWillLayoutSubviews()
+                container.view.layoutIfNeeded()
+            }
+            // 旧实现每次移除宿主并新建约束；除了最终尺寸，还必须验证约束和视图层级保持稳定。
+            XCTAssertEqual(Set(container.view.constraints.filter(\.isActive).map(ObjectIdentifier.init)), constraints)
+            XCTAssertTrue(primary.view.superview === primaryHost)
+            XCTAssertTrue(secondary.view.superview === secondaryHost)
+            XCTAssertTrue(primaryHost.superview === container.view)
+            XCTAssertTrue(secondaryHost.superview === container.view)
+        }
+
+        container.view.frame = CGRect(x: 0, y: 0, width: 1024, height: 768)
+        layoutAndAssertStable()
+        XCTAssertEqual(primaryHost.frame.width, container.view.safeAreaLayoutGuide.layoutFrame.width * 0.5, accuracy: 1)
+        XCTAssertFalse(secondaryHost.isHidden)
+
+        container.view.frame.size = CGSize(width: 768, height: 1024)
+        layoutAndAssertStable()
+        XCTAssertEqual(primaryHost.frame.height, container.view.safeAreaLayoutGuide.layoutFrame.height * 0.6, accuracy: 1)
+        container.horizontalOnly = true
+        layoutAndAssertStable()
+        XCTAssertTrue(secondaryHost.isHidden)
+        XCTAssertEqual(primaryHost.frame, container.view.safeAreaLayoutGuide.layoutFrame)
+
+        container.prefersOverlay = true
+        layoutAndAssertStable()
+        XCTAssertFalse(secondaryHost.isHidden)
+        XCTAssertEqual(secondaryHost.frame.height, container.view.safeAreaLayoutGuide.layoutFrame.height * 0.35, accuracy: 1)
+
+        parent.setOverrideTraitCollection(UITraitCollection(horizontalSizeClass: .compact), forChild: container)
+        layoutAndAssertStable()
+        XCTAssertTrue(secondaryHost.isHidden)
+        XCTAssertEqual(primaryHost.frame, container.view.safeAreaLayoutGuide.layoutFrame)
+    }
+
+    @MainActor
+    func testRepeatedControlLayoutUpdatesSettleAndStillSwitchModes() {
+        let controller = MPVQuickPlayerViewController(url: URL(fileURLWithPath: "/unused.mp4"), autoplay: false)
+        controller.loadViewIfNeeded()
+        defer { controller.finishPlaybackSession() }
+        controller.view.frame = CGRect(x: 0, y: 0, width: 1024, height: 768)
+        let probe = ConstraintUpdateProbeView(frame: .zero)
+        probe.translatesAutoresizingMaskIntoConstraints = false
+        controller.contentView.addSubview(probe)
+        NSLayoutConstraint.deactivate(controller.regularPlaybackControlLayoutConstraints)
+        NSLayoutConstraint.deactivate(controller.compactPlaybackControlLayoutConstraints)
+        let regular = probe.widthAnchor.constraint(equalToConstant: 100)
+        let compact = probe.widthAnchor.constraint(equalToConstant: 60)
+        controller.regularPlaybackControlLayoutConstraints = [regular]
+        controller.compactPlaybackControlLayoutConstraints = [compact]
+
+        for usesCompact in [false, true, false] {
+            controller.isHingeCompact = usesCompact
+            controller.updatePlaybackControlSafeAreaInsets()
+            controller.view.layoutIfNeeded()
+            XCTAssertEqual(regular.isActive, !usesCompact)
+            XCTAssertEqual(compact.isActive, usesCompact)
+            let settledUpdates = probe.constraintUpdateCount
+            // 检查真实约束引擎是否再次变脏，而非只检查最终 isActive（旧实现最终状态也正确）。
+            for _ in 0..<5 {
+                controller.updatePlaybackControlSafeAreaInsets()
+                controller.view.layoutIfNeeded()
+            }
+            XCTAssertEqual(probe.constraintUpdateCount, settledUpdates)
+        }
+    }
+
+    @MainActor
     func testNativeAlertsKeepUIKitManagedLayoutInManualLandscape() {
         let alert = UIAlertController(
             title: "视频轨道",
@@ -389,5 +474,15 @@ final class MPVQuickPlayerTests: XCTestCase {
         controller.player(controller.player, didChangeState: .paused)
         XCTAssertNil(controller.idleTimerDisabledBeforePlayback)
         XCTAssertEqual(UIApplication.shared.isIdleTimerDisabled, previousValue)
+    }
+}
+
+@MainActor
+private final class ConstraintUpdateProbeView: UIView {
+    var constraintUpdateCount = 0
+
+    override func updateConstraints() {
+        constraintUpdateCount += 1
+        super.updateConstraints()
     }
 }

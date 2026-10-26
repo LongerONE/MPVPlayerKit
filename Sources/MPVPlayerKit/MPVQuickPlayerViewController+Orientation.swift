@@ -323,13 +323,11 @@ extension MPVQuickPlayerViewController {
     }
 
     private func updatePlaybackControlLayout(isCompact: Bool) {
-        NSLayoutConstraint.deactivate(regularPlaybackControlLayoutConstraints)
-        NSLayoutConstraint.deactivate(compactPlaybackControlLayoutConstraints)
-        NSLayoutConstraint.activate(
-            isCompact
-                ? compactPlaybackControlLayoutConstraints
-                : regularPlaybackControlLayoutConstraints
-        )
+        let active = isCompact ? compactPlaybackControlLayoutConstraints : regularPlaybackControlLayoutConstraints
+        let inactive = isCompact ? regularPlaybackControlLayoutConstraints : compactPlaybackControlLayoutConstraints
+        // 布局回调可能重复进入；只切换实际变化的约束，避免每轮先撤销再恢复导致布局无法收敛。
+        NSLayoutConstraint.deactivate(inactive.filter(\.isActive))
+        NSLayoutConstraint.activate(active.filter { !$0.isActive })
     }
 
     static func playbackControlHorizontalInsets(

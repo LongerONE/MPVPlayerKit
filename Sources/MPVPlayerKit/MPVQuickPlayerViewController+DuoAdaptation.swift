@@ -76,6 +76,9 @@ public final class MPVPlayerDualPaneContainer: UIViewController {
     private let primaryHost = UIView()
     private let secondaryHost = UIView()
     private var didInstallChildren = false
+    private enum LayoutMode { case overlay, sideBySide, stacked, primaryOnly }
+    private var layoutMode: LayoutMode?
+    private var hostConstraints: [NSLayoutConstraint] = []
 
     public init(
         primary: UIViewController,
@@ -157,12 +160,6 @@ public final class MPVPlayerDualPaneContainer: UIViewController {
     }
 
     private func applyLayoutForCurrentTraits() {
-        view.layoutIfNeeded()
-        primaryHost.removeFromSuperview()
-        secondaryHost.removeFromSuperview()
-        view.addSubview(primaryHost)
-        view.addSubview(secondaryHost)
-
         let bounds = view.bounds
         let isRegular = traitCollection.horizontalSizeClass == .regular
         let isWide = bounds.width >= bounds.height
@@ -172,8 +169,15 @@ public final class MPVPlayerDualPaneContainer: UIViewController {
         let showStacked = isRegular && isWide == false && horizontalOnly == false
         let showOverlay = prefersOverlay && isRegular
 
-        if showOverlay {
-            NSLayoutConstraint.activate([
+        let mode: LayoutMode = showOverlay ? .overlay : (showSideBySide ? .sideBySide : (showStacked ? .stacked : .primaryOnly))
+        // 安全区约束会自行跟随尺寸；只在布局模式改变时替换，避免布局回调重挂视图并不断触发下一轮。
+        guard layoutMode != mode else { return }
+        NSLayoutConstraint.deactivate(hostConstraints)
+        layoutMode = mode
+
+        switch mode {
+        case .overlay:
+            hostConstraints = [
                 primaryHost.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
                 primaryHost.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
                 primaryHost.topAnchor.constraint(equalTo: safe.topAnchor),
@@ -182,9 +186,9 @@ public final class MPVPlayerDualPaneContainer: UIViewController {
                 secondaryHost.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
                 secondaryHost.bottomAnchor.constraint(equalTo: safe.bottomAnchor),
                 secondaryHost.heightAnchor.constraint(equalTo: safe.heightAnchor, multiplier: 0.35),
-            ])
-        } else if showSideBySide {
-            NSLayoutConstraint.activate([
+            ]
+        case .sideBySide:
+            hostConstraints = [
                 primaryHost.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
                 primaryHost.topAnchor.constraint(equalTo: safe.topAnchor),
                 primaryHost.bottomAnchor.constraint(equalTo: safe.bottomAnchor),
@@ -193,9 +197,9 @@ public final class MPVPlayerDualPaneContainer: UIViewController {
                 secondaryHost.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
                 secondaryHost.topAnchor.constraint(equalTo: safe.topAnchor),
                 secondaryHost.bottomAnchor.constraint(equalTo: safe.bottomAnchor),
-            ])
-        } else if showStacked {
-            NSLayoutConstraint.activate([
+            ]
+        case .stacked:
+            hostConstraints = [
                 primaryHost.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
                 primaryHost.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
                 primaryHost.topAnchor.constraint(equalTo: safe.topAnchor),
@@ -204,20 +208,18 @@ public final class MPVPlayerDualPaneContainer: UIViewController {
                 secondaryHost.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
                 secondaryHost.topAnchor.constraint(equalTo: primaryHost.bottomAnchor),
                 secondaryHost.bottomAnchor.constraint(equalTo: safe.bottomAnchor),
-            ])
-        } else {
+            ]
+        case .primaryOnly:
             // Compact or single-view: primary fills; secondary hidden but retained.
-            NSLayoutConstraint.activate([
+            hostConstraints = [
                 primaryHost.leadingAnchor.constraint(equalTo: safe.leadingAnchor),
                 primaryHost.trailingAnchor.constraint(equalTo: safe.trailingAnchor),
                 primaryHost.topAnchor.constraint(equalTo: safe.topAnchor),
                 primaryHost.bottomAnchor.constraint(equalTo: safe.bottomAnchor),
-            ])
-            secondaryHost.isHidden = true
-            return
+            ]
         }
-
-        secondaryHost.isHidden = false
+        NSLayoutConstraint.activate(hostConstraints)
+        secondaryHost.isHidden = mode == .primaryOnly
     }
 }
 

@@ -122,7 +122,10 @@ final class MPVQuickPlayerPictureSettingsView: MPVQuickPlayerSettingsPanelView {
                     background.cornerRadius = 7
                 }
                 updatedConfiguration?.background = background
-                button.configuration = updatedConfiguration
+                // 配置更新回调可能重复触发，等价样式不再次写入，避免产生额外更新。
+                if button.configuration != updatedConfiguration {
+                    button.configuration = updatedConfiguration
+                }
             }
             button.addTarget(self, action: #selector(displayModeButtonTapped(_:)), for: .touchUpInside)
             displayModeButtons.append(button)
