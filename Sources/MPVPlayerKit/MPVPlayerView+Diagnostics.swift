@@ -211,6 +211,18 @@ extension MPVPlayerView {
         mediaTracksCacheLock.lock()
         mediaTracksCache = tracks
         mediaTracksCacheLock.unlock()
+        mpvHandleLock.lock()
+        let usesReducedMaster = temporaryHLSMaster != nil
+        mpvHandleLock.unlock()
+        if usesReducedMaster {
+            // 只记录轨道数量，便于核对精简 master 是否保留音轨与字幕，不记录媒体内容。
+            let count: (String) -> String = { type in
+                String(tracks.filter { $0["mpvType"] as? String == type }.count)
+            }
+            recordDiagnosticEvent("HLS 轨道数量", fields: [
+                "视频": count("video"), "音频": count("audio"), "字幕": count("sub")
+            ])
+        }
         mpvDebugLog("refreshed media tracks cache count=\(tracks.count)")
     }
 

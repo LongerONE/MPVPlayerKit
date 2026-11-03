@@ -48,6 +48,8 @@ extension MPVPlayerView {
 #endif
         let wakeup = wakeupContextTransfer
         wakeupContextTransfer = nil
+        let temporaryMaster = temporaryHLSMaster
+        temporaryHLSMaster = nil
         mpvHandleLock.unlock()
         if let handle {
             mpv_set_wakeup_callback(handle, nil, nil)
@@ -62,6 +64,7 @@ extension MPVPlayerView {
                 timer?.setEventHandler {}
                 timer?.cancel()
                 teardown.terminate()
+                temporaryMaster?.stop()
             }
         } else {
 #if targetEnvironment(simulator)
@@ -69,6 +72,7 @@ extension MPVPlayerView {
 #endif
             timer?.setEventHandler {}
             timer?.cancel()
+            temporaryMaster?.stop()
         }
         return handle
     }
@@ -156,11 +160,14 @@ extension MPVPlayerView {
 #endif
             let pendingWakeup = wakeupContextTransfer
             wakeupContextTransfer = nil
+            let temporaryMaster = temporaryHLSMaster
+            temporaryHLSMaster = nil
             mpvHandleLock.unlock()
             guard let mpv = handleToDestroy else {
                 pendingWakeup?.release()
                 lastMPVTimeSnapshot = nil
                 markColorOutputRendererStopped()
+                temporaryMaster?.stop()
                 mpvDebugLog("destroyMPVHandle skipped reason=\(reason) handle=nil")
                 return
             }
@@ -175,6 +182,7 @@ extension MPVPlayerView {
             }
             mpvDebugLog("destroyMPVHandle stage=terminate-begin reason=\(reason)")
             mpv_terminate_destroy(mpv)
+            temporaryMaster?.stop()
             markColorOutputRendererStopped()
             mpvDebugLog("destroyMPVHandle stage=terminate-end reason=\(reason)")
             lastMPVTimeSnapshot = nil

@@ -292,11 +292,23 @@ extension MPVPlayerView {
         let originalURL = url.absoluteString
         let loadURL: String
         if MPVHLSMasterResolver.needsResolution(url) {
-            let resolved = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url, headers: headers, userAgent: userAgent) { [weak self] in
+            let resolved = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url, headers: headers, userAgent: userAgent, onReducedMaster: { [weak self] server in
+                guard let self else { server.stop(); return }
+                self.mpvHandleLock.lock()
+                self.temporaryHLSMaster = server
+                self.mpvHandleLock.unlock()
+            }) { [weak self] in
                 self?.isStopped() != false
                     || self?.currentBufferingSessionGeneration() != playbackUpdateSourceSession
             }
-            guard !isStopped(), currentBufferingSessionGeneration() == playbackUpdateSourceSession else { return false }
+            guard !isStopped(), currentBufferingSessionGeneration() == playbackUpdateSourceSession else {
+                mpvHandleLock.lock()
+                let server = temporaryHLSMaster
+                temporaryHLSMaster = nil
+                mpvHandleLock.unlock()
+                server?.stop()
+                return false
+            }
             loadURL = resolved.absoluteString
             if loadURL != originalURL {
                 mpvDebugLog("setupMPV HLS master resolved variant=\(redactedURLDescription(resolved))")
@@ -482,6 +494,23 @@ extension MPVPlayerView {
             mpvDebugLog("setupMPV loadfile failed profile=\(profile.name) status=\(loadStatus)")
             destroyMPVHandle(reason: "profile-\(profile.name)-loadfile-failed", sendStopCommand: false)
             return false
+        }
+        if isHLSStreamURL {
+            // 复杂或不可用的 master 可能持续探测而不返回错误，限制首帧等待时间。
+            queue.asyncAfter(deadline: .now() + 90) { [weak self] in
+                guard let self, !self.isStopped(), self.mpv != nil,
+                      self.currentBufferingSessionGeneration() == playbackUpdateSourceSession,
+                      !self.isPlaybackRestarted(), self.getFlag("pause") != true else { return }
+                self.recordDiagnosticEvent("HLS 首帧超时", fields: ["秒数": "90"])
+                self.setSetupFailed(true)
+                self.notifyOnMain {
+                    guard !self.isStopped(), self.currentBufferingSessionGeneration() == playbackUpdateSourceSession else { return }
+                    // 先向界面报告错误，避免 mpv 销毁等待网络时吞掉超时提示。
+                    self.notifyState(.error)
+                    self.pictureInPictureRendererRuntimeState.reset()
+                    self.destroyMPVHandle(reason: "setup-failed")
+                }
+            }
         }
         mpvDebugLog("setupMPV profile ready name=\(profile.name)")
         scheduleEarlyPlaybackProbes()

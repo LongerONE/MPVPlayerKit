@@ -3,6 +3,47 @@ import XCTest
 @testable import MPVPlayerKit
 
 final class MPVHLSMasterResolverTests: XCTestCase {
+    func testCookieResponseKeepsMasterForPlayerAuthentication() {
+        let session = makeSession()
+        defer { session.invalidateAndCancel() }
+        let master = URL(string: "https://example.com/cookies.m3u8")!
+        XCTAssertEqual(MPVHLSMasterResolver.resolveMediaPlaylistSync(from: master, session: session), master)
+    }
+
+    func testLocalMasterServesOnlyItsSessionPath() async throws {
+        let content = "#EXTM3U\n#EXT-X-VERSION:6\n"
+        let server = try XCTUnwrap(MPVHLSLocalMaster(playlist: content))
+        defer { server.stop() }
+        let (data, response) = try await URLSession.shared.data(from: server.url)
+        XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+        XCTAssertEqual(String(data: data, encoding: .utf8), content)
+        let other = server.url.deletingLastPathComponent().appendingPathComponent("other.m3u8")
+        let (_, missingResponse) = try await URLSession.shared.data(from: other)
+        XCTAssertEqual((missingResponse as? HTTPURLResponse)?.statusCode, 404)
+    }
+
+    func testReductionPreservesReferencedAudioAndSubtitleGroups() throws {
+        let master = URL(string: "https://example.com/hls/main.m3u8")!
+        var lines = ["#EXTM3U", "#EXT-X-VERSION:6",
+            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aac\",NAME=\"English\",DEFAULT=YES,URI=\"audio/en.m3u8\"",
+            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"aac\",NAME=\"中文\",DEFAULT=NO,URI=\"audio/zh.m3u8\"",
+            "#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID=\"ac3\",NAME=\"Surround\",DEFAULT=YES,URI=\"audio/surround.m3u8\"",
+            "#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID=\"subs\",NAME=\"English\",URI=\"subs/en.m3u8\""]
+        for i in 0..<13 {
+            let group = i.isMultiple(of: 2) ? "aac" : "ac3"
+            lines.append("#EXT-X-STREAM-INF:BANDWIDTH=\(1000000 + i),CODECS=\"avc1,mp4a.40.2\",RESOLUTION=1280x720,AUDIO=\"\(group)\",SUBTITLES=\"subs\"")
+            lines.append("video/\(i).m3u8")
+        }
+        let reduced = try XCTUnwrap(MPVHLSMasterReducer.reduce(lines.joined(separator: "\n"), baseURL: master))
+        XCTAssertEqual(reduced.components(separatedBy: "#EXT-X-STREAM-INF:").count - 1, 2)
+        XCTAssertTrue(reduced.contains("URI=\"https://example.com/hls/audio/en.m3u8\""))
+        XCTAssertTrue(reduced.contains("URI=\"https://example.com/hls/audio/zh.m3u8\""))
+        XCTAssertTrue(reduced.contains("URI=\"https://example.com/hls/audio/surround.m3u8\""))
+        XCTAssertTrue(reduced.contains("URI=\"https://example.com/hls/subs/en.m3u8\""))
+        XCTAssertTrue(reduced.contains("AUDIO=\"aac\",SUBTITLES=\"subs\""))
+        XCTAssertTrue(reduced.contains("AUDIO=\"ac3\",SUBTITLES=\"subs\""))
+        XCTAssertNil(MPVHLSMasterReducer.reduce(lines.joined(separator: "\n") + "\n#EXT-X-DEFINE:NAME=\"x\",VALUE=\"y\"", baseURL: master))
+    }
     func testSyncResolutionUsesHeadersUserAgentAndRedirectBase() {
         let session = makeSession()
         defer { session.invalidateAndCancel() }
@@ -42,9 +83,9 @@ final class MPVHLSMasterResolverTests: XCTestCase {
         defer { session.invalidateAndCancel() }
         let url = URL(string: "https://example.com/stalled.m3u8")!
         let started = Date.timeIntervalSinceReferenceDate
-        let result = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url, session: session) {
+        let result = MPVHLSMasterResolver.resolveMediaPlaylistSync(from: url, session: session, shouldCancel: {
             Date.timeIntervalSinceReferenceDate - started >= 0.2
-        }
+        })
         XCTAssertEqual(result, url)
         XCTAssertLessThan(Date.timeIntervalSinceReferenceDate - started, 2)
         XCTAssertEqual(ResolverURLProtocol.cancelled.wait(timeout: .now() + 2), .success)
@@ -125,6 +166,11 @@ private final class ResolverURLProtocol: URLProtocol, @unchecked Sendable {
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
     override func startLoading() {
         guard request.url?.lastPathComponent != "stalled.m3u8" else { return }
+        if request.url?.lastPathComponent == "cookies.m3u8" {
+            let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                           headerFields: ["Set-Cookie": "session=test; Path=/"])!
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        }
         if request.url?.lastPathComponent == "context.m3u8" {
             guard request.value(forHTTPHeaderField: "X-Emby-Token") == "test-token",
                   request.value(forHTTPHeaderField: "User-Agent") == "test-agent",

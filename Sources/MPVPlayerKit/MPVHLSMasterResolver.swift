@@ -27,19 +27,19 @@ enum MPVHLSMasterResolver: Sendable {
 
     private final class ResolutionResult: @unchecked Sendable {
         private let lock = NSLock()
-        private var url: URL?
+        private var playlist: (String, URL, Bool)?
         let semaphore = DispatchSemaphore(value: 0)
 
-        func store(_ url: URL) {
+        func store(_ text: String, baseURL: URL, canReduce: Bool) {
             lock.lock()
-            self.url = url
+            playlist = (text, baseURL, canReduce)
             lock.unlock()
         }
 
-        func value() -> URL? {
+        func value() -> (String, URL, Bool)? {
             lock.lock()
             defer { lock.unlock() }
-            return url
+            return playlist
         }
     }
 
@@ -49,6 +49,7 @@ enum MPVHLSMasterResolver: Sendable {
         session: URLSession = .shared,
         headers: [String: String] = [:],
         userAgent: String? = nil,
+        onReducedMaster: ((MPVHLSLocalMaster) -> Void)? = nil,
         shouldCancel: @Sendable () -> Bool = { false }
     ) -> URL {
         guard needsResolution(masterURL), !shouldCancel() else { return masterURL }
@@ -63,13 +64,28 @@ enum MPVHLSMasterResolver: Sendable {
                 return
             }
             let text = String(decoding: data, as: UTF8.self)
-            result.store(resolvedURL(in: text, baseURL: response?.url ?? masterURL, masterURL: masterURL))
+            let baseURL = response?.url ?? masterURL
+            let setsCookie = (response as? HTTPURLResponse)?.value(forHTTPHeaderField: "Set-Cookie") != nil
+            let cookieStorage = session.configuration.httpCookieStorage
+            let hasStoredCookies = [masterURL, baseURL].contains {
+                cookieStorage?.cookies(for: $0)?.isEmpty == false
+            }
+            // 原 master 可能通过 Set-Cookie 授权分片；本机 master 无法替代这一步。
+            result.store(text, baseURL: baseURL, canReduce: !setsCookie && !hasStoredCookies)
         }
         task.resume()
         let deadline = DispatchTime.now() + 15
         while !shouldCancel() {
             if result.semaphore.wait(timeout: min(deadline, .now() + .milliseconds(100))) == .success {
-                return shouldCancel() ? masterURL : result.value() ?? masterURL
+                guard !shouldCancel(), let (text, baseURL, canReduce) = result.value() else { return masterURL }
+                guard canReduce else { return masterURL }
+                let resolved = resolvedURL(in: text, baseURL: baseURL, masterURL: masterURL)
+                guard resolved == masterURL, let onReducedMaster,
+                      let reduced = MPVHLSMasterReducer.reduce(text, baseURL: baseURL) else { return resolved }
+                guard let server = MPVHLSLocalMaster(playlist: reduced) else { return masterURL }
+                guard !shouldCancel() else { server.stop(); return masterURL }
+                onReducedMaster(server)
+                return server.url
             }
             if DispatchTime.now() >= deadline { break }
         }
@@ -184,7 +200,7 @@ enum MPVHLSMasterResolver: Sendable {
         return variants
     }
 
-    private static func parseAttributes(from line: String) -> [String: String] {
+    static func parseAttributes(from line: String) -> [String: String] {
         guard let colon = line.firstIndex(of: ":") else { return [:] }
         let body = line[line.index(after: colon)...]
         var result: [String: String] = [:]

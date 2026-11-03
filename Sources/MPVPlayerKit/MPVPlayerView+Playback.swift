@@ -332,6 +332,8 @@ extension MPVPlayerView {
                 self.mpvDebugLog("selectTrack subtitle transaction success=\(success) visible=\(visible) trackID=\(trackID)")
             } else {
                 let status = self.command("set", args: [property, "\(trackID)"], checkForErrors: false)
+                // mpv 切轨后不会保证发送 track-list 变更，主动刷新缓存以同步选中状态。
+                if status >= 0 { self.refreshMediaTracksCache() }
                 self.mpvDebugLog("selectTrack mediaType=\(mediaType) property=\(property) trackID=\(trackID) status=\(status)")
             }
         }

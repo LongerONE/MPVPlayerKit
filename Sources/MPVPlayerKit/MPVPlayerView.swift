@@ -293,6 +293,8 @@ public final class MPVPlayerView: UIView {
     let secondarySubtitleRenderer = MPVDefaultSubtitleRenderer()
     var subtitleLayoutModeValue = MPVSubtitleLayoutMode.independent
     nonisolated(unsafe) var mpv: OpaquePointer?
+    // 临时 master 服务必须活到对应 mpv 句柄销毁，避免异步打开时资源失效。
+    nonisolated(unsafe) var temporaryHLSMaster: MPVHLSLocalMaster?
     // mpv 句柄与 wakeup 上下文的取出/置空需互斥，避免 stop 与 deinit 并发销毁。
     let mpvHandleLock = NSLock()
     // Bound to the MPV handle on `queue`. Playback snapshots carry this value
